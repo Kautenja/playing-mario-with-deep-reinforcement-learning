@@ -1,0 +1,11 @@
+sudo: required
+language: python
+python:
+- 3.6
+notifications:
+  email: false
+before_install:
+- make install_paper
+script:
+- make paper
+- make count_words
