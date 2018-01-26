@@ -15,7 +15,11 @@ Propose your project topic
 
 ## Outline
 
--   title: TODO
+-   title:
+	- modest titles:
+		- _Neuroevolution of Deep Reinforcement Models_
+	- clickbait titles:
+		- _Mario Speedrun: Neuroevolution of Deep Reinforcement Agents_
 -   _What is the problem you will be investigating?_
 	-   optimization of deep CNN **weights**, **hyperparameters** and
 		**architectures**.
