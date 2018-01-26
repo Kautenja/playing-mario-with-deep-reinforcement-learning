@@ -8,9 +8,9 @@ outlines the structure.
 
 ## Literature Review
 
-PDFs of reviewed papers as well as a `.bib` file for their reference are
-in [literature-review](literature-review). Each directory is named after
-the paper it houses and contains the paper itself as `paper.pdf` and the citation for the paper as `reference.bib`.
+Papers reviewed by this work (and their citations) are in
+[literature-review](literature-review). The corresponding
+[README](literature-review/README.md) describes he structure.
 
 ## Paper
 
@@ -20,14 +20,5 @@ outlines the structure.
 
 ## Source Code
 
-Source code for the project lives in [src](src).
-
-### Usage
-
-#### Installation
-
-To install dependent Python modules for the project:
-
-```shell
-python -m pip install -r requirements.txt
-```
+Source code for the project lives in [src](src). The corresponding
+[README](src/README) contains installation and execution instructions.
