@@ -1,0 +1,33 @@
+%% define the main template style for the document
+\documentclass{article}
+
+%\usepackage{nips_2017}
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{nips_2017}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage[pagebackref=true]{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+
+%% Import general packages
+\usepackage{
+  amsmath, amssymb, amsfonts,
+  algorithmic, textcomp, listings,
+  graphicx, subfig,
+  booktabs, longtable
+}
+
+% override tightlist. error with pandoc?
+\def\tightlist{}
+
+%% start the document, the Markdown parser takes over from this point
+\begin{document}
+$body$
+{\small
+	\bibliographystyle{my-unsrtnat}
+	\bibliography{references}
+}
+\end{document}
