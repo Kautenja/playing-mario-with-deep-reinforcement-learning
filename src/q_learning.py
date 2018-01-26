@@ -15,7 +15,8 @@ _REPR = """
     discount_factor={},
     exploration_rate={},
     exploration_decay={},
-    episodes={}
+    episodes={},
+    backup_file={}
 )
 """.lstrip()
 
@@ -44,7 +45,8 @@ class DeepQAgent(object):
                  discount_factor: float,
                  exploration_rate: float,
                  exploration_decay: float,
-                 episodes: int) -> None:
+                 episodes: int,
+                 backup_file: str=None) -> None:
         """
         Initialize a new Deep Q Agent.
 
@@ -62,6 +64,7 @@ class DeepQAgent(object):
         self.exploration_rate = exploration_rate
         self.exploration_decay = exploration_decay
         self.episodes = episodes
+        self.backup_file = backup_file
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
@@ -72,7 +75,23 @@ class DeepQAgent(object):
             self.exploration_rate,
             self.exploration_decay,
             self.episodes
+            self.backup_file
         ])
+
+    def load_model(self) -> None:
+        """Load the model of the Q algorithm into memory."""
+        raise NotImplementedError('TODO:')
+
+    def save_model(self) -> None:
+        """Backup the model of this agent to disk."""
+        # if there is no file specified, use the class name
+        if self.backup_file is None:
+            backup_file = self.__class__.__name__
+        # otherwise use the name stored in this object
+        else:
+            backup_file = self.backup_file
+        # save the model of this Q algorithm to disk
+        self.model.save(f'backup_file'.h5)
 
 
 __all__ = ['DeepQAgent']
