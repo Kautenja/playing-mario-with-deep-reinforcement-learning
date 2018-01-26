@@ -5,7 +5,7 @@ from distutils.dir_util import copy_tree
 from concatenate import concatenate_files
 
 # source directories in the parent with the paper materials
-SOURCE_DIRECTORIES = ['bib', 'sty', 'tex']
+SOURCE_DIRECTORIES = ['bib', 'sty', 'tex', 'bst']
 # the default build directory
 BUILD = './build'
 # the directory this file is in
