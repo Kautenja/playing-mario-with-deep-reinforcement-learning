@@ -1,0 +1,23 @@
+%% define the main template style for the document
+\documentclass{article}
+
+%% redefine the page geometry to something more standard
+\usepackage[a4paper, portrait, margin=1in]{geometry}
+
+%% Import general packages
+\usepackage{
+  hyperref,
+  amsmath, amssymb, amsfonts,
+  algorithmic, textcomp, listings,
+  graphicx, subfig,
+  booktabs, longtable,
+  balance
+}
+
+% override tightlist. error with pandoc?
+\def\tightlist{}
+
+%% start the document, the Markdown parser takes over from this point
+\begin{document}
+$body$
+\end{document}

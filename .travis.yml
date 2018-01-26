@@ -5,7 +5,6 @@ python:
 notifications:
   email: false
 before_install:
-- make install_paper
+- make install
 script:
 - make paper
-- make count_words
