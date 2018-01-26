@@ -17,24 +17,30 @@ Propose your project topic
 
 -   title: TODO
 -   _What is the problem you will be investigating?_
-	-   optimization of deep CNN **weights**, **hyperparameters**, and
+	-   optimization of deep CNN **weights**, **hyperparameters** and
 		**architectures**.
 	-   _why is it interesting?_
-		-   Integrating other biologically inspired technology like evolutionary
-			computation to evolve the predictive "brain" of a reinforcement
-			learning agent allows the model to grow and shrink dynamically.
-			In a technological sense, this is interesting because can apply this
-			technology to find _optimal models_, an otherwise manual task for a
-			data-scientist.
+		-   This problem is interesting because it fuses two different
+			biologically inspired processes to define a general model of
+			intelligence
+		-   In a technological sense, this work is interesting because
+			it can potentially find _optimal models_, an otherwise manual  and
+			laborious task for a data-scientist.
+		-   In a mathematical sense, this work can help define future research
+			directions for non-gradient based optimization techniques
 -   _What method or algorithm are you proposing / modifying from?_
-	-   optimization and search algorithms for optimal models for value
-		function prediction in reinforcement learning.
+	-   We are modifying the Deep Q network with evolutionary computation with
+		evolutionary optimization:
+		-	model weights (back-propagation via stochastic hill climbing)
+		-	model architectures (evolution of the hypercube)
+		-	hyper-parameters (automatic tuning of the models)
 -   _What reading will you examine to provide context and background?_
-	-   TODO: citations
+	-   TODO: Find papers, place in lit review with .bib, cite here
 -   _How will you evaluate your results?_
 	-   we will benchmark our optimization technique against existing state
 		of the art standards on a set of games provided through Open.ai gym.
-		-   Deep Q Network
+		The metrics will include raw performance on task (scores/rewards) and
+		computational complexity measured in terms of physical runtime.
 
 
 ## Getting Started
