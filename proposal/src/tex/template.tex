@@ -5,19 +5,17 @@
 % to compile a camera-ready version, add the [final] option, e.g.:
 \usepackage[final]{nips_2017}
 
-\usepackage[utf8]{inputenc} % allow utf-8 input
-\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
-\usepackage[pagebackref=true]{hyperref}       % hyperlinks
-\usepackage{url}            % simple URL typesetting
-\usepackage{nicefrac}       % compact symbols for 1/2, etc.
-\usepackage{microtype}      % microtypography
-
+%% Import packages with parameters
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[pagebackref=true]{hyperref}
 %% Import general packages
 \usepackage{
   amsmath, amssymb, amsfonts,
   algorithmic, textcomp, listings,
   graphicx, subfig,
-  booktabs, longtable
+  booktabs, longtable,
+  url, nicefrac, microtype
 }
 
 % override tightlist. error with pandoc?
@@ -25,7 +23,12 @@
 
 %% start the document, the Markdown parser takes over from this point
 \begin{document}
+% pandoc will inject the parsed Markdown right here
 $body$
+% output everything in the reference file, even if it wasn't referenced in the
+% paper. This is a proposal and should enumerate our potential sources.
+\nocite{*}
+% genererate the references
 {\small
 	\bibliographystyle{my-unsrtnat}
 	\bibliography{references}
