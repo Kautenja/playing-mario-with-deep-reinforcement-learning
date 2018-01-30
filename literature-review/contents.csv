@@ -9,3 +9,4 @@ Reinforcement Learning with Unsupervised Auxilary Tasks,They introduce an agent 
 Deep Reinforcement Learning with Double Q-Learning,They introduce the Double DQN that helps prevent overestimation on the Atari domain to achieve new state-of-the-art performance,Atari
 An Actor-Critic Algorithm for Sequence Prediction,They use the actor-critic method from RL to define a novel training method for RNN on machine translation tasks,German-English Translation
 Actor-Critic-Based Optimal Tracking for Partially Unkown Nonlinear Discrete-Time Systems,?,?
+Large-Scale Evolution of Image Classifiers,They use an evolutionary algorithm for architecture search on CIFAR image recognition datasets,"CIFAR-10, CIFAR-100"
