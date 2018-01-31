@@ -8,7 +8,7 @@ outlines the structure.
 
 ### Usage
 
-To compile the proposal:
+To compile the proposal into the [build](build) directory.
 
 ```shell
 make proposal
@@ -40,7 +40,7 @@ outlines the structure.
 
 ### Usage
 
-To compile the paper:
+To compile the paper into the [build](build) directory.
 
 ```shell
 make paper
