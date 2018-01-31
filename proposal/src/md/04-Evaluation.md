@@ -1,12 +1,7 @@
 # Evaluation
 
-<!--
-\cite{open-ai-gym} provide an open source Python interface to popular RL
-benchmarks including the suite of Atari games.
--->
-
 We will benchmark our algorithm across a the full series of Atari 2600
-game matching the work of
+games matching the work of
 \cite{deep-neuroevolution-genetic-algorithms-are-a-competitive-alternative,
 human-level-control-through-deep-rl}. The cumulative reward - final score of
 the game - after $n$ training episodes provides an objective measure of the

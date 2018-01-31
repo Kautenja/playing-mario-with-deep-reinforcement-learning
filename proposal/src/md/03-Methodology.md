@@ -10,5 +10,5 @@ not only a weight-set $\theta$, but also the network _topology_, _components_,
 and _hyperparameters_. This idea derives from the work of
 \cite{evolving-deep-neural-networks}, who show that such algorithms produce
 models that compete with the best man-made models. Ultimately, we aim to
-aggregate these methods to produce a simple genetic algorithm that optimizes
-the architecture and $\theta$ of a reinforcement agent's value predicting DNN.
+aggregate these methods to produce an SGA that optimizes the architecture and
+$\theta$ of a reinforcement agent's value predicting DNN.
