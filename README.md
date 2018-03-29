@@ -1,4 +1,10 @@
-# Deep Learning Project
+# Evolution of Deep Reinforcement Agents
+
+<!-- Project Badges -->
+[![build-status][]][build-server]
+
+[build-status]: https://travis-ci.com/Kautenja/deep-learning-project.svg?token=FCkX2qMNHzx2qWEzZZMP&branch=master
+[build-server]: https://travis-ci.com/Kautenja/deep-learning-project
 
 ## Project Proposal
 
