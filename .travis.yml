@@ -1,10 +1,13 @@
 sudo: required
 language: python
 python:
+- 3.5.2
 - 3.6
 notifications:
   email: false
 before_install:
 - make install
 script:
+- make proposal
 - make paper
+- make test

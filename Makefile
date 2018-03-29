@@ -41,3 +41,11 @@ proposal: build_folder
 # make the paper
 paper: build_folder
 	$(call make_pdf,paper)
+
+#
+# MARK: Python code
+#
+
+# run the unittests
+test:
+	python3 -m unittest discover src
