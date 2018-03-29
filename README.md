@@ -65,8 +65,7 @@ make paper
 
 ## Source Code
 
-Source code for the project lives in [src](src). The corresponding
-[README](src/README) contains installation and execution instructions.
+Source code for the project lives in [src](src).
 
 ### Usage
 
