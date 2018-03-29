@@ -77,15 +77,24 @@ tex: markdown
 # MARK: PDF Compilation
 #
 
+# a command for making a build directory
+build:
+	mkdir -p ${BUILD}
+
+# delete all the stupid garbage that LaTeX generates. Run this before and
+# after to ensure that each build is completely fresh.
+delete_tex_garbage: build
+	cd ${BUILD} && rm -f *.aux *.nav *.log *.out *.snm *.toc *.bbl *.blg *.brf *.swp *.nlo
+
 # generate a pdf document using pdflatex and bibtex on the LaTeX build artifact
 # This block looks redundant and dumb, but is the official recipe for compiling
 # with Bibtex...
-pdf: tex
-	cd ${BUILD}; \
-	${PDFLATEX} ${BUILD}; \
-	${BIBTEX} ${BUILD}; \
-	${PDFLATEX} ${BUILD}; \
-	${PDFLATEX} ${BUILD}
+pdf: delete_tex_garbage tex
+	cd ${BUILD} && ${PDFLATEX} -halt-on-error ${BUILD} | grep -a3 "^!" || true
+	cd ${BUILD} && ${BIBTEX} ${BUILD}
+	cd ${BUILD} && ${PDFLATEX} -halt-on-error ${BUILD} | grep -a3 "^!" || true
+	cd ${BUILD} && ${PDFLATEX} -halt-on-error ${BUILD} | grep -a3 "^!" || true
+	@make delete_tex_garbage
 
 #
 # MARK: Word Counts

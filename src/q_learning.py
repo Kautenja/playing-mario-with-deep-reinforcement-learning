@@ -2,14 +2,8 @@
 import numpy as np
 
 
-# take a step and observe the environment variables
-next_state, reward, done, info = env.step(action)
-# calculate the target: r + γ max_a'(Q[s', a'])
-target = reward + gamma * np.argmax(model.predict(next_state))
-
-
 # the format string for this objects representation
-_REPR = """
+_REPR_TEMPLATE = """
 {}(
     learning_rate={},
     discount_factor={},
@@ -68,7 +62,7 @@ class DeepQAgent(object):
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
-        return _REPR.format(*[
+        return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.learning_rate,
             self.discount_factor,
@@ -76,7 +70,7 @@ class DeepQAgent(object):
             self.exploration_decay,
             self.episodes
             self.backup_file
-        ])
+        )
 
     def load_model(self) -> None:
         """Load the model of the Q algorithm into memory."""
@@ -93,5 +87,19 @@ class DeepQAgent(object):
         # save the model of this Q algorithm to disk
         self.model.save(f'backup_file'.h5)
 
+    def step(self):
+        """
+        TODO: description
+        TODO: args and types
+        TODO: return type
+        TODO: implementation
+        """
+        # TODO: this is just example code
+        # take a step and observe the environment variables
+        next_state, reward, done, info = env.step(action)
+        # calculate the target: r + γ max_a'(Q[s', a'])
+        target = reward + gamma * np.argmax(model.predict(next_state))
 
+
+# explicitly export the public API of this module
 __all__ = ['DeepQAgent']
