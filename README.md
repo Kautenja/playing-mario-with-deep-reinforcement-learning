@@ -56,3 +56,19 @@ make paper
 
 Source code for the project lives in [src](src). The corresponding
 [README](src/README) contains installation and execution instructions.
+
+### Usage
+
+#### Test Cases
+
+To execute the unittest suite for the project run:
+
+```shell
+make test
+```
+
+This will recursively find test cases in [src](src) and run them.
+
+#### Notebooks
+
+Jupyter notebooks can be found in the [ipynb](ipynb) directory.
