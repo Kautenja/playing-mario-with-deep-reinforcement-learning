@@ -19,5 +19,5 @@ on how to deploy the project on a live system.
 To install dependent modules:
 
 ```shell
-python -m pip install -r requirements.txt
+python -m pip install -r ../requirements.txt
 ```
