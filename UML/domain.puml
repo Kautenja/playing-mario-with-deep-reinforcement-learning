@@ -1,0 +1,27 @@
+@startuml
+
+class DeepAgent {
+
+}
+
+class DeepQAgent {
+
+}
+DeepQAgent --|> DeepAgent
+
+class DoubleDeepQAgent {
+
+}
+DoubleDeepQAgent --|> DeepAgent
+
+class A3CAgent {
+
+}
+A3CAgent --|> DeepAgent
+
+class RandomAgent {
+
+}
+RandomAgent --|> DeepAgent
+
+@enduml
