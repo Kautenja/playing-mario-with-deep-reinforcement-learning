@@ -1,4 +1,4 @@
-# Evolution of Deep Reinforcement Agents
+# Evolutionary Search for Reinforcement Agents
 
 <!-- Project Badges -->
 [![build-status][]][build-server]
