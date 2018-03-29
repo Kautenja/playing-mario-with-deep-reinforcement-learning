@@ -1,9 +1,23 @@
 # the build directory
 BUILD=build
 
+#
+# MARK: build artifacts
+#
+
 # make the build folder
 build_folder:
 	mkdir -p ${BUILD}
+
+#
+# MARK: installation
+#
+
+# install dependencies for the project
+install:
+	cd proposal && make install
+	cd paper && make install
+	python3 -m pip install -r requirements.txt
 
 #
 # MARK: references
