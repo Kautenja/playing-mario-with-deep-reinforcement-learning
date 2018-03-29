@@ -1,2 +1,9 @@
 gym
 gym_pull
+tensorflow
+keras
+sklearn
+numpy
+pandas
+tqdm
+tabulate
