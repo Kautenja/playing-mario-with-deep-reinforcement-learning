@@ -6,19 +6,7 @@
 [build-status]: https://travis-ci.com/Kautenja/deep-learning-project.svg?token=FCkX2qMNHzx2qWEzZZMP&branch=master
 [build-server]: https://travis-ci.com/Kautenja/deep-learning-project
 
-## Project Proposal
 
-The Markdown / LaTeX files comprising the proposal are in
-[proposal](proposal). The corresponding [README](proposal/README.md)
-outlines the structure.
-
-### Usage
-
-To compile the proposal into the [build](build) directory.
-
-```shell
-make proposal
-```
 
 ## Literature Review
 
@@ -38,6 +26,26 @@ make update_proposal_references
 make update_paper_references
 ```
 
+
+
+
+## Project Proposal
+
+The Markdown / LaTeX files comprising the proposal are in
+[proposal](proposal). The corresponding [README](proposal/README.md)
+outlines the structure.
+
+### Usage
+
+To compile the proposal into the [build](build) directory.
+
+```shell
+make proposal
+```
+
+
+
+
 ## Paper
 
 The Markdown / LaTeX files comprising the paper are in
@@ -51,6 +59,9 @@ To compile the paper into the [build](build) directory.
 ```shell
 make paper
 ```
+
+
+
 
 ## Source Code
 
