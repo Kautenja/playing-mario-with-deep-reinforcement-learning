@@ -6,8 +6,9 @@ python:
 notifications:
   email: false
 before_install:
-- make install
+# - make install
+- python3 -m pip install -r requirements.txt
 script:
-- make proposal
-- make paper
+# - make proposal
+# - make paper
 - make test
