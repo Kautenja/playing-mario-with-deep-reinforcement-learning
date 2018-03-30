@@ -10,7 +10,14 @@ class DeepAgent {
 DeepAgent "1" *-- "1" Model: estimator >
 
 class DeepQAgent {
-
+    ' also known as alpha
+    learning_rate: Float
+    ' also known as gamma
+    discount_factor: Float
+    ' also known as epsilon
+    exploration_rate: Float
+    exploration_decay: Float
+    episodes: Integer
 }
 DeepQAgent --|> DeepAgent
 
