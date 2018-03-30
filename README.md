@@ -16,7 +16,7 @@ Papers reviewed by this work (and their citations) are in
 
 ### Usage
 
-To update the `references.bib` for either to proposal or the paper:
+To update the `references.bib` for either the proposal or the paper:
 
 ```shell
 make update_proposal_references
@@ -69,6 +69,26 @@ Source code for the project lives in [src](src). The corresponding
 [README](src/README.md) outlines the structure.
 
 ### Usage
+
+#### `virtualenv`
+
+Use `virtualenv` to contain the environment to a single
+local installation of python3:
+
+##### Setup
+
+To setup the virtual environment:
+
+```shell
+virtualenv -p python3 .env
+source .env/bin/activate
+```
+
+When you've concluded the session:
+
+```shell
+deactivate
+```
 
 #### Test Cases
 
