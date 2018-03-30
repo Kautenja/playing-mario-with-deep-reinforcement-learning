@@ -5,6 +5,6 @@ from sys import path
 # the parent directory where `src` is)
 module_path = abspath(join('..'))
 # check if the path already exists
-if module_path not in PATH:
+if module_path not in path:
     # add the new path to the python path
     path.append(module_path)
