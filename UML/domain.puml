@@ -1,8 +1,13 @@
 @startuml
 
+class Model {
+
+}
+
 class DeepAgent {
 
 }
+DeepAgent "1" *-- "1" Model: estimator >
 
 class DeepQAgent {
 
