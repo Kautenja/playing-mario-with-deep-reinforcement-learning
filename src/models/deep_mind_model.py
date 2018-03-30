@@ -3,6 +3,7 @@ from keras.models import Model
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Flatten
+from keras.layers import Activation
 from keras.layers.convolutional import Conv2D
 from keras.optimizers import Adam
 
@@ -33,14 +34,20 @@ def build_deep_mind_model(
     """
     # build the model for image classification fitting the given parameters
     model = Sequential([
-        Conv2D(32, (8, 8), strides=(4,4), padding='same', activation='relu',
+        Conv2D(32, (8, 8), strides=(4,4), padding='same',
             input_shape=(*image_size, num_frames)
         ),
-        Conv2D(64, (4, 4), strides=(2,2), padding='same', activation='relu'),
-        Conv2D(64, (3, 3), strides=(1,1), padding='same', activation='relu'),
+        Activation('relu'),
+        Conv2D(64, (4, 4), strides=(2,2), padding='same'),
+        Activation('relu'),
+        Conv2D(64, (3, 3), strides=(1,1), padding='same'),
+        Activation('relu'),
         Flatten(),
-        Dense(512, activation='relu'),
-        Dense(num_actions, activation='softmax')
+        Dense(512),
+        Activation('relu'),
+        Dense(num_actions),
+        # TODO: is softmax necessary?
+        Activation('softmax'),
     ])
     # compile the model with the default loss and optimization technique
     model.compile(loss='mse', optimizer=Adam(lr=1e-6))
@@ -49,4 +56,4 @@ def build_deep_mind_model(
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['build_model']
+__all__ = ['build_deep_mind_model']
