@@ -46,8 +46,6 @@ def build_deep_mind_model(
         Dense(512),
         Activation('relu'),
         Dense(num_actions),
-        # TODO: is softmax necessary?
-        Activation('softmax'),
     ])
     # compile the model with the default loss and optimization technique
     model.compile(loss='mse', optimizer=Adam(lr=1e-6))
