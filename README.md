@@ -90,6 +90,17 @@ When you've concluded the session:
 deactivate
 ```
 
+#### Dependencies
+
+[requirements.txt](requirements.txt) lists the Python dependencies for the project with frozen versions. To install
+dependencies:
+
+```shell
+python -m pip install -r requirements.txt
+```
+
+**NOTE** if you're NOT using `virtualenv`, ensure that `python` aliases python3; python2 is not supported.
+
 #### Test Cases
 
 To execute the unittest suite for the project run:
