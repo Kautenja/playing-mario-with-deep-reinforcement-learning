@@ -5,3 +5,5 @@ numpy==1.14.2
 pandas==0.22.0
 tqdm==4.19.5
 tabulate==0.8.2
+jupyter==1.0.0
+atari_py==0.1.1
