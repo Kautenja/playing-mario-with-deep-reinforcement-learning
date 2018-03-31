@@ -283,7 +283,7 @@ class DeepQAgent(Agent):
             # store the state and reward from this frame after down-sampling
             next_state[:, :, frame] = self.downsample(state)
             # TODO: is this necessary?
-            # reward = reward if not done else -10
+            reward = reward if not done else -1
             # add the current reward to the total reward
             total_reward += reward
 
