@@ -1,7 +1,7 @@
 """An implementation of Deep Q-Learning."""
 import numpy as np
 import cv2
-from keras.models import Model
+from src.models import build_deep_mind_model
 from .agent import Agent
 from .replay_queue import ReplayQueue
 
@@ -9,13 +9,15 @@ from .replay_queue import ReplayQueue
 # the format string for this objects representation
 _REPR_TEMPLATE = """
 {}(
-    model={},
     env={},
     learning_rate={},
     discount_factor={},
     exploration_rate={},
     exploration_decay={},
-    episodes={}
+    exploration_min={},
+    image_size={},
+    frames_per_action={},
+    replay_size={}
 )
 """.lstrip()
 
@@ -43,29 +45,31 @@ class DeepQAgent(Agent):
     """
 
     def __init__(self,
-                 model: Model,
                  env,
                  learning_rate: float=0.001,
                  discount_factor: float=0.99,
                  exploration_rate: float=1.0,
                  exploration_decay: float=0.9998,
-                 episodes: int=1000) -> None:
+                 exploration_min: float=0.1,
+                 image_size: tuple=(84, 84),
+                 frames_per_action: int=4,
+                 replay_size: int=20000
+        ) -> None:
         """
         Initialize a new Deep Q Agent.
 
         Args:
+            env: the environment to run on
             learning_rate: the learning rate, α
             discount_factor: the discount factor, γ
             exploration_rate: the exploration rate, ε
             exploration_decay: the decay factor for exploration rate
-            episodes: the number of episodes for the agent to experience
+            exploration_min: the minimum value for the exploration rate
+            frames_per_action: the number of frames to hold an action
+            replay_size: the
 
         Returns: None
         """
-        # verify model
-        if not isinstance(model, Model):
-            raise TypeError('model must be of type: keras.models.Model')
-
         # TODO: validate env type
 
         # verify learning_rate
@@ -88,34 +92,52 @@ class DeepQAgent(Agent):
             raise TypeError('exploration_decay must be of type float')
         if exploration_decay < 0:
             raise ValueError('exploration_decay must be positive')
-        # verify episodes
-        if not isinstance(episodes, int):
-            raise TypeError('episodes must be of type int')
-        if episodes < 0:
-            raise ValueError('episodes must be positive')
-        # assign args to self
-        self.model = model
+        # verify exploration_min
+        if not isinstance(exploration_min, float):
+            raise TypeError('exploration_min must be of type float')
+        if exploration_min < 0:
+            raise ValueError('exploration_min must be positive')
+        # verify image_size
+        if not isinstance(image_size, tuple):
+            raise TypeError('image_size must be of type tuple')
+        if len(image_size) != 2:
+            raise ValueError('image_size must be a tuple of two integers')
+        # verify frames_per_action
+        if not isinstance(frames_per_action, int):
+            raise TypeError('frames_per_action must be of type int')
+        if frames_per_action < 1:
+            raise ValueError('frames_per_action must be >= 1')
+        # assign arguments to self
         self.env = env
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
         self.exploration_decay = exploration_decay
-        self.episodes = episodes
+        self.exploration_min = exploration_min
+        self.image_size = image_size
+        self.frames_per_action = frames_per_action
         # setup other instance members
-        # TODO: parameterize the replay queue size (defaults to 20000)
-        self.queue = ReplayQueue()
+        self.model = build_deep_mind_model(
+            image_size=image_size,
+            num_frames=frames_per_action,
+            num_actions=env.action_space.n,
+            learning_rate=learning_rate
+        )
+        self.queue = ReplayQueue(replay_size)
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
-            self.model,
             self.env,
             self.learning_rate,
             self.discount_factor,
             self.exploration_rate,
             self.exploration_decay,
-            self.episodes,
+            self.exploration_min,
+            self.image_size,
+            self.frames_per_action,
+            self.queue.size
         )
 
     @property
@@ -128,7 +150,7 @@ class DeepQAgent(Agent):
         """Return the number of actions for this agent."""
         return self.model.output_shape[1]
 
-    def downsample(self, frame: np.ndarray) -> np.ndarray:
+    def _downsample(self, frame: np.ndarray) -> np.ndarray:
         """
         Down-sample the given frame from RGB to B&W with a reduced size.
 
@@ -139,7 +161,7 @@ class DeepQAgent(Agent):
             a down-sample B&W frame
 
         """
-        return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), (84, 84))
+        return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), self.image_size)
 
     def predict_action(self, frames: np.ndarray) -> tuple:
         """
@@ -173,7 +195,7 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def train(self,
+    def _train(self,
         s: np.ndarray,
         a: np.ndarray,
         r: np.ndarray,
@@ -184,7 +206,7 @@ class DeepQAgent(Agent):
         Train the network on a mini-batch of replay data.
 
         Notes:
-            all args are arrays that should be of the same size
+            all arguments are arrays that should be of the same size
 
         Args:
             s: an array of current states
@@ -221,15 +243,16 @@ class DeepQAgent(Agent):
 
         return self.model.train_on_batch(s, y)
 
-    def initial_state(self) -> np.ndarray:
+    def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
-        # reset the environment
-        state = [self.env.reset()] * 4
-        # convert the initial frame to 4 down-sampled frames
-        state = np.array([self.downsample(frame) for frame in state]).T
-        return state
+        # reset the environment, duplicate the initial state based on the
+        # number of frames per action
+        return np.stack(
+            [self._downsample(self.env.reset())] * self.frames_per_action,
+            axis=2
+        )
 
-    def next_state(self, action: int) -> tuple:
+    def _next_state(self, action: int) -> tuple:
         """
         Return the next state based on the given action.
 
@@ -247,30 +270,39 @@ class DeepQAgent(Agent):
         next_state = []
         reward = 0
         # iterate over the number of buffered frames
-        for _ in range(4):
+        for _ in range(self.frames_per_action):
             # render the frame
             self.env.render()
             # make the step and observe the state, reward, done
             _next_state, _reward, done, _ = self.env.step(action=action)
             # store the state and reward from this frame
-            next_state.append(self.downsample(_next_state))
+            next_state.append(self._downsample(_next_state))
             # TODO: is this necessary?
-            # _reward = _reward if not done else -10
+            _reward = _reward if not done else -10
             # add the current reward to the total reward
             reward += _reward
 
         # convert the state to an ndarray with the expected size
-        next_state = np.array(next_state).T
+        next_state = np.stack(next_state, axis=2)
 
         # return the next state, the average reward and the done flag
         return next_state, reward, done
 
-    def run(self):
+    def train(self, episodes: int=1000, batch_size: int=32) -> None:
         """
+        Train the network for a number of episodes (games).
+
+        Args:
+            episodes: the number of episodes (games) to play
+            batch_size: the size of the replay history batches
+
+        Returns:
+            None
+
         """
-        for episode in range(self.episodes):
+        for episode in range(episodes):
             # reset the game and get the initial state
-            state = self.initial_state()
+            state = self._initial_state()
             # the done flag indicating that an episode has ended
             done = False
             score = 0
@@ -280,18 +312,52 @@ class DeepQAgent(Agent):
                 # predict the best action based on the current state
                 action, Q = self.predict_action(state)
                 # hold the action for the number of frames
-                next_state, reward, done = self.next_state(action)
+                next_state, reward, done = self._next_state(action)
                 score += reward
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # TODO: parameterize the batch_size
-                loss += self.train(*self.queue.sample(size=32))
+                # train the network on replay memory
+                loss += self._train(*self.queue.sample(size=batch_size))
                 # decay the exploration rate
                 self.exploration_rate = self.exploration_rate * self.exploration_decay
 
             print(score, loss)
+
+    def run(self, games: int=30) -> np.ndarray:
+        """
+        Run the agent without training for a number of games.
+
+        Args:
+            games: the number of games to play
+
+        Returns:
+            an array of scores
+
+        """
+        # a list to keep track of the scores
+        scores = np.zeros(games)
+        # iterate over the number of games
+        for game in range(games):
+            # reset the game and get the initial state
+            state = self._initial_state()
+            # the done flag indicating that a game has ended
+            done = False
+            score = 0
+            # loop until done
+            while not done:
+                # predict the best action based on the current state
+                action, Q = self.predict_action(state)
+                # hold the action for the number of frames
+                next_state, reward, done = self._next_state(action)
+                score += reward
+                # set the state to the new state
+                state = next_state
+            # push the score onto the history
+            scores[game] = score
+
+        return scores
 
 
 # explicitly define the outward facing API of this module

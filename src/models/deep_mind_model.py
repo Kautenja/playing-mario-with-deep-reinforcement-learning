@@ -5,13 +5,14 @@ from keras.layers import Dense
 from keras.layers import Flatten
 from keras.layers import Activation
 from keras.layers.convolutional import Conv2D
-from keras.optimizers import Adam
+from keras.optimizers import Nadam
 
 
 def build_deep_mind_model(
     image_size: tuple=(84, 84),
     num_frames: int=4,
-    num_actions: int=6
+    num_actions: int=6,
+    learning_rate: float=1e-5
 ) -> Model:
     """
     Build and return the Deep Mind model for the given domain parameters.
@@ -27,6 +28,8 @@ def build_deep_mind_model(
                     DeepMind uses 4 frames in their original implementation
         num_actions: the output shape for the model, this represents the
                      number of discrete actions available to a game
+        learning_rate: the learning rate for the optimization method for the
+                       network
 
     Returns:
         a blank DeepMind CNN for image classification in a reinforcement agent
@@ -48,7 +51,7 @@ def build_deep_mind_model(
         Dense(num_actions),
     ])
     # compile the model with the default loss and optimization technique
-    model.compile(loss='mse', optimizer=Adam(lr=1e-5))
+    model.compile(loss='mse', optimizer=Nadam(lr=learning_rate))
 
     return model
 

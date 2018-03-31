@@ -34,6 +34,11 @@ class ReplayQueue(object):
         """Return the number of items in the queue."""
         return len(self.queue)
 
+    @property
+    def size(self) -> int:
+        """Return the size of the queue."""
+        return self.queue.maxlen
+
     def push(self, *args) -> None:
         """
         Push a new experience onto the queue.
