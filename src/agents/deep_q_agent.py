@@ -48,7 +48,7 @@ class DeepQAgent(Agent):
 
     def __init__(self,
                  env,
-                 learning_rate: float=0.001,
+                 learning_rate: float=1e-5,
                  discount_factor: float=0.99,
                  exploration_rate: float=1.0,
                  exploration_decay: float=0.9998,
@@ -292,7 +292,7 @@ class DeepQAgent(Agent):
 
     def observe(self, num_observations: int=1000) -> None:
         """
-        Observe random moves for the replay memory.
+        Observe random moves to initialize the replay memory.
 
         Args:
             num_observations: the number of random observations to make
@@ -301,6 +301,7 @@ class DeepQAgent(Agent):
             None
 
         """
+        progress = tqdm(total=num_observations, unit='frame')
         # loop until done
         while True:
             # reset the game and get the initial state
@@ -319,8 +320,11 @@ class DeepQAgent(Agent):
                 state = next_state
                 # decrement the observation counter
                 num_observations -= 1
+                # update the progress bar
+                progress.update(1)
                 # break out if done observing
-                if num_observations < 0:
+                if num_observations <= 0:
+                    progress.close()
                     return
 
     def train(self,
