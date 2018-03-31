@@ -67,6 +67,7 @@ class DeepQAgent(Agent):
             exploration_rate: the exploration rate, ε
             exploration_decay: the decay factor for exploration rate
             exploration_min: the minimum value for the exploration rate
+            image_size: the size of the images to pass to the CNN
             frames_per_action: the number of frames to hold an action
             replay_size: the
 
@@ -152,7 +153,7 @@ class DeepQAgent(Agent):
         """Return the number of actions for this agent."""
         return self.model.output_shape[1]
 
-    def _downsample(self, frame: np.ndarray) -> np.ndarray:
+    def downsample(self, frame: np.ndarray) -> np.ndarray:
         """
         Down-sample the given frame from RGB to B&W with a reduced size.
 
@@ -163,7 +164,10 @@ class DeepQAgent(Agent):
             a down-sample B&W frame
 
         """
-        return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), self.image_size)
+        return cv2.resize(
+            cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY),
+            self.image_size
+        )
 
     def predict_action(self, frames: np.ndarray) -> tuple:
         """
@@ -197,7 +201,7 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def _train(self,
+    def _replay(self,
         s: np.ndarray,
         a: np.ndarray,
         r: np.ndarray,
@@ -249,7 +253,7 @@ class DeepQAgent(Agent):
         """Reset the environment and return the initial state."""
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
-        initial_frame = self._downsample(self.env.reset())[:, :, np.newaxis]
+        initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
         return np.repeat(initial_frame, self.frames_per_action, axis=2)
 
     def _next_state(self, action: int) -> tuple:
@@ -277,7 +281,7 @@ class DeepQAgent(Agent):
             # make the step and observe the state, reward, done flag
             state, reward, done, _ = self.env.step(action=action)
             # store the state and reward from this frame after down-sampling
-            next_state[:, :, frame] = self._downsample(state)
+            next_state[:, :, frame] = self.downsample(state)
             # TODO: is this necessary?
             # reward = reward if not done else -10
             # add the current reward to the total reward
@@ -302,6 +306,7 @@ class DeepQAgent(Agent):
             None
 
         """
+        # iterate over the number of training episodes
         for episode in tqdm(range(episodes), unit='episode'):
             # reset the game and get the initial state
             state = self._initial_state()
@@ -321,16 +326,17 @@ class DeepQAgent(Agent):
                 # set the state to the new state
                 state = next_state
                 # train the network on replay memory
-                loss += self._train(*self.queue.sample(size=batch_size))
-                # decay the exploration rate, it bottoms out at 0.1
-                # TODO: add logic to have minimum of 0.1
-                self.exploration_rate = self.exploration_rate * self.exploration_decay
+                loss += self._replay(*self.queue.sample(size=batch_size))
+                # check if the exploration rate has reached minimum
+                if self.exploration_rate > self.exploration_min:
+                    # decay the exploration rate
+                    self.exploration_rate *= self.exploration_decay
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score)
 
-    def run(self, games: int=30) -> np.ndarray:
+    def play(self, games: int=30) -> np.ndarray:
         """
         Run the agent without training for a number of games.
 
