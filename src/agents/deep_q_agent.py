@@ -324,6 +324,7 @@ class DeepQAgent(Agent):
                 progress.update(1)
                 # break out if done observing
                 if num_observations <= 0:
+                    # close the progress bar
                     progress.close()
                     return
 
