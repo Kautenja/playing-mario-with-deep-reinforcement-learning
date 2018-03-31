@@ -5,7 +5,7 @@ from keras.layers import Dense
 from keras.layers import Flatten
 from keras.layers import Activation
 from keras.layers.convolutional import Conv2D
-from keras.optimizers import Nadam
+from keras.optimizers import Adam
 
 
 def build_deep_mind_model(
@@ -51,7 +51,7 @@ def build_deep_mind_model(
         Dense(num_actions),
     ])
     # compile the model with the default loss and optimization technique
-    model.compile(loss='mse', optimizer=Nadam(lr=learning_rate))
+    model.compile(loss='mse', optimizer=Adam(lr=learning_rate))
 
     return model
 
