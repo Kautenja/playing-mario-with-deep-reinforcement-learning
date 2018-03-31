@@ -287,6 +287,12 @@ class DeepQAgent(Agent):
             # add the current reward to the total reward
             total_reward += reward
 
+        # normalize the reward in [-1, 0, 1]
+        if total_reward < 0:
+            total_reward = -1
+        elif total_reward > 0:
+            total_reward = 1
+
         # return the next state, the average reward and the done flag
         return next_state, total_reward, done
 
