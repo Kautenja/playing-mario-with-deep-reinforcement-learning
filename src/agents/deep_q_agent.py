@@ -128,7 +128,20 @@ class DeepQAgent(Agent):
         """Return the number of actions for this agent."""
         return self.model.output_shape[1]
 
-    def predict_action(self, frames: list) -> tuple:
+    def downsample(self, frame: np.ndarray) -> np.ndarray:
+        """
+        Down-sample the given frame from RGB to B&W with a reduced size.
+
+        Args:
+            frame: the frame to down-sample
+
+        Returns:
+            a down-sample B&W frame
+
+        """
+        return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), (84, 84))
+
+    def predict_action(self, frames: np.ndarray) -> tuple:
         """
         Predict an action from a stack of frames.
 
@@ -160,38 +173,53 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def train(self, s, a, r, d, s2) -> float:
+    def train(self,
+        s: np.ndarray,
+        a: np.ndarray,
+        r: np.ndarray,
+        d: np.ndarray,
+        s2: np.ndarray
+    ) -> float:
         """
-        """
-        targets = np.zeros((s.shape[0], self.num_actions))
+        Train the network on a mini-batch of replay data.
 
+        Notes:
+            all args are arrays that should be of the same size
+
+        Args:
+            s: an array of current states
+            a: an array of actions
+            r: an array of rewards
+            d: an array of terminal flags
+            s2: an array of next states
+
+        Returns:
+            the loss as a result of the training
+
+        """
+        # initialize y values as zeros
+        y = np.zeros((s.shape[0], self.num_actions))
+
+        # iterate over the samples in this mini-batch
         for index in range(len(s)):
-            targets[index] = self.model.predict(
+            # get the Q values for this state
+            y[index] = self.model.predict(
                 s[index].reshape(self.input_shape),
                 batch_size=1
             )
+            # get the Q values for the next state
             a_prime = self.model.predict(
                 s2[index].reshape(self.input_shape),
                 batch_size=1
             )
-            targets[index, a[index]] = r[index]
+            # calculate target y values
+            # y = r_j for terminal phi_{j+1}
+            y[index, a[index]] = r[index]
+            # check if y is terminal, if so y = t_j + gamma * max_{a'} Q
             if not d[index]:
-                targets[index, a[index]] += self.discount_factor * np.max(a_prime)
+                y[index, a[index]] += self.discount_factor * np.max(a_prime)
 
-        return self.model.train_on_batch(s, targets)
-
-    def downsample(self, frame: np.ndarray) -> np.ndarray:
-        """
-        Down-sample the given frame from RGB to B&W with a reduced size.
-
-        Args:
-            frame: the frame to down-sample
-
-        Returns:
-            a down-sample B&W frame
-
-        """
-        return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), (84, 84))
+        return self.model.train_on_batch(s, y)
 
     def initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
@@ -259,7 +287,7 @@ class DeepQAgent(Agent):
                 # set the state to the new state
                 state = next_state
                 # TODO: parameterize the batch_size
-                loss += self.train(*self.queue.sample(size=64))
+                loss += self.train(*self.queue.sample(size=32))
                 # decay the exploration rate
                 self.exploration_rate = self.exploration_rate * self.exploration_decay
 
