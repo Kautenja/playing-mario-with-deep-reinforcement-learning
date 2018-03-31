@@ -249,10 +249,8 @@ class DeepQAgent(Agent):
         """Reset the environment and return the initial state."""
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
-        return np.stack(
-            [self._downsample(self.env.reset())] * self.frames_per_action,
-            axis=2
-        )
+        initial_frame = self._downsample(self.env.reset())[:, :, np.newaxis]
+        return np.repeat(initial_frame, self.frames_per_action, axis=2)
 
     def _next_state(self, action: int) -> tuple:
         """
