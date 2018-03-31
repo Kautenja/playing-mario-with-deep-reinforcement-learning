@@ -290,6 +290,39 @@ class DeepQAgent(Agent):
         # return the next state, the average reward and the done flag
         return next_state, total_reward, done
 
+    def observe(self, num_observations: int=1000) -> None:
+        """
+        Observe random moves for the replay memory.
+
+        Args:
+            num_observations: the number of random observations to make
+
+        Returns:
+            None
+
+        """
+        # loop until done
+        while True:
+            # reset the game and get the initial state
+            state = self._initial_state()
+            # the done flag indicating that an episode has ended
+            done = False
+            # loop until done
+            while not done:
+                # predict the best action based on the current state
+                action, Q = self.predict_action(state)
+                # hold the action for the number of frames
+                next_state, reward, done = self._next_state(action)
+                # push the memory onto the replay queue
+                self.queue.push(state, action, reward, done, next_state)
+                # set the state to the new state
+                state = next_state
+                # decrement the observation counter
+                num_observations -= 1
+                # break out if done observing
+                if num_observations < 0:
+                    return
+
     def train(self,
         episodes: int=1000,
         batch_size: int=32,
