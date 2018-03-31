@@ -1,6 +1,8 @@
 """An implementation of Deep Q-Learning."""
 import numpy as np
 import cv2
+from tqdm import tqdm
+from typing import Callable
 from src.models import build_deep_mind_model
 from .agent import Agent
 from .replay_queue import ReplayQueue
@@ -278,7 +280,7 @@ class DeepQAgent(Agent):
             # store the state and reward from this frame
             next_state.append(self._downsample(_next_state))
             # TODO: is this necessary?
-            _reward = _reward if not done else -10
+            # _reward = _reward if not done else -10
             # add the current reward to the total reward
             reward += _reward
 
@@ -288,7 +290,11 @@ class DeepQAgent(Agent):
         # return the next state, the average reward and the done flag
         return next_state, reward, done
 
-    def train(self, episodes: int=1000, batch_size: int=32) -> None:
+    def train(self,
+        episodes: int=1000,
+        batch_size: int=32,
+        callback: Callable=None
+    ) -> None:
         """
         Train the network for a number of episodes (games).
 
@@ -300,7 +306,7 @@ class DeepQAgent(Agent):
             None
 
         """
-        for episode in range(episodes):
+        for episode in tqdm(range(episodes), unit='episode'):
             # reset the game and get the initial state
             state = self._initial_state()
             # the done flag indicating that an episode has ended
@@ -323,7 +329,9 @@ class DeepQAgent(Agent):
                 # decay the exploration rate
                 self.exploration_rate = self.exploration_rate * self.exploration_decay
 
-            print(score, loss)
+            # pass the score to the callback at the end of the episode
+            if callable(callback):
+                callback(score)
 
     def run(self, games: int=30) -> np.ndarray:
         """
@@ -339,7 +347,7 @@ class DeepQAgent(Agent):
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
-        for game in range(games):
+        for game in tqdm(range(games), unit='game'):
             # reset the game and get the initial state
             state = self._initial_state()
             # the done flag indicating that a game has ended
