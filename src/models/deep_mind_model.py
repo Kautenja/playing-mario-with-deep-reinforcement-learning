@@ -48,7 +48,7 @@ def build_deep_mind_model(
         Dense(num_actions),
     ])
     # compile the model with the default loss and optimization technique
-    model.compile(loss='mse', optimizer=Adam(lr=1e-6))
+    model.compile(loss='mse', optimizer=Adam(lr=1e-5))
 
     return model
 
