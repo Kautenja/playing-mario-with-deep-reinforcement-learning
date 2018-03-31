@@ -47,8 +47,8 @@ class DeepQAgent(Agent):
                  env,
                  learning_rate: float=0.001,
                  discount_factor: float=0.99,
-                 exploration_rate: float=0.8,
-                 exploration_decay: float=0.99,
+                 exploration_rate: float=1.0,
+                 exploration_decay: float=0.9998,
                  episodes: int=1000) -> None:
         """
         Initialize a new Deep Q Agent.
@@ -119,6 +119,11 @@ class DeepQAgent(Agent):
         )
 
     @property
+    def input_shape(self) -> tuple:
+        """Return the input shape of the DQN."""
+        return (1, *self.model.input_shape[1:])
+
+    @property
     def num_actions(self) -> int:
         """Return the number of actions for this agent."""
         return self.model.output_shape[1]
@@ -138,7 +143,7 @@ class DeepQAgent(Agent):
         """
         # predict the values of each action
         actions = self.model.predict(
-            frames.reshape((1, *self.model.input_shape[1:])),
+            frames.reshape(self.input_shape),
             batch_size=1
         )
         # draw a number in [0, 1] and explore if it's less than the
@@ -155,27 +160,27 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def train(self, s, a, r, d, s2) -> None:
+    def train(self, s, a, r, d, s2) -> float:
         """
         """
         targets = np.zeros((s.shape[0], self.num_actions))
 
         for index in range(len(s)):
             targets[index] = self.model.predict(
-                s[index].reshape(self.model.input_shape),
+                s[index].reshape(self.input_shape),
                 batch_size=1
             )
             a_prime = self.model.predict(
-                s2[index].reshape(self.model.input_shape),
+                s2[index].reshape(self.input_shape),
                 batch_size=1
             )
-            targets[i, a[i]] = r[i]
-            if not d[i]:
-                targets[i, a[i]] += self.discount_factor * np.max(a_prime)
+            targets[index, a[index]] = r[index]
+            if not d[index]:
+                targets[index, a[index]] += self.discount_factor * np.max(a_prime)
 
         return self.model.train_on_batch(s, targets)
 
-    def downsample(self, frame):
+    def downsample(self, frame: np.ndarray) -> np.ndarray:
         """
         Down-sample the given frame from RGB to B&W with a reduced size.
 
@@ -188,26 +193,29 @@ class DeepQAgent(Agent):
         """
         return cv2.resize(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY), (84, 84))
 
-    @property
-    def initial_state(self):
-        """
-        """
+    def initial_state(self) -> np.ndarray:
+        """Reset the environment and return the initial state."""
         # reset the environment
         state = [self.env.reset()] * 4
         # convert the initial frame to 4 down-sampled frames
-        black_buffer = np.array([self.downsample(frame) for frame in state]).T
-        return black_buffer
-        # sample a random action to start with
-        # action = self.env.action_space.sample()
-        # TODO: refactor this four out to be parameterized somehow, maybe
-        # build_model will have to be passed or something
-        # for index in range(4):
-        #     next_state, reward, done, info = env.step(action=action)
-        # return [self.env.step(action=action) for index in range(4)]
+        state = np.array([self.downsample(frame) for frame in state]).T
+        return state
 
-    def next_state(self, action):
+    def next_state(self, action: int) -> tuple:
         """
+        Return the next state based on the given action.
+
+        Args:
+            action: the action to perform for some frames
+
+        Returns:
+            a tuple of:
+                - the next state
+                - the average reward over the frames
+                - the done flag
+
         """
+        # create buffers to store results in over the frame range
         next_state = []
         reward = 0
         # iterate over the number of buffered frames
@@ -215,52 +223,47 @@ class DeepQAgent(Agent):
             # render the frame
             self.env.render()
             # make the step and observe the state, reward, done
-            state, _reward, done, _ = self.env.step(action=action)
+            _next_state, _reward, done, _ = self.env.step(action=action)
             # store the state and reward from this frame
-            next_state.append(self.downsample(state))
-            reward += _reward
+            next_state.append(self.downsample(_next_state))
             # TODO: is this necessary?
-            reward = reward if not done else -10
+            # _reward = _reward if not done else -10
+            # add the current reward to the total reward
+            reward += _reward
 
+        # convert the state to an ndarray with the expected size
         next_state = np.array(next_state).T
 
-        return next_state, reward / 4, done
+        # return the next state, the average reward and the done flag
+        return next_state, reward, done
 
     def run(self):
         """
         """
         for episode in range(self.episodes):
             # reset the game and get the initial state
-            state = self.initial_state
+            state = self.initial_state()
             # the done flag indicating that an episode has ended
             done = False
+            score = 0
+            loss = 0
             # loop until done
             while not done:
                 # predict the best action based on the current state
                 action, Q = self.predict_action(state)
                 # hold the action for the number of frames
-                for _ in range(4):
-                    # render the frame
-                    self.env.render()
-                    # make the step and observe the next_state, reward, done
-                    next_state, reward, done, _ = self.env.step(action=action)
-                    # TODO: is this necessary
-                    reward = reward if not done else -10
-                    # push this state to the replay queue
-                    self.queue.push(state, action, reward, done, next_state)
+                next_state, reward, done = self.next_state(action)
+                score += reward
+                # push the memory onto the replay queue
+                self.queue.push(state, action, reward, done, next_state)
+                # set the state to the new state
+                state = next_state
+                # TODO: parameterize the batch_size
+                loss += self.train(*self.queue.sample(size=64))
+                # decay the exploration rate
+                self.exploration_rate = self.exploration_rate * self.exploration_decay
 
-    # def step(self):
-    #     """
-    #     TODO: description
-    #     TODO: args and types
-    #     TODO: return type
-    #     TODO: implementation
-    #     """
-    #     # TODO: this is just example code
-    #     # take a step and observe the environment variables
-    #     next_state, reward, done, info = env.step(action)
-    #     # calculate the target: r + γ max_a'(Q[s', a'])
-    #     target = reward + gamma * np.argmax(model.predict(next_state))
+            print(score, loss)
 
 
 # explicitly define the outward facing API of this module
