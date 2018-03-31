@@ -268,27 +268,25 @@ class DeepQAgent(Agent):
                 - the done flag
 
         """
-        # create buffers to store results in over the frame range
-        next_state = []
-        reward = 0
+        # create a matrix for the four frames using the image size and
+        # frame per action size
+        next_state = np.zeros((*self.image_size, self.frames_per_action))
+        total_reward = 0
         # iterate over the number of buffered frames
-        for _ in range(self.frames_per_action):
-            # render the frame
+        for frame in range(self.frames_per_action):
+            # render this frame in the emulator
             self.env.render()
-            # make the step and observe the state, reward, done
-            _next_state, _reward, done, _ = self.env.step(action=action)
-            # store the state and reward from this frame
-            next_state.append(self._downsample(_next_state))
+            # make the step and observe the state, reward, done flag
+            state, reward, done, _ = self.env.step(action=action)
+            # store the state and reward from this frame after down-sampling
+            next_state[:, :, frame] = self._downsample(state)
             # TODO: is this necessary?
-            _reward = _reward if not done else -10
+            # reward = reward if not done else -10
             # add the current reward to the total reward
-            reward += _reward
-
-        # convert the state to an ndarray with the expected size
-        next_state = np.stack(next_state, axis=2)
+            total_reward += reward
 
         # return the next state, the average reward and the done flag
-        return next_state, reward, done
+        return next_state, total_reward, done
 
     def train(self,
         episodes: int=1000,
@@ -326,7 +324,8 @@ class DeepQAgent(Agent):
                 state = next_state
                 # train the network on replay memory
                 loss += self._train(*self.queue.sample(size=batch_size))
-                # decay the exploration rate
+                # decay the exploration rate, it bottoms out at 0.1
+                # TODO: add logic to have minimum of 0.1
                 self.exploration_rate = self.exploration_rate * self.exploration_decay
 
             # pass the score to the callback at the end of the episode
