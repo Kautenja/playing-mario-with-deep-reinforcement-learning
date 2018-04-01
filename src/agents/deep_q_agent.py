@@ -230,22 +230,25 @@ class DeepQAgent(Agent):
 
         # iterate over the samples in this mini-batch
         for index in range(len(s)):
-            # get the Q values for this state
-            y[index] = self.model.predict(
-                s[index].reshape(self.input_shape),
-                batch_size=1
-            )
             # get the Q values for the next state
             a_prime = self.model.predict(
                 s2[index].reshape(self.input_shape),
                 batch_size=1
             )
-            # calculate target y values
-            # y = r_j for terminal phi_{j+1}
-            y[index, a[index]] = r[index]
-            # check if y is terminal, if so y = t_j + gamma * max_{a'} Q
-            if not d[index]:
-                y[index, a[index]] += self.discount_factor * np.max(a_prime)
+            # the first part of the Q equation
+            Q_sa = (1 - self.learning_rate) * self.model.predict(
+                s[index].reshape(self.input_shape),
+                batch_size=1
+            )
+            # the second part of the Q equation
+            Q_sa2 = np.zeros_like(Q_sa)
+            Q_sa2[0, np.argmax(a_prime)] = r[index]
+            Q_sa2 += self.discount_factor * np.max(a_prime)
+            Q_sa2 *= self.learning_rate
+            # combine the two pieces together
+            Q_sa += Q_sa2
+
+            y[index] = Q_sa
 
         return self.model.train_on_batch(s, y)
 
