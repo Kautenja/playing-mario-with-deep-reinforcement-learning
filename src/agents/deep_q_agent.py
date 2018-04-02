@@ -200,12 +200,18 @@ class DeepQAgent(Agent):
         # save the weights
         self.model.load_weights(filename)
 
-    def downsample(self, frame: np.ndarray) -> np.ndarray:
+    def downsample(self,
+        frame: np.ndarray,
+        x: int=8,
+        y: int=14
+    ) -> np.ndarray:
         """
         Down-sample the given frame from RGB to B&W with a reduced size.
 
         Args:
             frame: the frame to down-sample
+            x: the number of x pixels to crop
+            y: the number of y pixels to crop
 
         Returns:
             a down-sample B&W frame
@@ -213,6 +219,13 @@ class DeepQAgent(Agent):
         """
         # convert the frame from RGB to gray scale
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        # crop the image
+        frame = frame[2*y:frame.shape[0] - y, x:frame.shape[1] - x]
+
+        # zero out specific colors
+        # 142 is the generic gray color
+        frame[frame == 142] = 0
+
         # resize the frame to the expected shape
         frame = cv2.resize(frame, self.image_size)
         # normalize the image to floating point in [0, 1]
