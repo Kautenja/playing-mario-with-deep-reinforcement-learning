@@ -1,8 +1,9 @@
 """An implementation of Deep Q-Learning."""
-import numpy as np
 import cv2
-from tqdm import tqdm
+import numpy as np
 from typing import Callable
+from tqdm import tqdm
+from pygame.time import Clock
 from src.models import build_deep_mind_model
 from .agent import Agent
 from .replay_queue import ReplayQueue
@@ -382,17 +383,21 @@ class DeepQAgent(Agent):
             if callable(callback):
                 callback(score, loss)
 
-    def play(self, games: int=30) -> np.ndarray:
+    def play(self, games: int=30, fps: int=None) -> np.ndarray:
         """
         Run the agent without training for a number of games.
 
         Args:
             games: the number of games to play
+            fps: the frame-rate to limit gameplay to.
+                - fps=None will not limit the frame-rate
 
         Returns:
             an array of scores
 
         """
+        # initialize a clock to keep the frame-rate
+        clock = Clock()
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
@@ -411,6 +416,9 @@ class DeepQAgent(Agent):
                 score += reward
                 # set the state to the new state
                 state = next_state
+                # bound the frame rate if there is an fps provided
+                if fps is not None:
+                    clock.tick(fps)
             # push the score onto the history
             scores[game] = score
 

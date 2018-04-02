@@ -9,3 +9,4 @@ jupyter==1.0.0
 pydot==1.2.4
 graphviz==0.8.2
 matplotlib==2.1.2
+pygame==1.9.3
