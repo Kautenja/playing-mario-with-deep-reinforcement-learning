@@ -316,10 +316,10 @@ class DeepQAgent(Agent):
             # unpack the memory
             s[index], action, reward, done, next_state = memory
             # set the target based on current Q values
-            y[index] = self.model.predict(
-                s[index].reshape(self.input_shape),
-                batch_size=1
-            )
+            # y[index] = self.model.predict(
+            #     s[index].reshape(self.input_shape),
+            #     batch_size=1
+            # )
             # if the next state is terminal, the label is just the reward.
             if done:
                 y[index][action] = reward
