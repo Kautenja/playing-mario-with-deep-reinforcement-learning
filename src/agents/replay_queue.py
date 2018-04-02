@@ -70,9 +70,7 @@ class ReplayQueue(object):
         # generate an index of items to extract
         idx_batch = set(np.random.randint(0, len(self), size))
         # extract the batch from the queue
-        batch = [val for i, val in enumerate(self.queue) if i in idx_batch]
-        # unpack the batch into individual lists (s, a, r, d, s2)
-        return tuple(map(np.array, zip(*batch)))
+        return [val for i, val in enumerate(self.queue) if i in idx_batch]
 
 
 # explicitly define the outward facing API of this module
