@@ -1,4 +1,5 @@
 """An implementation of Deep Q-Learning."""
+import os
 import cv2
 import numpy as np
 from typing import Callable
@@ -7,6 +8,10 @@ from pygame.time import Clock
 from src.models import build_deep_mind_model
 from .agent import Agent
 from .replay_queue import ReplayQueue
+
+
+# the name of the directory housing this module
+THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 
 # the format string for this objects representation
@@ -153,6 +158,47 @@ class DeepQAgent(Agent):
     def num_actions(self) -> int:
         """Return the number of actions for this agent."""
         return self.model.output_shape[1]
+
+    @property
+    def default_weight_file(self) -> str:
+        """Return the name of the default weight file for this network."""
+        return '{}/{}.h5'.format(THIS_DIRECTORY, self.__class__.__name__)
+
+    def save_model(self, filename: str=None, overwrite: bool=True) -> str:
+        """
+        Save the model to disk.
+
+        Args:
+            filename: the filename of the weights file to create
+                - if None, file use the classname followed by '.h5'
+
+        Returns:
+            the path the the created weights file
+
+        """
+        # if there is no filename, fall back on the default
+        if filename is None:
+            filename = self.default_weight_file
+        # save the weights
+        self.model.save_weights(filename, overwrite=overwrite)
+
+    def load_model(self, filename: str=None) -> None:
+        """
+        Load the model from disk.
+
+        Args:
+            filename: the filename of the weights file to load from
+                - if None, file use the classname followed by '.h5'
+
+        Returns:
+            None
+
+        """
+        # if there is no filename, fall back on the default
+        if filename is None:
+            filename = self.default_weight_file
+        # save the weights
+        self.model.load_weights(filename)
 
     def downsample(self, frame: np.ndarray) -> np.ndarray:
         """
