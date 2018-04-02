@@ -301,9 +301,9 @@ class DeepQAgent(Agent):
             total_reward += reward
 
         # normalize the reward in [-1, 0, 1]
-        if total_reward < 0:
+        if total_reward < -1:
             total_reward = -1
-        elif total_reward > 0:
+        elif total_reward > 1:
             total_reward = 1
 
         # return the next state, the average reward and the done flag
@@ -369,20 +369,19 @@ class DeepQAgent(Agent):
         # unpack the batch of memories
         s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
         # initialize target y values as a matrix of zeros
-        y = np.zeros((len(batch), self.num_actions))
-        # TODO: some implementations do this, but no papers do (they use zeros)
-        # it seems more intuitive to set the reward of the other actions than
-        # zero, but idk
-        # y = self.model.predict_on_batch(s)
+        # y = np.zeros((len(batch), self.num_actions))
+        # Calculate Q values for the current states
+        y = self.model.predict_on_batch(s)
 
-        # predict Q values for each memory in the batch and take the maximum
-        Q = np.max(self.model.predict_on_batch(s2), axis=1)
+        # predict Q values for the next state of each memory in the batch and
+        # take the maximum value
+        Q_s2 = np.max(self.model.predict_on_batch(s2), axis=1)
         # discount the reward from the next state and zero out the Q value
         # for states that are done
-        Q *= self.discount_factor * (1 - d)
+        Q_s2 *= self.discount_factor * (1 - d)
         # set the y value for each sample to the reward of the selected
         # action
-        y[range(y.shape[0]), a] = r + Q
+        y[range(y.shape[0]), a] = r + Q_s2
 
         # train the model on the batch and return the loss
         return self.model.train_on_batch(s, y)
