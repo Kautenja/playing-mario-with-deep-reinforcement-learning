@@ -201,13 +201,7 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def _replay(self,
-        s: np.ndarray,
-        a: np.ndarray,
-        r: np.ndarray,
-        d: np.ndarray,
-        s2: np.ndarray
-    ) -> float:
+    def _replay(self, batch: list) -> float:
         """
         Train the network on a mini-batch of replay data.
 
@@ -215,37 +209,44 @@ class DeepQAgent(Agent):
             all arguments are arrays that should be of the same size
 
         Args:
-            s: an array of current states
-            a: an array of actions
-            r: an array of rewards
-            d: an array of terminal flags
-            s2: an array of next states
+            batch: the batch of tuples to train on containing:
+                - s: the current state
+                - a: the action
+                - r: the reward
+                - d: the terminal flags
+                - s2: the next state
 
         Returns:
             the loss as a result of the training
 
         """
-        # initialize y values as zeros
-        y = np.zeros((s.shape[0], self.num_actions))
+        # initialize target y values as a matrix of zeros
+        y = np.zeros((len(batch), self.num_actions))
+        # initialize a tensor to store states in (these are x values)
+        s = np.zeros((len(batch), *self.input_shape[1:]))
 
         # iterate over the samples in this mini-batch
-        for index in range(len(s)):
+        for index, memory in enumerate(batch):
+            # unpack the memory
+            s[index], action, reward, done, next_state = memory
+            # set the target based on current Q values
             y[index] = self.model.predict(
                 s[index].reshape(self.input_shape),
                 batch_size=1
             )
             # if the next state is terminal, the label is just the reward.
-            if d[index]:
-                y[index][a[index]] = r[index]
+            if done:
+                y[index][action] = reward
             # otherwise add the discounted maximum Q-value of the next state
             # to the reward as the label
             else:
-                Q_s2 = self.model.predict(
-                    s2[index].reshape(self.input_shape),
+                Q = self.model.predict(
+                    next_state.reshape(self.input_shape),
                     batch_size=1
                 )
-                y[index][a[index]] = r[index] + self.discount_factor * np.max(Q_s2)
+                y[index][action] = reward + self.discount_factor * np.max(Q)
 
+        # train the model on the batch and return the loss
         return self.model.train_on_batch(s, y)
 
     def _initial_state(self) -> np.ndarray:
@@ -369,7 +370,7 @@ class DeepQAgent(Agent):
                 # set the state to the new state
                 state = next_state
                 # train the network on replay memory
-                loss += self._replay(*self.queue.sample(size=batch_size))
+                loss += self._replay(self.queue.sample(size=batch_size))
                 # check if the exploration rate has reached minimum
                 if self.exploration_rate > self.exploration_min:
                     # decay the exploration rate
