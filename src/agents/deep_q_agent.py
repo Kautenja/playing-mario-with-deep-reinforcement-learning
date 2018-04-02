@@ -25,6 +25,7 @@ _REPR_TEMPLATE = """
     exploration_min={},
     image_size={},
     frames_per_action={},
+    update_frequency={}
     replay_size={}
 )
 """.lstrip()
@@ -61,6 +62,7 @@ class DeepQAgent(Agent):
                  exploration_min: float=0.1,
                  image_size: tuple=(84, 84),
                  frames_per_action: int=4,
+                 update_frequency: int=4,
                  replay_size: int=20000
         ) -> None:
         """
@@ -75,6 +77,7 @@ class DeepQAgent(Agent):
             exploration_min: the minimum value for the exploration rate
             image_size: the size of the images to pass to the CNN
             frames_per_action: the number of frames to hold an action
+            update_frequency: the number of actions between Q updates
             replay_size: the
 
         Returns: None
@@ -116,6 +119,16 @@ class DeepQAgent(Agent):
             raise TypeError('frames_per_action must be of type int')
         if frames_per_action < 1:
             raise ValueError('frames_per_action must be >= 1')
+        # verify update_frequency
+        if not isinstance(update_frequency, int):
+            raise TypeError('update_frequency must be of type int')
+        if update_frequency < 1:
+            raise ValueError('update_frequency must be >= 1')
+        # verify replay_size
+        if not isinstance(replay_size, int):
+            raise TypeError('replay_size must be of type int')
+        if replay_size < 1:
+            raise ValueError('replay_size must be >= 1')
         # assign arguments to self
         self.env = env
         self.learning_rate = learning_rate
@@ -125,6 +138,7 @@ class DeepQAgent(Agent):
         self.exploration_min = exploration_min
         self.image_size = image_size
         self.frames_per_action = frames_per_action
+        self.update_frequency = update_frequency
         # setup other instance members
         self.model = build_deep_mind_model(
             image_size=image_size,
@@ -146,13 +160,14 @@ class DeepQAgent(Agent):
             self.exploration_min,
             self.image_size,
             self.frames_per_action,
+            self.update_frequency,
             self.queue.size
         )
 
     @property
     def input_shape(self) -> tuple:
         """Return the input shape of the DQN."""
-        return (1, *self.model.input_shape[1:])
+        return (1, *self.image_size, self.frames_per_action)
 
     @property
     def num_actions(self) -> int:
@@ -227,40 +242,9 @@ class DeepQAgent(Agent):
         frame[frame == 142] = 0
 
         # resize the frame to the expected shape
-        frame = cv2.resize(frame, self.image_size)
-        # normalize the image to floating point in [0, 1]
-        # frame = frame / 255.0
+        frame = cv2.resize(frame, self.image_size).astype('uint8')
 
         return frame
-
-    def predict_action(self, frames: np.ndarray) -> tuple:
-        """
-        Predict an action from a stack of frames.
-
-        Args:
-            frames: the stack of frames to predict Q values from
-
-        Returns:
-            a tuple of:
-                - the optimal action
-                - the Q value for the optimal action
-
-        """
-        # draw a number in [0, 1] and explore if it's less than the
-        # exploration rate
-        if np.random.random() < self.exploration_rate:
-            # select a random action. the output shape of the network implies
-            # the action name by index, so use that shape as the upper bound
-            return np.random.randint(0, self.num_actions)
-        else:
-            # predict the values of each action
-            actions = self.model.predict(
-                frames.reshape(self.input_shape),
-                batch_size=1
-            )
-            # select the action with the highest estimated score as the
-            # optimal action
-            return np.argmax(actions)
 
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
@@ -295,19 +279,45 @@ class DeepQAgent(Agent):
             state, reward, done, _ = self.env.step(action=action)
             # store the state and reward from this frame after down-sampling
             next_state[:, :, frame] = self.downsample(state)
-            # TODO: is this necessary?
-            reward = reward if not done else -1
+            # if the game is done, assign a negative reward
+            reward = reward if not done else -10
             # add the current reward to the total reward
             total_reward += reward
 
-        # normalize the reward in [-1, 0, 1]
-        if total_reward < -1:
-            total_reward = -1
-        elif total_reward > 1:
-            total_reward = 1
+        # normalize the reward in the integers [-1, 0, 1]
+        total_reward = np.sign(total_reward)
 
         # return the next state, the average reward and the done flag
         return next_state, total_reward, done
+
+    def predict_action(self, frames: np.ndarray) -> tuple:
+        """
+        Predict an action from a stack of frames.
+
+        Args:
+            frames: the stack of frames to predict Q values from
+
+        Returns:
+            a tuple of:
+                - the optimal action
+                - the Q value for the optimal action
+
+        """
+        # draw a number in [0, 1] and explore if it's less than the
+        # exploration rate
+        if np.random.random() < self.exploration_rate:
+            # select a random action. the output shape of the network implies
+            # the action name by index, so use that shape as the upper bound
+            return np.random.randint(0, self.num_actions)
+        else:
+            # reshape the frames and make the mask
+            frames = frames.reshape(self.input_shape)
+            mask = np.ones((self.frames_per_action, self.num_actions))
+            # predict the values of each action
+            actions = self.model.predict([frames, mask], batch_size=1)
+            # select the action with the highest estimated score as the
+            # optimal action
+            return np.argmax(actions)
 
     def observe(self, num_observations: int=1000) -> None:
         """
@@ -369,22 +379,21 @@ class DeepQAgent(Agent):
         # unpack the batch of memories
         s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
         # initialize target y values as a matrix of zeros
-        # y = np.zeros((len(batch), self.num_actions))
-        # Calculate Q values for the current states
-        y = self.model.predict_on_batch(s)
+        y = np.zeros((len(batch), self.num_actions))
 
         # predict Q values for the next state of each memory in the batch and
         # take the maximum value
-        Q_s2 = np.max(self.model.predict_on_batch(s2), axis=1)
-        # discount the reward from the next state and zero out the Q value
-        # for states that are done
-        Q_s2 *= self.discount_factor * (1 - d)
+        all_mask = np.ones((len(batch), self.num_actions))
+        Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
+        # terminal states have Q value of zero
+        Q[d] = 0
         # set the y value for each sample to the reward of the selected
-        # action
-        y[range(y.shape[0]), a] = r + Q_s2
+        # action plus the discounted Q value
+        y[range(y.shape[0]), a] = r + self.discount_factor * Q
 
         # train the model on the batch and return the loss
-        return self.model.train_on_batch(s, y)
+        action_mask = np.eye(self.num_actions)[a]
+        return self.model.train_on_batch([s, action_mask], y)
 
     def train(self,
         episodes: int=1000,
@@ -402,6 +411,8 @@ class DeepQAgent(Agent):
             None
 
         """
+        # initialize an action counter counter
+        frames = 0
         # iterate over the number of training episodes
         for episode in tqdm(range(episodes), unit='episode'):
             # reset the game and get the initial state
@@ -421,13 +432,17 @@ class DeepQAgent(Agent):
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # train the network on replay memory
-                loss += self._replay(self.queue.sample(size=batch_size))
                 # check if the exploration rate has reached minimum
                 if self.exploration_rate > self.exploration_min:
                     # decay the exploration rate
                     self.exploration_rate *= self.exploration_decay
-
+                # increment the frames counter
+                frames += 1
+                # if the frames counter has looped its epoch, update Q from
+                # replay memory
+                if frames % self.update_frequency == 0:
+                    # train the network on replay memory
+                    loss += self._replay(self.queue.sample(size=batch_size))
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss,
