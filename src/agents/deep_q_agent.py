@@ -205,54 +205,6 @@ class DeepQAgent(Agent):
         # return the optimal action and its corresponding Q value
         return optimal_action, actions[0, optimal_action]
 
-    def _replay(self, batch: list) -> float:
-        """
-        Train the network on a mini-batch of replay data.
-
-        Notes:
-            all arguments are arrays that should be of the same size
-
-        Args:
-            batch: the batch of tuples to train on containing:
-                - s: the current state
-                - a: the action
-                - r: the reward
-                - d: the terminal flags
-                - s2: the next state
-
-        Returns:
-            the loss as a result of the training
-
-        """
-        # initialize target y values as a matrix of zeros
-        y = np.zeros((len(batch), self.num_actions))
-        # initialize a tensor to store states in (these are x values)
-        s = np.zeros((len(batch), *self.input_shape[1:]))
-
-        # iterate over the samples in this mini-batch
-        for index, memory in enumerate(batch):
-            # unpack the memory
-            s[index], action, reward, done, next_state = memory
-            # set the target based on current Q values
-            y[index] = self.model.predict(
-                s[index].reshape(self.input_shape),
-                batch_size=1
-            )
-            # if the next state is terminal, the label is just the reward.
-            if done:
-                y[index][action] = reward
-            # otherwise add the discounted maximum Q-value of the next state
-            # to the reward as the label
-            else:
-                Q = self.model.predict(
-                    next_state.reshape(self.input_shape),
-                    batch_size=1
-                )
-                y[index][action] = reward + self.discount_factor * np.max(Q)
-
-        # train the model on the batch and return the loss
-        return self.model.train_on_batch(s, y)
-
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
         # reset the environment, duplicate the initial state based on the
@@ -338,6 +290,59 @@ class DeepQAgent(Agent):
                     progress.close()
                     return
 
+    def _replay(self, batch: list) -> float:
+        """
+        Train the network on a mini-batch of replay data.
+
+        Notes:
+            all arguments are arrays that should be of the same size
+
+        Args:
+            batch: the batch of tuples to train on containing:
+                - s: the current state
+                - a: the action
+                - r: the reward
+                - d: the terminal flags
+                - s2: the next state
+
+        Returns:
+            the loss as a result of the training
+
+        """
+        # initialize target y values as a matrix of zeros
+        y = np.zeros((len(batch), self.num_actions))
+        # initialize a tensor to store states in (these are x values)
+        s = np.zeros((len(batch), *self.input_shape[1:]))
+
+        # iterate over the samples in this mini-batch
+        for index, memory in enumerate(batch):
+            # unpack the memory
+            s[index], action, reward, done, next_state = memory
+            # set the target based on current Q values
+            y[index] = self.model.predict(
+                s[index].reshape(self.input_shape),
+                batch_size=1
+            )
+            # if the next state is terminal, the label is just the reward.
+            if done:
+                y[index][action] = reward
+            # otherwise add the discounted maximum Q-value of the next state
+            # to the reward as the label
+            else:
+                Q = self.model.predict(
+                    next_state.reshape(self.input_shape),
+                    batch_size=1
+                )
+                y[index][action] = reward + self.discount_factor * np.max(Q)
+
+        # check if the exploration rate has reached minimum
+        if self.exploration_rate > self.exploration_min:
+            # decay the exploration rate
+            self.exploration_rate *= self.exploration_decay
+
+        # train the model on the batch and return the loss
+        return self.model.train_on_batch(s, y)
+
     def train(self,
         episodes: int=1000,
         batch_size: int=32,
@@ -375,10 +380,6 @@ class DeepQAgent(Agent):
                 state = next_state
                 # train the network on replay memory
                 loss += self._replay(self.queue.sample(size=batch_size))
-                # check if the exploration rate has reached minimum
-                if self.exploration_rate > self.exploration_min:
-                    # decay the exploration rate
-                    self.exploration_rate *= self.exploration_decay
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
