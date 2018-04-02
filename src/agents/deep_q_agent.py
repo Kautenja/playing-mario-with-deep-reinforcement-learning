@@ -389,8 +389,8 @@ class DeepQAgent(Agent):
 
         Args:
             games: the number of games to play
-            fps: the frame-rate to limit gameplay to.
-                - fps=None will not limit the frame-rate
+            fps: the frame-rate to limit game play to
+                - if None, the frame-rate will not be limited (i.e infinite)
 
         Returns:
             an array of scores
