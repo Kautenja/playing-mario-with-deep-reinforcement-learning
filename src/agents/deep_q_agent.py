@@ -383,7 +383,7 @@ class DeepQAgent(Agent):
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
-                callback(score)
+                callback(score, loss)
 
     def play(self, games: int=30) -> np.ndarray:
         """
