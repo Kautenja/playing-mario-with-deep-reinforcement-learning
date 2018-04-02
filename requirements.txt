@@ -10,3 +10,4 @@ pydot==1.2.4
 graphviz==0.8.2
 matplotlib==2.1.2
 pygame==1.9.3
+h5py==2.7.1
