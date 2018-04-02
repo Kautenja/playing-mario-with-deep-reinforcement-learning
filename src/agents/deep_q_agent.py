@@ -186,24 +186,21 @@ class DeepQAgent(Agent):
                 - the Q value for the optimal action
 
         """
-        # predict the values of each action
-        actions = self.model.predict(
-            frames.reshape(self.input_shape),
-            batch_size=1
-        )
         # draw a number in [0, 1] and explore if it's less than the
         # exploration rate
         if np.random.random() < self.exploration_rate:
             # select a random action. the output shape of the network implies
             # the action name by index, so use that shape as the upper bound
-            optimal_action = np.random.randint(0, self.num_actions)
+            return np.random.randint(0, self.num_actions)
         else:
+            # predict the values of each action
+            actions = self.model.predict(
+                frames.reshape(self.input_shape),
+                batch_size=1
+            )
             # select the action with the highest estimated score as the
             # optimal action
-            optimal_action = np.argmax(actions)
-
-        # return the optimal action and its corresponding Q value
-        return optimal_action, actions[0, optimal_action]
+            return np.argmax(actions)
 
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
@@ -272,8 +269,8 @@ class DeepQAgent(Agent):
             done = False
             # loop until done
             while not done:
-                # predict the best action based on the current state
-                action, Q = self.predict_action(state)
+                # sample a random action to perform
+                action = self.env.action_space.sample()
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 # push the memory onto the replay queue
@@ -370,7 +367,7 @@ class DeepQAgent(Agent):
             # loop until done
             while not done:
                 # predict the best action based on the current state
-                action, Q = self.predict_action(state)
+                action = self.predict_action(state)
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
@@ -408,7 +405,7 @@ class DeepQAgent(Agent):
             # loop until done
             while not done:
                 # predict the best action based on the current state
-                action, Q = self.predict_action(state)
+                action = self.predict_action(state)
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
