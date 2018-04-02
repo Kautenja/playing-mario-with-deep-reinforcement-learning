@@ -37,7 +37,8 @@ class ReplyBuffer_sample(TestCase):
         for i in range(10):
             arb.push('s', 'a', 'r', 'd', 's2')
 
-        s, a, r, d, s2 = arb.sample()
+        batch = arb.sample()
+        s, a, r, d, s2 = zip(*batch)
 
         self.assertEqual(['s'] * 10, list(s))
         self.assertEqual(['a'] * 10, list(a))
