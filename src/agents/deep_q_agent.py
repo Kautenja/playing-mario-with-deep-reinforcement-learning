@@ -398,6 +398,8 @@ class DeepQAgent(Agent):
     def train(self,
         episodes: int=1000,
         batch_size: int=32,
+        null_op_max: int=30,
+        _null_op: int=0,
         callback: Callable=None
     ) -> None:
         """
@@ -406,6 +408,12 @@ class DeepQAgent(Agent):
         Args:
             episodes: the number of episodes (games) to play
             batch_size: the size of the replay history batches
+            null_op_max: the max number of random null ops at the beginning
+                         of an episode to introduce stochasticity
+            _null_op: the action code for the NULL operation (do nothing)
+            callback: an optional callback to get updates about the score,
+                      loss, discount factor, and exploration rate every
+                      episode
 
         Returns:
             None
@@ -417,6 +425,10 @@ class DeepQAgent(Agent):
         for episode in tqdm(range(episodes), unit='episode'):
             # reset the game and get the initial state
             state = self._initial_state()
+            # perform NOPs randomly
+            for k in range(np.random.randint(0, null_op_max)):
+                next_state, reward, done = self._next_state(_null_op)
+
             # the done flag indicating that an episode has ended
             done = False
             score = 0
