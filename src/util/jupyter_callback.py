@@ -7,7 +7,7 @@ from IPython import display
 class JupyterCallback(object):
     """A rich reward tracking callback for Jupyter notebooks."""
 
-    def __init__(self, max_losses: int=10) -> None:
+    def __init__(self, max_losses: int=None) -> None:
         """Create a new Jupyter Callback method."""
         self.max_losses = max_losses
         # setup instance members
@@ -41,7 +41,7 @@ class JupyterCallback(object):
         # MARK: loss
         # keep the losses bounded to a certain size
         losses = self.losses
-        if len(losses) > self.max_losses:
+        if self.max_losses is not None and len(losses) > self.max_losses:
             losses = losses[-self.max_losses:]
         # plot the loss
         plt.subplot(2, 1, 2)
