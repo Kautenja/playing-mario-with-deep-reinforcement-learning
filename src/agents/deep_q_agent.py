@@ -164,10 +164,14 @@ class DeepQAgent(Agent):
             a down-sample B&W frame
 
         """
-        return cv2.resize(
-            cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY),
-            self.image_size
-        )
+        # convert the frame from RGB to gray scale
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        # resize the frame to the expected shape
+        frame = cv2.resize(frame, self.image_size)
+        # normalize the image to floating point in [0, 1]
+        frame = frame / 255.0
+
+        return frame
 
     def predict_action(self, frames: np.ndarray) -> tuple:
         """
