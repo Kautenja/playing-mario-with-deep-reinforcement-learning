@@ -1,6 +1,7 @@
 """The Deep Mind Convolutional Neural Network (CNN) model."""
 from keras.models import Model
 from keras.models import Sequential
+from keras.layers import Lambda
 from keras.layers import Dense
 from keras.layers import Flatten
 from keras.layers import Activation
@@ -37,9 +38,8 @@ def build_deep_mind_model(
     """
     # build the model for image classification fitting the given parameters
     model = Sequential([
-        Conv2D(32, (8, 8), strides=(4,4), padding='same',
-            input_shape=(*image_size, num_frames)
-        ),
+        Lambda(lambda x: x / 255.0, input_shape=(*image_size, num_frames)),
+        Conv2D(32, (8, 8), strides=(4,4), padding='same'),
         Activation('relu'),
         Conv2D(64, (4, 4), strides=(2,2), padding='same'),
         Activation('relu'),

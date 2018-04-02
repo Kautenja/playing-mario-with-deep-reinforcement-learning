@@ -229,7 +229,7 @@ class DeepQAgent(Agent):
         # resize the frame to the expected shape
         frame = cv2.resize(frame, self.image_size)
         # normalize the image to floating point in [0, 1]
-        frame = frame / 255.0
+        # frame = frame / 255.0
 
         return frame
 
