@@ -1,4 +1,5 @@
 """The Deep Mind Convolutional Neural Network (CNN) model."""
+import tensorflow as tf
 from keras.models import Model
 from keras.layers import Input
 from keras.layers import Lambda
@@ -61,7 +62,7 @@ def build_deep_mind_model(
     # TODO: parameterize optimizer, is learning rate necessary?
     # model.compile(loss='mse', optimizer=Adam(lr=learning_rate))
     optimizer = RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
-    model.compile(loss='mse', optimizer=optimizer)
+    model.compile(loss=tf.losses.huber_loss, optimizer=optimizer)
 
     return model
 
