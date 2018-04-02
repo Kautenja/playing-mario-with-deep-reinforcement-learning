@@ -418,7 +418,10 @@ class DeepQAgent(Agent):
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
-                callback(score, loss)
+                callback(score, loss,
+                    self.discount_factor,
+                    self.exploration_rate
+                )
 
     def play(self, games: int=30, fps: int=None) -> np.ndarray:
         """
