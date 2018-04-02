@@ -353,36 +353,23 @@ class DeepQAgent(Agent):
             the loss as a result of the training
 
         """
+        # unpack the batch of memories
+        s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
         # initialize target y values as a matrix of zeros
         y = np.zeros((len(batch), self.num_actions))
-        # initialize a tensor to store states in (these are x values)
-        s = np.zeros((len(batch), *self.input_shape[1:]))
+        # TODO: some implementations do this, but no papers do (they use zeros)
+        # it seems more intuitive to set the reward of the other actions than
+        # zero, but idk
+        # y = self.model.predict_on_batch(s)
 
-        # iterate over the samples in this mini-batch
-        for index, memory in enumerate(batch):
-            # unpack the memory
-            s[index], action, reward, done, next_state = memory
-            # set the target based on current Q values
-            # y[index] = self.model.predict(
-            #     s[index].reshape(self.input_shape),
-            #     batch_size=1
-            # )
-            # if the next state is terminal, the label is just the reward.
-            if done:
-                y[index][action] = reward
-            # otherwise add the discounted maximum Q-value of the next state
-            # to the reward as the label
-            else:
-                Q = self.model.predict(
-                    next_state.reshape(self.input_shape),
-                    batch_size=1
-                )
-                y[index][action] = reward + self.discount_factor * np.max(Q)
-
-        # check if the exploration rate has reached minimum
-        if self.exploration_rate > self.exploration_min:
-            # decay the exploration rate
-            self.exploration_rate *= self.exploration_decay
+        # predict Q values for each memory in the batch and take the maximum
+        Q = np.max(self.model.predict_on_batch(s2), axis=1)
+        # discount the reward from the next state and zero out the Q value
+        # for states that are done
+        Q *= self.discount_factor * (1 - d)
+        # set the y value for each sample to the reward of the selected
+        # action
+        y[range(y.shape[0]), a] = r + Q
 
         # train the model on the batch and return the loss
         return self.model.train_on_batch(s, y)
@@ -424,6 +411,10 @@ class DeepQAgent(Agent):
                 state = next_state
                 # train the network on replay memory
                 loss += self._replay(self.queue.sample(size=batch_size))
+                # check if the exploration rate has reached minimum
+                if self.exploration_rate > self.exploration_min:
+                    # decay the exploration rate
+                    self.exploration_rate *= self.exploration_decay
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
