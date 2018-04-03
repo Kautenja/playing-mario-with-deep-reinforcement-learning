@@ -58,7 +58,7 @@ def build_deep_mind_model(
     output = Multiply()([cnn, mask_input])
 
     # build the model
-    model = Model(input=[cnn_input, mask_input], output=output)
+    model = Model(inputs=[cnn_input, mask_input], outputs=output)
     # compile the model with the default loss and optimization technique
     model.compile(loss=loss, optimizer=optimizer)
 
