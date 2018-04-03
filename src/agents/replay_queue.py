@@ -66,7 +66,7 @@ class ReplayQueue(object):
         """Pop an item off the queue and return it."""
         return self.queue.popleft()
 
-    def sample(self, size: int=64, replace: bool=True):
+    def sample(self, size: int=32):
         """
         Return a random sample of items from the queue.
 
@@ -74,7 +74,7 @@ class ReplayQueue(object):
             size: the number of items to sample and return
 
         Returns:
-            TODO
+            A random sample from the queue sampled uniformly
 
         """
         # generate an index of items to extract
