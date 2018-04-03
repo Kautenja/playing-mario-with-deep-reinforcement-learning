@@ -143,6 +143,7 @@ class DeepQAgent(Agent):
         self.frames_per_action = frames_per_action
         self.update_frequency = update_frequency
         # setup other instance members
+        self.frame_buffer = np.zeros((*image_size, frames_per_action))
         self.model = build_deep_mind_model(
             image_size=image_size,
             num_frames=frames_per_action,
@@ -256,7 +257,10 @@ class DeepQAgent(Agent):
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
-        return np.repeat(initial_frame, self.frames_per_action, axis=2)
+        # reset the frame frame with the initial state
+        self.frame_buffer = np.repeat(initial_frame, self.frames_per_action, axis=2)
+        # return the frame buffer as the state
+        return self.frame_buffer
 
     def _next_state(self, action: int) -> tuple:
         """
@@ -272,28 +276,22 @@ class DeepQAgent(Agent):
                 - the done flag
 
         """
-        # create a matrix for the four frames using the image size and
-        # frame per action size
-        next_state = np.zeros((*self.image_size, self.frames_per_action))
-        total_reward = 0
-        # iterate over the number of buffered frames
-        for frame in range(self.frames_per_action):
-            # render this frame in the emulator
-            self.env.render()
-            # make the step and observe the state, reward, done flag
-            state, reward, done, _ = self.env.step(action=action)
-            # store the state and reward from this frame after down-sampling
-            next_state[:, :, frame] = self.downsample(state)
-            # if the game is done, assign a negative reward
-            reward = reward if not done else -10
-            # add the current reward to the total reward
-            total_reward += reward
+        # make the step and observe the state, reward, done flag
+        state, reward, done, _ = self.env.step(action=action)
+        # render this frame in the emulator
+        self.env.render()
 
-        # clip the reward in the integers [-1, 0, 1]
-        total_reward = np.sign(total_reward)
+        # downsample the state and convert it to the expected shape
+        state = self.downsample(state)[:, :, np.newaxis]
+        # add the state to the frame buffer
+        self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
+        # remove the last frame in the frame buffer
+        self.frame_buffer = self.frame_buffer[:, :, 1:]
 
-        # return the next state, the average reward and the done flag
-        return next_state, total_reward, done
+        # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
+        reward = np.sign(reward)
+
+        return self.frame_buffer, reward, done
 
     def predict_action(self, frames: np.ndarray) -> tuple:
         """
