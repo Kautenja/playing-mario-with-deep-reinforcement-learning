@@ -2,9 +2,11 @@
 import os
 import cv2
 import numpy as np
+import tensorflow as tf
 from typing import Callable
 from tqdm import tqdm
 from pygame.time import Clock
+from keras.optimizers import RMSprop
 from src.models import build_deep_mind_model
 from .agent import Agent
 from .replay_queue import ReplayQueue
@@ -18,7 +20,8 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 _REPR_TEMPLATE = """
 {}(
     env={},
-    learning_rate={},
+    loss={},
+    optimizer={},
     discount_factor={},
     exploration_rate={},
     exploration_decay={},
@@ -55,10 +58,11 @@ class DeepQAgent(Agent):
 
     def __init__(self,
                  env,
-                 learning_rate: float=1e-5,
+                 loss=tf.losses.huber_loss,
+                 optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
                  discount_factor: float=0.99,
                  exploration_rate: float=1.0,
-                 exploration_decay: float=0.9998,
+                 exploration_decay: float=0.99985,
                  exploration_min: float=0.1,
                  image_size: tuple=(84, 84),
                  frames_per_action: int=4,
@@ -70,7 +74,8 @@ class DeepQAgent(Agent):
 
         Args:
             env: the environment to run on
-            learning_rate: the learning rate, α
+            loss: the loss metric to use in the CNN
+            optimizer: the optimization method to use on the CNN
             discount_factor: the discount factor, γ
             exploration_rate: the exploration rate, ε
             exploration_decay: the decay factor for exploration rate
@@ -83,12 +88,9 @@ class DeepQAgent(Agent):
         Returns: None
         """
         # TODO: validate env type
+        # TODO: validate loss type
+        # TODO: validate optimizer type
 
-        # verify learning_rate
-        if not isinstance(learning_rate, float):
-            raise TypeError('learning_rate must be of type float')
-        if learning_rate < 0:
-            raise ValueError('learning_rate must be positive')
         # verify discount_factor
         if not isinstance(discount_factor, float):
             raise TypeError('discount_factor must be of type float')
@@ -131,7 +133,8 @@ class DeepQAgent(Agent):
             raise ValueError('replay_size must be >= 1')
         # assign arguments to self
         self.env = env
-        self.learning_rate = learning_rate
+        self.loss = loss
+        self.optimizer = optimizer
         self.discount_factor = discount_factor
         self.exploration_rate = exploration_rate
         self.exploration_decay = exploration_decay
@@ -144,7 +147,8 @@ class DeepQAgent(Agent):
             image_size=image_size,
             num_frames=frames_per_action,
             num_actions=env.action_space.n,
-            learning_rate=learning_rate
+            loss=loss,
+            optimizer=optimizer
         )
         self.queue = ReplayQueue(replay_size)
 
@@ -153,7 +157,8 @@ class DeepQAgent(Agent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.learning_rate,
+            self.loss,
+            self.optimizer,
             self.discount_factor,
             self.exploration_rate,
             self.exploration_decay,
