@@ -178,7 +178,7 @@ class DeepQAgent(Agent):
     @property
     def num_actions(self) -> int:
         """Return the number of actions for this agent."""
-        return self.model.output_shape[1]
+        return self.env.action_space.n
 
     @property
     def default_weight_file(self) -> str:
@@ -281,7 +281,7 @@ class DeepQAgent(Agent):
         # render this frame in the emulator
         self.env.render()
 
-        # downsample the state and convert it to the expected shape
+        # down-sample the state and convert it to the expected shape
         state = self.downsample(state)[:, :, np.newaxis]
         # add the state to the frame buffer
         self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
@@ -293,6 +293,8 @@ class DeepQAgent(Agent):
 
         return self.frame_buffer, reward, done
 
+    # TODO: should epsilon be disabled in testing? i.e. ie_epsilon check before
+    #       np.random
     def predict_action(self, frames: np.ndarray) -> tuple:
         """
         Predict an action from a stack of frames.
@@ -301,9 +303,7 @@ class DeepQAgent(Agent):
             frames: the stack of frames to predict Q values from
 
         Returns:
-            a tuple of:
-                - the optimal action
-                - the Q value for the optimal action
+            the predicted optimal action based on the frames
 
         """
         # draw a number in [0, 1] and explore if it's less than the
@@ -385,25 +385,28 @@ class DeepQAgent(Agent):
         y = np.zeros((len(batch), self.num_actions))
 
         # predict Q values for the next state of each memory in the batch and
-        # take the maximum value
+        # take the maximum value. dont mask any outputs, i.e. use ones
         all_mask = np.ones((len(batch), self.num_actions))
         Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
-        # terminal states have Q value of zero
+        # terminal states have a Q value of zero by definition
         Q[d] = 0
         # set the y value for each sample to the reward of the selected
         # action plus the discounted Q value
         y[range(y.shape[0]), a] = r + self.discount_factor * Q
 
-        # train the model on the batch and return the loss
+        # use an identity of size action space, and index rows from it using
+        # the action vector to produce a one-hot matrix representing the mask
         action_mask = np.eye(self.num_actions)[a]
+        # train the model on the batch and return the loss. use the mask that
+        # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
 
     def train(self,
         episodes: int=1000,
         batch_size: int=32,
         null_op_max: int=30,
+        callback: Callable=None,
         _null_op: int=0,
-        callback: Callable=None
     ) -> None:
         """
         Train the network for a number of episodes (games).
@@ -413,10 +416,10 @@ class DeepQAgent(Agent):
             batch_size: the size of the replay history batches
             null_op_max: the max number of random null ops at the beginning
                          of an episode to introduce stochasticity
-            _null_op: the action code for the NULL operation (do nothing)
             callback: an optional callback to get updates about the score,
                       loss, discount factor, and exploration rate every
                       episode
+            _null_op: the action code for the NULL operation (do nothing)
 
         Returns:
             None
@@ -430,7 +433,7 @@ class DeepQAgent(Agent):
             state = self._initial_state()
             # perform NOPs randomly
             for k in range(np.random.randint(0, null_op_max)):
-                next_state, reward, done = self._next_state(_null_op)
+                state, reward, done = self._next_state(_null_op)
 
             # the done flag indicating that an episode has ended
             done = False
