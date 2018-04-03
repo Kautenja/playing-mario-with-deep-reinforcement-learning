@@ -288,6 +288,8 @@ class DeepQAgent(Agent):
         # remove the last frame in the frame buffer
         self.frame_buffer = self.frame_buffer[:, :, 1:]
 
+        # assign a negative reward if terminal state
+        reward = -1.0 if done else reward
         # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
         reward = np.sign(reward)
 
