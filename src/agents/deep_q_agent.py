@@ -56,19 +56,18 @@ class DeepQAgent(Agent):
 
     """
 
-    def __init__(self,
-                 env,
-                 loss=tf.losses.huber_loss,
-                 optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
-                 discount_factor: float=0.99,
-                 exploration_rate: float=1.0,
-                 exploration_decay: float=0.99985,
-                 exploration_min: float=0.1,
-                 image_size: tuple=(84, 84),
-                 frames_per_action: int=4,
-                 update_frequency: int=4,
-                 replay_size: int=20000
-        ) -> None:
+    def __init__(self, env,
+        loss=tf.losses.huber_loss,
+        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        discount_factor: float=0.99,
+        exploration_rate: float=1.0,
+        exploration_decay: float=0.9999975,
+        exploration_min: float=0.1,
+        image_size: tuple=(84, 84),
+        frames_per_action: int=4,
+        update_frequency: int=4,
+        replay_size: int=20000
+    ) -> None:
         """
         Initialize a new Deep Q Agent.
 
@@ -79,6 +78,7 @@ class DeepQAgent(Agent):
             discount_factor: the discount factor, γ
             exploration_rate: the exploration rate, ε
             exploration_decay: the decay factor for exploration rate
+                               0.9999975 will decay to ~0.1 after 1000000 it.
             exploration_min: the minimum value for the exploration rate
             image_size: the size of the images to pass to the CNN
             frames_per_action: the number of frames to hold an action
@@ -247,7 +247,7 @@ class DeepQAgent(Agent):
         frame[frame == 142] = 0
 
         # resize the frame to the expected shape
-        frame = cv2.resize(frame, self.image_size).astype('uint8')
+        frame = cv2.resize(frame, self.image_size)
 
         return frame
 
@@ -289,7 +289,7 @@ class DeepQAgent(Agent):
             # add the current reward to the total reward
             total_reward += reward
 
-        # normalize the reward in the integers [-1, 0, 1]
+        # clip the reward in the integers [-1, 0, 1]
         total_reward = np.sign(total_reward)
 
         # return the next state, the average reward and the done flag

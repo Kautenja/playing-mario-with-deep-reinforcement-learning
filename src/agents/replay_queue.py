@@ -39,20 +39,30 @@ class ReplayQueue(object):
         """Return the size of the queue."""
         return self.queue.maxlen
 
-    def push(self, *args) -> None:
+    def push(self, s, a, r, d, s2) -> None:
         """
         Push a new experience onto the queue.
 
         Args:
-            *args: the experience s, a, r, d, s'
+            s: the current state
+            a: the action to get from state to next state
+            r: the reward as a result of the action
+            d: a flag indicating if the episode (game) has ended
+            s2: the next state as a result of the action from state
 
         Returns:
             None
 
         """
-        self.queue.append(args)
+        # ensure types are the smallest possible before storing in the queue
+        s = s.astype('uint8')
+        s2 = s2.astype('uint8')
+        a = int(a)
+        r = int(r)
+        # push the variables onto the queue
+        self.queue.append((s, a, r, d, s2))
 
-    def dequeu(self) -> tuple:
+    def deque(self) -> tuple:
         """Pop an item off the queue and return it."""
         return self.queue.popleft()
 
