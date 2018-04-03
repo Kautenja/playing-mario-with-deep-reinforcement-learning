@@ -15,7 +15,8 @@ def build_deep_mind_model(
     image_size: tuple=(84, 84),
     num_frames: int=4,
     num_actions: int=6,
-    learning_rate: float=1e-5
+    loss=tf.losses.huber_loss,
+    optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
 ) -> Model:
     """
     Build and return the Deep Mind model for the given domain parameters.
@@ -31,8 +32,8 @@ def build_deep_mind_model(
                     DeepMind uses 4 frames in their original implementation
         num_actions: the output shape for the model, this represents the
                      number of discrete actions available to a game
-        learning_rate: the learning rate for the optimization method for the
-                       network
+        loss: the loss metric to use at the end of the network
+        optimizer: the optimizer for reducing error from batches
 
     Returns:
         a blank DeepMind CNN for image classification in a reinforcement agent
@@ -59,10 +60,7 @@ def build_deep_mind_model(
     # build the model
     model = Model(input=[cnn_input, mask_input], output=output)
     # compile the model with the default loss and optimization technique
-    # TODO: parameterize optimizer, is learning rate necessary?
-    # model.compile(loss='mse', optimizer=Adam(lr=learning_rate))
-    optimizer = RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
-    model.compile(loss=tf.losses.huber_loss, optimizer=optimizer)
+    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
