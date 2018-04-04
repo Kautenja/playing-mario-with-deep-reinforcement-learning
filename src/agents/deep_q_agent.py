@@ -27,10 +27,15 @@ _REPR_TEMPLATE = """
     update_frequency={},
     optimizer={},
     exploration_rate={},
+    null_op_max={},
     loss={},
     image_size={},
 )
 """.lstrip()
+
+
+# the operation for null ops
+NULL_OP = 0
 
 
 class DeepQAgent(Agent):
@@ -62,6 +67,7 @@ class DeepQAgent(Agent):
         update_frequency: int=4,
         optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
+        null_op_max: int=30,
         loss=tf.losses.huber_loss,
         image_size: tuple=(84, 84)
     ) -> None:
@@ -91,6 +97,7 @@ class DeepQAgent(Agent):
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
+        self.null_op_max = null_op_max
         self.loss = loss
         self.image_size = image_size
         # setup the buffer for frames the agent uses to predict on
@@ -116,6 +123,7 @@ class DeepQAgent(Agent):
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
+            self.null_op_max,
             self.loss,
             self.image_size
         )
@@ -209,7 +217,7 @@ class DeepQAgent(Agent):
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
-        # reset the frame frame with the initial state
+        # reset the frame buffer with the initial state
         self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
         return self.frame_buffer
@@ -359,9 +367,8 @@ class DeepQAgent(Agent):
         return self.model.train_on_batch([s, action_mask], y)
 
     def train(self,
-        episodes: int=1000,
+        frames_to_play: int=50000000,
         batch_size: int=32,
-        null_op_max: int=30,
         callback: Callable=None,
         _null_op: int=0,
     ) -> None:
@@ -369,7 +376,7 @@ class DeepQAgent(Agent):
         Train the network for a number of episodes (games).
 
         Args:
-            episodes: the number of episodes (games) to play
+            frames: the number of frames to play the game for
             batch_size: the size of the replay history batches
             null_op_max: the max number of random null ops at the beginning
                          of an episode to introduce stochasticity
@@ -382,46 +389,56 @@ class DeepQAgent(Agent):
             None
 
         """
-        # initialize an action counter counter
-        frames = 0
-        # iterate over the number of training episodes
-        for episode in tqdm(range(episodes), unit='episode'):
+        # the progress bar for the operation
+        progress = tqdm(total=frames_to_play, unit='frame')
+        # loop indefinitely
+        while True:
+            # the done flag indicating that an episode has ended
+            done = False
+            # metrics throughout this episode
+            score = 0
+            loss = 0
+            frames = 0
             # reset the game and get the initial state
             state = self._initial_state()
             # perform NOPs randomly
-            for k in range(np.random.randint(0, null_op_max)):
-                state, reward, done = self._next_state(_null_op)
-
-            # the done flag indicating that an episode has ended
-            done = False
-            score = 0
-            loss = 0
-            # loop until done
+            for k in range(np.random.randint(0, self.null_op_max)):
+                state, reward, done = self._next_state(NULL_OP)
+            # loop until the episode ends
             while not done:
                 # predict the best action based on the current state
                 action = self.predict_action(state, self.exploration_rate.value)
                 # step the exploration rate forward
                 self.exploration_rate.step()
-                # hold the action for the number of frames
+                # fire the action and observe the next state, reward, and flag
                 next_state, reward, done = self._next_state(action)
+                # add the reward to the cumulative score
                 score += reward
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # increment the frames counter
+                # decrement the observation counter
+                frames_to_play -= 1
                 frames += 1
-                # if the frames counter has looped its epoch, update Q from
-                # replay memory
-                if frames % self.update_frequency == 0:
+                # update Q from replay
+                if frames_to_play % self.update_frequency == 0:
                     # train the network on replay memory
                     loss += self._replay(self.queue.sample(size=batch_size))
+                # break out if done observing
+                if frames_to_play <= 0:
+                    # close the progress bar
+                    progress.close()
+                    return
+
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss,
                     self.discount_factor,
                     self.exploration_rate.value
                 )
+            # update the progress bar
+            progress.update(frames)
 
     # TODO: 5 minute expiration timer like in Human Control
     def play(self,
@@ -450,6 +467,9 @@ class DeepQAgent(Agent):
         for game in tqdm(range(games), unit='game'):
             # reset the game and get the initial state
             state = self._initial_state()
+            # perform NOPs randomly
+            for k in range(np.random.randint(0, self.null_op_max)):
+                state, reward, done = self._next_state(NULL_OP)
             # the done flag indicating that a game has ended
             done = False
             score = 0
