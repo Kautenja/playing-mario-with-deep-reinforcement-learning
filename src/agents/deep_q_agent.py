@@ -8,6 +8,7 @@ from tqdm import tqdm
 from pygame.time import Clock
 from keras.optimizers import RMSprop
 from src.models import build_deep_mind_model
+from src.base import AnnealingVariable
 from .agent import Agent
 from .replay_queue import ReplayQueue
 
@@ -20,18 +21,21 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 _REPR_TEMPLATE = """
 {}(
     env={},
-    loss={},
-    optimizer={},
+    replay_memory_size={},
+    agent_history_length={},
     discount_factor={},
+    update_frequency={},
+    optimizer={},
     exploration_rate={},
-    exploration_decay={},
-    exploration_min={},
+    null_op_max={},
+    loss={},
     image_size={},
-    frames_per_action={},
-    update_frequency={}
-    replay_size={}
 )
 """.lstrip()
+
+
+# the operation for null ops
+NULL_OP = 0
 
 
 class DeepQAgent(Agent):
@@ -57,127 +61,83 @@ class DeepQAgent(Agent):
     """
 
     def __init__(self, env,
-        loss=tf.losses.huber_loss,
-        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        replay_memory_size: int=1000000,
+        agent_history_length: int=4,
         discount_factor: float=0.99,
-        exploration_rate: float=1.0,
-        exploration_decay: float=0.9999975,
-        exploration_min: float=0.1,
-        image_size: tuple=(84, 84),
-        frames_per_action: int=4,
         update_frequency: int=4,
-        replay_size: int=20000
+        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
+        null_op_max: int=30,
+        loss=tf.losses.huber_loss,
+        image_size: tuple=(84, 84)
     ) -> None:
         """
         Initialize a new Deep Q Agent.
 
         Args:
+            TODO: update
             env: the environment to run on
             loss: the loss metric to use in the CNN
             optimizer: the optimization method to use on the CNN
             discount_factor: the discount factor, γ
             exploration_rate: the exploration rate, ε
-            exploration_decay: the decay factor for exploration rate
-                               0.9999975 will decay to ~0.1 after 1000000 it.
-            exploration_min: the minimum value for the exploration rate
             image_size: the size of the images to pass to the CNN
             frames_per_action: the number of frames to hold an action
             update_frequency: the number of actions between Q updates
-            replay_size: the
+            replay_memory_size:
 
-        Returns: None
+        Returns:
+            None
+
         """
-        # TODO: validate env type
-        # TODO: validate loss type
-        # TODO: validate optimizer type
-
-        # verify discount_factor
-        if not isinstance(discount_factor, float):
-            raise TypeError('discount_factor must be of type float')
-        if discount_factor < 0:
-            raise ValueError('discount_factor must be positive')
-        # verify exploration_rate
-        if not isinstance(exploration_rate, float):
-            raise TypeError('exploration_rate must be of type float')
-        if not 0 <= exploration_rate <= 1:
-            raise ValueError('exploration_rate must be in [0,1]')
-        # verify exploration_decay
-        if not isinstance(exploration_decay, float):
-            raise TypeError('exploration_decay must be of type float')
-        if exploration_decay < 0:
-            raise ValueError('exploration_decay must be positive')
-        # verify exploration_min
-        if not isinstance(exploration_min, float):
-            raise TypeError('exploration_min must be of type float')
-        if exploration_min < 0:
-            raise ValueError('exploration_min must be positive')
-        # verify image_size
-        if not isinstance(image_size, tuple):
-            raise TypeError('image_size must be of type tuple')
-        if len(image_size) != 2:
-            raise ValueError('image_size must be a tuple of two integers')
-        # verify frames_per_action
-        if not isinstance(frames_per_action, int):
-            raise TypeError('frames_per_action must be of type int')
-        if frames_per_action < 1:
-            raise ValueError('frames_per_action must be >= 1')
-        # verify update_frequency
-        if not isinstance(update_frequency, int):
-            raise TypeError('update_frequency must be of type int')
-        if update_frequency < 1:
-            raise ValueError('update_frequency must be >= 1')
-        # verify replay_size
-        if not isinstance(replay_size, int):
-            raise TypeError('replay_size must be of type int')
-        if replay_size < 1:
-            raise ValueError('replay_size must be >= 1')
-        # assign arguments to self
         self.env = env
-        self.loss = loss
-        self.optimizer = optimizer
+        self.queue = ReplayQueue(replay_memory_size)
+        self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
-        self.exploration_rate = exploration_rate
-        self.exploration_decay = exploration_decay
-        self.exploration_min = exploration_min
-        self.image_size = image_size
-        self.frames_per_action = frames_per_action
         self.update_frequency = update_frequency
-        # setup other instance members
+        self.optimizer = optimizer
+        self.exploration_rate = exploration_rate
+        self.null_op_max = null_op_max
+        self.loss = loss
+        self.image_size = image_size
+        # setup the buffer for frames the agent uses to predict on
+        self.frame_buffer = np.zeros((*image_size, agent_history_length))
+        # build the neural model for estimating Q values
         self.model = build_deep_mind_model(
             image_size=image_size,
-            num_frames=frames_per_action,
+            num_frames=agent_history_length,
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
         )
-        self.queue = ReplayQueue(replay_size)
+
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.loss,
-            self.optimizer,
+            self.queue.size,
+            self.agent_history_length,
             self.discount_factor,
-            self.exploration_rate,
-            self.exploration_decay,
-            self.exploration_min,
-            self.image_size,
-            self.frames_per_action,
             self.update_frequency,
-            self.queue.size
+            self.optimizer,
+            self.exploration_rate,
+            self.null_op_max,
+            self.loss,
+            self.image_size
         )
 
+    # TODO: just store this in init? these values never change
     @property
     def input_shape(self) -> tuple:
         """Return the input shape of the DQN."""
-        return (1, *self.image_size, self.frames_per_action)
+        return (1, *self.image_size, self.agent_history_length)
 
     @property
     def num_actions(self) -> int:
         """Return the number of actions for this agent."""
-        return self.model.output_shape[1]
+        return self.env.action_space.n
 
     @property
     def default_weight_file(self) -> str:
@@ -190,7 +150,7 @@ class DeepQAgent(Agent):
 
         Args:
             filename: the filename of the weights file to create
-                - if None, file use the classname followed by '.h5'
+                - if None, file use the class name followed by '.h5'
 
         Returns:
             the path the the created weights file
@@ -220,6 +180,7 @@ class DeepQAgent(Agent):
         # save the weights
         self.model.load_weights(filename)
 
+    # TODO: replace with a class that allows custom cropping and stuff?
     def downsample(self,
         frame: np.ndarray,
         x: int=8,
@@ -256,7 +217,12 @@ class DeepQAgent(Agent):
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
-        return np.repeat(initial_frame, self.frames_per_action, axis=2)
+        # render this frame in the emulator
+        self.env.render()
+        # reset the frame buffer with the initial state
+        self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
+        # return the frame buffer as the state
+        return self.frame_buffer
 
     def _next_state(self, action: int) -> tuple:
         """
@@ -268,74 +234,73 @@ class DeepQAgent(Agent):
         Returns:
             a tuple of:
                 - the next state
-                - the average reward over the frames
-                - the done flag
+                - the reward as a result of the action
+                - the terminal flag
 
         """
-        # create a matrix for the four frames using the image size and
-        # frame per action size
-        next_state = np.zeros((*self.image_size, self.frames_per_action))
-        total_reward = 0
-        # iterate over the number of buffered frames
-        for frame in range(self.frames_per_action):
-            # render this frame in the emulator
-            self.env.render()
-            # make the step and observe the state, reward, done flag
-            state, reward, done, _ = self.env.step(action=action)
-            # store the state and reward from this frame after down-sampling
-            next_state[:, :, frame] = self.downsample(state)
-            # if the game is done, assign a negative reward
-            reward = reward if not done else -10
-            # add the current reward to the total reward
-            total_reward += reward
+        # make the step and observe the state, reward, done flag
+        state, reward, done, _ = self.env.step(action=action)
+        # render this frame in the emulator
+        self.env.render()
 
-        # clip the reward in the integers [-1, 0, 1]
-        total_reward = np.sign(total_reward)
+        # down-sample the state and convert it to the expected shape
+        state = self.downsample(state)[:, :, np.newaxis]
+        # add the state to the frame buffer
+        self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
+        # remove the last frame in the frame buffer
+        self.frame_buffer = self.frame_buffer[:, :, 1:]
 
-        # return the next state, the average reward and the done flag
-        return next_state, total_reward, done
+        # assign a negative reward if terminal state
+        reward = -1.0 if done else reward
+        # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
+        reward = np.sign(reward)
 
-    def predict_action(self, frames: np.ndarray) -> tuple:
+        return self.frame_buffer, reward, done
+
+    def predict_action(self,
+        frames: np.ndarray,
+        exploration_rate: float
+    ) -> tuple:
         """
         Predict an action from a stack of frames.
 
         Args:
             frames: the stack of frames to predict Q values from
+            exploration_rate: the exploration rate for epsilon greedy selection
 
         Returns:
-            a tuple of:
-                - the optimal action
-                - the Q value for the optimal action
+            the predicted optimal action based on the frames
 
         """
         # draw a number in [0, 1] and explore if it's less than the
         # exploration rate
-        if np.random.random() < self.exploration_rate:
+        if np.random.random() < exploration_rate:
             # select a random action. the output shape of the network implies
             # the action name by index, so use that shape as the upper bound
             return np.random.randint(0, self.num_actions)
         else:
             # reshape the frames and make the mask
             frames = frames.reshape(self.input_shape)
-            mask = np.ones((self.frames_per_action, self.num_actions))
+            mask = np.ones((self.agent_history_length, self.num_actions))
             # predict the values of each action
             actions = self.model.predict([frames, mask], batch_size=1)
             # select the action with the highest estimated score as the
             # optimal action
             return np.argmax(actions)
 
-    def observe(self, num_observations: int=1000) -> None:
+    def observe(self, replay_start_size: int=50000) -> None:
         """
         Observe random moves to initialize the replay memory.
 
         Args:
-            num_observations: the number of random observations to make
+            replay_start_size: the number of random observations to make
+                i.e. the size to fill the replay memory with to start
 
         Returns:
             None
 
         """
-        progress = tqdm(total=num_observations, unit='frame')
+        progress = tqdm(total=replay_start_size, unit='frame')
         # loop until done
         while True:
             # reset the game and get the initial state
@@ -353,11 +318,11 @@ class DeepQAgent(Agent):
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
-                num_observations -= 1
+                replay_start_size -= 1
                 # update the progress bar
                 progress.update(1)
                 # break out if done observing
-                if num_observations <= 0:
+                if replay_start_size <= 0:
                     # close the progress bar
                     progress.close()
                     return
@@ -387,92 +352,107 @@ class DeepQAgent(Agent):
         y = np.zeros((len(batch), self.num_actions))
 
         # predict Q values for the next state of each memory in the batch and
-        # take the maximum value
+        # take the maximum value. dont mask any outputs, i.e. use ones
         all_mask = np.ones((len(batch), self.num_actions))
         Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
-        # terminal states have Q value of zero
+        # terminal states have a Q value of zero by definition
         Q[d] = 0
         # set the y value for each sample to the reward of the selected
         # action plus the discounted Q value
         y[range(y.shape[0]), a] = r + self.discount_factor * Q
 
-        # train the model on the batch and return the loss
+        # use an identity of size action space, and index rows from it using
+        # the action vector to produce a one-hot matrix representing the mask
         action_mask = np.eye(self.num_actions)[a]
+        # train the model on the batch and return the loss. use the mask that
+        # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
 
     def train(self,
-        episodes: int=1000,
+        frames_to_play: int=50000000,
         batch_size: int=32,
-        null_op_max: int=30,
+        callback: Callable=None,
         _null_op: int=0,
-        callback: Callable=None
     ) -> None:
         """
         Train the network for a number of episodes (games).
 
         Args:
-            episodes: the number of episodes (games) to play
+            frames: the number of frames to play the game for
             batch_size: the size of the replay history batches
             null_op_max: the max number of random null ops at the beginning
                          of an episode to introduce stochasticity
-            _null_op: the action code for the NULL operation (do nothing)
             callback: an optional callback to get updates about the score,
                       loss, discount factor, and exploration rate every
                       episode
+            _null_op: the action code for the NULL operation (do nothing)
 
         Returns:
             None
 
         """
-        # initialize an action counter counter
-        frames = 0
-        # iterate over the number of training episodes
-        for episode in tqdm(range(episodes), unit='episode'):
+        # the progress bar for the operation
+        progress = tqdm(total=frames_to_play, unit='frame')
+        # loop indefinitely
+        while True:
+            # the done flag indicating that an episode has ended
+            done = False
+            # metrics throughout this episode
+            score = 0
+            loss = 0
+            frames = 0
             # reset the game and get the initial state
             state = self._initial_state()
             # perform NOPs randomly
-            for k in range(np.random.randint(0, null_op_max)):
-                next_state, reward, done = self._next_state(_null_op)
-
-            # the done flag indicating that an episode has ended
-            done = False
-            score = 0
-            loss = 0
-            # loop until done
+            for k in range(np.random.randint(0, self.null_op_max)):
+                state, reward, done = self._next_state(NULL_OP)
+            # loop until the episode ends
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state)
-                # hold the action for the number of frames
+                action = self.predict_action(state, self.exploration_rate.value)
+                # step the exploration rate forward
+                self.exploration_rate.step()
+                # fire the action and observe the next state, reward, and flag
                 next_state, reward, done = self._next_state(action)
+                # add the reward to the cumulative score
                 score += reward
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # check if the exploration rate has reached minimum
-                if self.exploration_rate > self.exploration_min:
-                    # decay the exploration rate
-                    self.exploration_rate *= self.exploration_decay
-                # increment the frames counter
+                # decrement the observation counter
+                frames_to_play -= 1
                 frames += 1
-                # if the frames counter has looped its epoch, update Q from
-                # replay memory
-                if frames % self.update_frequency == 0:
+                # update Q from replay
+                if frames_to_play % self.update_frequency == 0:
                     # train the network on replay memory
                     loss += self._replay(self.queue.sample(size=batch_size))
+                # break out if done observing
+                if frames_to_play <= 0:
+                    # close the progress bar
+                    progress.close()
+                    return
+
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss,
                     self.discount_factor,
-                    self.exploration_rate
+                    self.exploration_rate.value
                 )
+            # update the progress bar
+            progress.update(frames)
 
-    def play(self, games: int=30, fps: int=None) -> np.ndarray:
+    def play(self,
+        games: int=30,
+        exploration_rate: float=0.05,
+        fps: int=None
+    ) -> np.ndarray:
         """
         Run the agent without training for a number of games.
 
         Args:
             games: the number of games to play
+            exploration_rate: the epsilon for epsilon greedy exploration
             fps: the frame-rate to limit game play to
                 - if None, the frame-rate will not be limited (i.e infinite)
 
@@ -488,13 +468,16 @@ class DeepQAgent(Agent):
         for game in tqdm(range(games), unit='game'):
             # reset the game and get the initial state
             state = self._initial_state()
+            # perform NOPs randomly
+            for k in range(np.random.randint(0, self.null_op_max)):
+                state, reward, done = self._next_state(NULL_OP)
             # the done flag indicating that a game has ended
             done = False
             score = 0
             # loop until done
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state)
+                action = self.predict_action(state, exploration_rate)
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
