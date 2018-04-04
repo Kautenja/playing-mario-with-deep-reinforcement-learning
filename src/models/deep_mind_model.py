@@ -42,11 +42,11 @@ def build_deep_mind_model(
     # build the CNN using the functional API
     cnn_input = Input((*image_size, num_frames), name='cnn')
     cnn = Lambda(lambda x: x / 255.0)(cnn_input)
-    cnn = Conv2D(32, (8, 8), strides=(4,4), padding='same')(cnn)
+    cnn = Conv2D(32, (8, 8), strides=(4, 4), padding='same')(cnn)
     cnn = Activation('relu')(cnn)
-    cnn = Conv2D(64, (4, 4), strides=(2,2), padding='same')(cnn)
+    cnn = Conv2D(64, (4, 4), strides=(2, 2), padding='same')(cnn)
     cnn = Activation('relu')(cnn)
-    cnn = Conv2D(64, (3, 3), strides=(1,1), padding='same')(cnn)
+    cnn = Conv2D(64, (3, 3), strides=(1, 1), padding='same')(cnn)
     cnn = Activation('relu')(cnn)
     cnn = Flatten()(cnn)
     cnn = Dense(512)(cnn)
@@ -58,7 +58,7 @@ def build_deep_mind_model(
     output = Multiply()([cnn, mask_input])
 
     # build the model
-    model = Model(input=[cnn_input, mask_input], output=output)
+    model = Model(inputs=[cnn_input, mask_input], outputs=output)
     # compile the model with the default loss and optimization technique
     model.compile(loss=loss, optimizer=optimizer)
 
