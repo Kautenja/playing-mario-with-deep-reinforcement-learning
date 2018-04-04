@@ -120,6 +120,7 @@ class DeepQAgent(Agent):
             self.image_size
         )
 
+    # TODO: just store this in init? these values never change
     @property
     def input_shape(self) -> tuple:
         """Return the input shape of the DQN."""
@@ -171,6 +172,7 @@ class DeepQAgent(Agent):
         # save the weights
         self.model.load_weights(filename)
 
+    # TODO: replace with a class that allows custom cropping and stuff?
     def downsample(self,
         frame: np.ndarray,
         x: int=8,
@@ -222,8 +224,8 @@ class DeepQAgent(Agent):
         Returns:
             a tuple of:
                 - the next state
-                - the average reward over the frames
-                - the done flag
+                - the reward as a result of the action
+                - the terminal flag
 
         """
         # make the step and observe the state, reward, done flag
@@ -245,14 +247,16 @@ class DeepQAgent(Agent):
 
         return self.frame_buffer, reward, done
 
-    # TODO: should epsilon be disabled in testing? i.e. ie_epsilon check before
-    #       np.random
-    def predict_action(self, frames: np.ndarray) -> tuple:
+    def predict_action(self,
+        frames: np.ndarray,
+        exploration_rate: float
+    ) -> tuple:
         """
         Predict an action from a stack of frames.
 
         Args:
             frames: the stack of frames to predict Q values from
+            exploration_rate: the exploration rate for epsilon greedy selection
 
         Returns:
             the predicted optimal action based on the frames
@@ -260,7 +264,7 @@ class DeepQAgent(Agent):
         """
         # draw a number in [0, 1] and explore if it's less than the
         # exploration rate
-        if np.random.random() < self.exploration_rate.value:
+        if np.random.random() < exploration_rate:
             # select a random action. the output shape of the network implies
             # the action name by index, so use that shape as the upper bound
             return np.random.randint(0, self.num_actions)
@@ -274,18 +278,19 @@ class DeepQAgent(Agent):
             # optimal action
             return np.argmax(actions)
 
-    def observe(self, num_observations: int=1000) -> None:
+    def observe(self, replay_start_size: int=50000) -> None:
         """
         Observe random moves to initialize the replay memory.
 
         Args:
-            num_observations: the number of random observations to make
+            replay_start_size: the number of random observations to make
+                i.e. the size to fill the replay memory with to start
 
         Returns:
             None
 
         """
-        progress = tqdm(total=num_observations, unit='frame')
+        progress = tqdm(total=replay_start_size, unit='frame')
         # loop until done
         while True:
             # reset the game and get the initial state
@@ -303,11 +308,11 @@ class DeepQAgent(Agent):
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
-                num_observations -= 1
+                replay_start_size -= 1
                 # update the progress bar
                 progress.update(1)
                 # break out if done observing
-                if num_observations <= 0:
+                if replay_start_size <= 0:
                     # close the progress bar
                     progress.close()
                     return
@@ -394,7 +399,9 @@ class DeepQAgent(Agent):
             # loop until done
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state)
+                action = self.predict_action(state, self.exploration_rate.value)
+                # step the exploration rate forward
+                self.exploration_rate.step()
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
@@ -402,8 +409,6 @@ class DeepQAgent(Agent):
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # step the exploration rate forward
-                self.exploration_rate.step()
                 # increment the frames counter
                 frames += 1
                 # if the frames counter has looped its epoch, update Q from
@@ -418,12 +423,18 @@ class DeepQAgent(Agent):
                     self.exploration_rate.value
                 )
 
-    def play(self, games: int=30, fps: int=None) -> np.ndarray:
+    # TODO: 5 minute expiration timer like in Human Control
+    def play(self,
+        games: int=30,
+        exploration_rate: float=0.05,
+        fps: int=None
+    ) -> np.ndarray:
         """
         Run the agent without training for a number of games.
 
         Args:
             games: the number of games to play
+            exploration_rate: the epsilon for epsilon greedy exploration
             fps: the frame-rate to limit game play to
                 - if None, the frame-rate will not be limited (i.e infinite)
 
@@ -445,7 +456,7 @@ class DeepQAgent(Agent):
             # loop until done
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state)
+                action = self.predict_action(state, exploration_rate)
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
