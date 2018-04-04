@@ -8,6 +8,7 @@ from tqdm import tqdm
 from pygame.time import Clock
 from keras.optimizers import RMSprop
 from src.models import build_deep_mind_model
+from src.base import AnnealingVariable
 from .agent import Agent
 from .replay_queue import ReplayQueue
 
@@ -20,16 +21,14 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 _REPR_TEMPLATE = """
 {}(
     env={},
-    loss={},
-    optimizer={},
+    replay_memory_size={},
+    agent_history_length={},
     discount_factor={},
+    update_frequency={},
+    optimizer={},
     exploration_rate={},
-    exploration_decay={},
-    exploration_min={},
+    loss={},
     image_size={},
-    frames_per_action={},
-    update_frequency={}
-    replay_size={}
 )
 """.lstrip()
 
@@ -57,123 +56,74 @@ class DeepQAgent(Agent):
     """
 
     def __init__(self, env,
-        loss=tf.losses.huber_loss,
-        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        replay_memory_size: int=1000000,
+        agent_history_length: int=4,
         discount_factor: float=0.99,
-        exploration_rate: float=1.0,
-        exploration_decay: float=0.9999975,
-        exploration_min: float=0.1,
-        image_size: tuple=(84, 84),
-        frames_per_action: int=4,
         update_frequency: int=4,
-        replay_size: int=20000
+        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
+        loss=tf.losses.huber_loss,
+        image_size: tuple=(84, 84)
     ) -> None:
         """
         Initialize a new Deep Q Agent.
 
         Args:
+            TODO: update
             env: the environment to run on
             loss: the loss metric to use in the CNN
             optimizer: the optimization method to use on the CNN
             discount_factor: the discount factor, γ
             exploration_rate: the exploration rate, ε
-            exploration_decay: the decay factor for exploration rate
-                               0.9999975 will decay to ~0.1 after 1000000 it.
-            exploration_min: the minimum value for the exploration rate
             image_size: the size of the images to pass to the CNN
             frames_per_action: the number of frames to hold an action
             update_frequency: the number of actions between Q updates
-            replay_size: the
+            replay_memory_size:
 
-        Returns: None
+        Returns:
+            None
+
         """
-        # TODO: validate env type
-        # TODO: validate loss type
-        # TODO: validate optimizer type
-
-        # verify discount_factor
-        if not isinstance(discount_factor, float):
-            raise TypeError('discount_factor must be of type float')
-        if discount_factor < 0:
-            raise ValueError('discount_factor must be positive')
-        # verify exploration_rate
-        if not isinstance(exploration_rate, float):
-            raise TypeError('exploration_rate must be of type float')
-        if not 0 <= exploration_rate <= 1:
-            raise ValueError('exploration_rate must be in [0,1]')
-        # verify exploration_decay
-        if not isinstance(exploration_decay, float):
-            raise TypeError('exploration_decay must be of type float')
-        if exploration_decay < 0:
-            raise ValueError('exploration_decay must be positive')
-        # verify exploration_min
-        if not isinstance(exploration_min, float):
-            raise TypeError('exploration_min must be of type float')
-        if exploration_min < 0:
-            raise ValueError('exploration_min must be positive')
-        # verify image_size
-        if not isinstance(image_size, tuple):
-            raise TypeError('image_size must be of type tuple')
-        if len(image_size) != 2:
-            raise ValueError('image_size must be a tuple of two integers')
-        # verify frames_per_action
-        if not isinstance(frames_per_action, int):
-            raise TypeError('frames_per_action must be of type int')
-        if frames_per_action < 1:
-            raise ValueError('frames_per_action must be >= 1')
-        # verify update_frequency
-        if not isinstance(update_frequency, int):
-            raise TypeError('update_frequency must be of type int')
-        if update_frequency < 1:
-            raise ValueError('update_frequency must be >= 1')
-        # verify replay_size
-        if not isinstance(replay_size, int):
-            raise TypeError('replay_size must be of type int')
-        if replay_size < 1:
-            raise ValueError('replay_size must be >= 1')
-        # assign arguments to self
         self.env = env
-        self.loss = loss
-        self.optimizer = optimizer
+        self.queue = ReplayQueue(replay_memory_size)
+        self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
-        self.exploration_rate = exploration_rate
-        self.exploration_decay = exploration_decay
-        self.exploration_min = exploration_min
-        self.image_size = image_size
-        self.frames_per_action = frames_per_action
         self.update_frequency = update_frequency
-        # setup other instance members
-        self.frame_buffer = np.zeros((*image_size, frames_per_action))
+        self.optimizer = optimizer
+        self.exploration_rate = exploration_rate
+        self.loss = loss
+        self.image_size = image_size
+        # setup the buffer for frames the agent uses to predict on
+        self.frame_buffer = np.zeros((*image_size, agent_history_length))
+        # build the neural model for estimating Q values
         self.model = build_deep_mind_model(
             image_size=image_size,
-            num_frames=frames_per_action,
+            num_frames=agent_history_length,
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
         )
-        self.queue = ReplayQueue(replay_size)
+
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.loss,
-            self.optimizer,
+            self.queue.size,
+            self.agent_history_length,
             self.discount_factor,
-            self.exploration_rate,
-            self.exploration_decay,
-            self.exploration_min,
-            self.image_size,
-            self.frames_per_action,
             self.update_frequency,
-            self.queue.size
+            self.optimizer,
+            self.exploration_rate,
+            self.loss,
+            self.image_size
         )
 
     @property
     def input_shape(self) -> tuple:
         """Return the input shape of the DQN."""
-        return (1, *self.image_size, self.frames_per_action)
+        return (1, *self.image_size, self.agent_history_length)
 
     @property
     def num_actions(self) -> int:
@@ -191,7 +141,7 @@ class DeepQAgent(Agent):
 
         Args:
             filename: the filename of the weights file to create
-                - if None, file use the classname followed by '.h5'
+                - if None, file use the class name followed by '.h5'
 
         Returns:
             the path the the created weights file
@@ -258,7 +208,7 @@ class DeepQAgent(Agent):
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
         # reset the frame frame with the initial state
-        self.frame_buffer = np.repeat(initial_frame, self.frames_per_action, axis=2)
+        self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
         return self.frame_buffer
 
@@ -310,14 +260,14 @@ class DeepQAgent(Agent):
         """
         # draw a number in [0, 1] and explore if it's less than the
         # exploration rate
-        if np.random.random() < self.exploration_rate:
+        if np.random.random() < self.exploration_rate.value:
             # select a random action. the output shape of the network implies
             # the action name by index, so use that shape as the upper bound
             return np.random.randint(0, self.num_actions)
         else:
             # reshape the frames and make the mask
             frames = frames.reshape(self.input_shape)
-            mask = np.ones((self.frames_per_action, self.num_actions))
+            mask = np.ones((self.agent_history_length, self.num_actions))
             # predict the values of each action
             actions = self.model.predict([frames, mask], batch_size=1)
             # select the action with the highest estimated score as the
@@ -452,10 +402,8 @@ class DeepQAgent(Agent):
                 self.queue.push(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
-                # check if the exploration rate has reached minimum
-                if self.exploration_rate > self.exploration_min:
-                    # decay the exploration rate
-                    self.exploration_rate *= self.exploration_decay
+                # step the exploration rate forward
+                self.exploration_rate.step()
                 # increment the frames counter
                 frames += 1
                 # if the frames counter has looped its epoch, update Q from
@@ -467,7 +415,7 @@ class DeepQAgent(Agent):
             if callable(callback):
                 callback(score, loss,
                     self.discount_factor,
-                    self.exploration_rate
+                    self.exploration_rate.value
                 )
 
     def play(self, games: int=30, fps: int=None) -> np.ndarray:
