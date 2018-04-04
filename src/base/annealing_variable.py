@@ -1,6 +1,10 @@
 """A wrapper for a variable that decays or grows over time."""
 
 
+# the representation format string for the AnnealingVariable class
+_REPR = "{}(initial_value={}, final_value={}, steps={})"
+
+
 class AnnealingVariable(object):
     """A variable that decays or grows over time."""
 
@@ -29,6 +33,7 @@ class AnnealingVariable(object):
         self.initial_value = initial_value
         self.final_value = final_value
         self.value = initial_value
+        self.steps = steps
         # get the geometric rate for the annealing
         self.rate = (final_value / initial_value)**(1.0 / steps)
         # determine whether to use max or min when bounding with the final
@@ -37,6 +42,15 @@ class AnnealingVariable(object):
             self.bound = min
         else:
             self.bound = max
+
+    def __repr__(self) -> str:
+        """return an executable representation of self."""
+        return _REPR.format(
+            self.__class__.__name__,
+            self.initial_value,
+            self.final_value,
+            self.steps
+        )
 
     def step(self) -> None:
         """Perform a step to decay or grow the variable."""
