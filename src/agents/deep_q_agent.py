@@ -217,6 +217,8 @@ class DeepQAgent(Agent):
         # reset the environment, duplicate the initial state based on the
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
+        # render this frame in the emulator
+        self.env.render()
         # reset the frame buffer with the initial state
         self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
@@ -440,7 +442,6 @@ class DeepQAgent(Agent):
             # update the progress bar
             progress.update(frames)
 
-    # TODO: 5 minute expiration timer like in Human Control
     def play(self,
         games: int=30,
         exploration_rate: float=0.05,
