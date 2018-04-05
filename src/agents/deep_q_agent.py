@@ -134,6 +134,7 @@ class DeepQAgent(Agent):
         """Return the input shape of the DQN."""
         return (1, *self.image_size, self.agent_history_length)
 
+    # TODO: move to super class?
     @property
     def num_actions(self) -> int:
         """Return the number of actions for this agent."""
@@ -144,6 +145,9 @@ class DeepQAgent(Agent):
         """Return the name of the default weight file for this network."""
         return '{}/{}.h5'.format(THIS_DIRECTORY, self.__class__.__name__)
 
+    # TODO: this really doesnt need to be here. removing it allows the
+    # default_weight_file to be removed and the THIS_DIRECTORY stuff.
+    # these add a lot of lines with functionality that isnt and wont be used
     def save_model(self, filename: str=None, overwrite: bool=True) -> str:
         """
         Save the model to disk.
@@ -442,6 +446,7 @@ class DeepQAgent(Agent):
             # update the progress bar
             progress.update(frames)
 
+    # TODO: 5 min limit per game
     def play(self,
         games: int=30,
         exploration_rate: float=0.05,
