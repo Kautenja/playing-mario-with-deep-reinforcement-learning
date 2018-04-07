@@ -13,10 +13,6 @@ from .agent import Agent
 from .replay_queue import ReplayQueue
 
 
-# the name of the directory housing this module
-THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-
-
 # the format string for this objects representation
 _REPR_TEMPLATE = """
 {}(
@@ -39,26 +35,7 @@ NULL_OP = 0
 
 
 class DeepQAgent(Agent):
-    """
-    An implementation of Deep Q-Learning.
-
-    Algorithm:
-        initialize Q[s, a]
-        observe initial state s
-        while not done:
-          select and perform an action a
-          observe a reward r and new state s'
-          Q[s, a] ←  Q[s, a] + α(r + γ max_a'(Q[s', a']) - Q[s, a])
-          s ← s'
-
-    Note:
-    -   when α = 1, this reduces to vanilla Bellman Equation
-      -   Q[s, a] ← r + γmax_a'(Q[s', a'])
-    -   another formulation uses the probabilistic inverse of the
-        learning rate as a factor for original Q value:
-      -   Q[s, a] ←  (1 - α)Q[s, a] + α(r + γ max_a'(Q[s', a']) - Q[s, a])
-
-    """
+    """The Deep Q reinforcement learning algorithm."""
 
     def __init__(self, env,
         replay_memory_size: int=1000000,
@@ -75,16 +52,20 @@ class DeepQAgent(Agent):
         Initialize a new Deep Q Agent.
 
         Args:
-            TODO: update
             env: the environment to run on
-            loss: the loss metric to use in the CNN
-            optimizer: the optimization method to use on the CNN
+            agent_history_length: the number of previous frames for the agent
+                                  to make new decisions based on
             discount_factor: the discount factor, γ
-            exploration_rate: the exploration rate, ε
+            update_frequency: the number of actions between updates to the
+                              deep Q network
+            optimizer: the optimization method to use on the CNN
+            exploration_rate: the exploration rate, ε, expected as an
+                              AnnealingVariable subclass
+            null_op_max: the maximum number of random null ops at the start of
+                         each new game. this adds stochastic "human start" to
+                         the training and playing process for the agent
+            loss: the loss method to use from TF or Keras
             image_size: the size of the images to pass to the CNN
-            frames_per_action: the number of frames to hold an action
-            update_frequency: the number of actions between Q updates
-            replay_memory_size:
 
         Returns:
             None
@@ -111,7 +92,6 @@ class DeepQAgent(Agent):
             optimizer=optimizer
         )
 
-
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
@@ -127,62 +107,6 @@ class DeepQAgent(Agent):
             self.loss,
             self.image_size
         )
-
-    # TODO: just store this in init? these values never change
-    @property
-    def input_shape(self) -> tuple:
-        """Return the input shape of the DQN."""
-        return (1, *self.image_size, self.agent_history_length)
-
-    # TODO: move to super class?
-    @property
-    def num_actions(self) -> int:
-        """Return the number of actions for this agent."""
-        return self.env.action_space.n
-
-    @property
-    def default_weight_file(self) -> str:
-        """Return the name of the default weight file for this network."""
-        return '{}/{}.h5'.format(THIS_DIRECTORY, self.__class__.__name__)
-
-    # TODO: this really doesnt need to be here. removing it allows the
-    # default_weight_file to be removed and the THIS_DIRECTORY stuff.
-    # these add a lot of lines with functionality that isnt and wont be used
-    def save_model(self, filename: str=None, overwrite: bool=True) -> str:
-        """
-        Save the model to disk.
-
-        Args:
-            filename: the filename of the weights file to create
-                - if None, file use the class name followed by '.h5'
-
-        Returns:
-            the path the the created weights file
-
-        """
-        # if there is no filename, fall back on the default
-        if filename is None:
-            filename = self.default_weight_file
-        # save the weights
-        self.model.save_weights(filename, overwrite=overwrite)
-
-    def load_model(self, filename: str=None) -> None:
-        """
-        Load the model from disk.
-
-        Args:
-            filename: the filename of the weights file to load from
-                - if None, file use the classname followed by '.h5'
-
-        Returns:
-            None
-
-        """
-        # if there is no filename, fall back on the default
-        if filename is None:
-            filename = self.default_weight_file
-        # save the weights
-        self.model.load_weights(filename)
 
     # TODO: replace with a class that allows custom cropping and stuff?
     def downsample(self,
@@ -281,11 +205,11 @@ class DeepQAgent(Agent):
         if np.random.random() < exploration_rate:
             # select a random action. the output shape of the network implies
             # the action name by index, so use that shape as the upper bound
-            return np.random.randint(0, self.num_actions)
+            return self.env.action_space.sample()
         else:
             # reshape the frames and make the mask
-            frames = frames.reshape(self.input_shape)
-            mask = np.ones((self.agent_history_length, self.num_actions))
+            frames = frames[np.newaxis, :, :, :]
+            mask = np.ones((self.agent_history_length, self.env.action_space.n))
             # predict the values of each action
             actions = self.model.predict([frames, mask], batch_size=1)
             # select the action with the highest estimated score as the
@@ -331,7 +255,7 @@ class DeepQAgent(Agent):
                     progress.close()
                     return
 
-    def _replay(self, batch: list) -> float:
+    def _replay(self, s, a, r, d, s2) -> float:
         """
         Train the network on a mini-batch of replay data.
 
@@ -339,25 +263,22 @@ class DeepQAgent(Agent):
             all arguments are arrays that should be of the same size
 
         Args:
-            batch: the batch of tuples to train on containing:
-                - s: the current state
-                - a: the action
-                - r: the reward
-                - d: the terminal flags
-                - s2: the next state
+            s: a batch of current states
+            a: a batch of actions from each state in s
+            r: a batch of reward from each action in a
+            d: a batch of terminal flags after each action in a
+            s2: the next state from each state, action pair in s, a
 
         Returns:
             the loss as a result of the training
 
         """
-        # unpack the batch of memories
-        s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
         # initialize target y values as a matrix of zeros
-        y = np.zeros((len(batch), self.num_actions))
+        y = np.zeros((len(s), self.env.action_space.n))
 
         # predict Q values for the next state of each memory in the batch and
         # take the maximum value. dont mask any outputs, i.e. use ones
-        all_mask = np.ones((len(batch), self.num_actions))
+        all_mask = np.ones((len(s), self.env.action_space.n))
         Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
         # terminal states have a Q value of zero by definition
         Q[d] = 0
@@ -367,7 +288,7 @@ class DeepQAgent(Agent):
 
         # use an identity of size action space, and index rows from it using
         # the action vector to produce a one-hot matrix representing the mask
-        action_mask = np.eye(self.num_actions)[a]
+        action_mask = np.eye(self.env.action_space.n)[a]
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
@@ -376,7 +297,6 @@ class DeepQAgent(Agent):
         frames_to_play: int=50000000,
         batch_size: int=32,
         callback: Callable=None,
-        _null_op: int=0,
     ) -> None:
         """
         Train the network for a number of episodes (games).
@@ -389,7 +309,6 @@ class DeepQAgent(Agent):
             callback: an optional callback to get updates about the score,
                       loss, discount factor, and exploration rate every
                       episode
-            _null_op: the action code for the NULL operation (do nothing)
 
         Returns:
             None
@@ -430,10 +349,11 @@ class DeepQAgent(Agent):
                 # update Q from replay
                 if frames_to_play % self.update_frequency == 0:
                     # train the network on replay memory
-                    loss += self._replay(self.queue.sample(size=batch_size))
+                    loss += self._replay(*self.queue.sample(size=batch_size))
                 # break out if done observing
                 if frames_to_play <= 0:
-                    # close the progress bar
+                    # update and close the progress bar
+                    progress.update(frames)
                     progress.close()
                     return
 
