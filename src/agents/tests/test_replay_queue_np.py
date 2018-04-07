@@ -94,6 +94,12 @@ class ReplyBuffer_sample(TestCase):
 
         s, a, r, d, s2 = arb.sample()
 
+        self.assertEqual(s.dtype, np.uint8)
+        self.assertEqual(a.dtype, np.uint8)
+        self.assertEqual(r.dtype, np.int8)
+        self.assertEqual(d.dtype, np.bool)
+        self.assertEqual(s2.dtype, np.uint8)
+
         sample_size = len(s)
 
         exp_s, exp_a, exp_r, exp_d, exp_s2 = ones()
@@ -115,6 +121,12 @@ class ReplyBuffer_sample_random(TestCase):
             arb.push(*random_state())
 
         s, a, r, d, s2 = arb.sample()
+
+        self.assertEqual(s.dtype, np.uint8)
+        self.assertEqual(a.dtype, np.uint8)
+        self.assertEqual(r.dtype, np.int8)
+        self.assertEqual(d.dtype, np.bool)
+        self.assertEqual(s2.dtype, np.uint8)
 
         # save the arrays as the expected arrays
         # np.save('{}/arrays/s_np.npy'.format(DIR), s)
