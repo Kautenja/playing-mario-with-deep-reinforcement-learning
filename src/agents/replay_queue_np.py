@@ -5,12 +5,18 @@ import numpy as np
 class ReplayQueue(object):
     """A queue for storing previous experiences to sample from."""
 
-    def __init__(self, size: int=1000000) -> None:
+    def __init__(self,
+        size: int=250000,
+        image_size: tuple=(84, 84),
+        agent_history_length: int=4
+    ) -> None:
         """
         Initialize a new replay buffer with a given size.
 
         Args:
             size: the maximum number of experiences to store
+            image_size: the size of the images to store
+            agent_history_length
 
         Returns:
             None
@@ -23,14 +29,25 @@ class ReplayQueue(object):
             raise ValueError('size must be at least 1')
         # assign size to self
         self._size = size
+        # the size of frames
+        frame_size = (*image_size, agent_history_length)
+        # setup the queues
+        self.s = np.zeros((size, *frame_size)).astype('uint8')
+        self.a = np.zeros(size).astype('uint8')
+        self.r = np.zeros(size).astype('uint8')
+        self.d = np.zeros(size).astype(bool)
+        self.s2 = np.zeros((size, *frame_size)).astype('uint8')
+        # setup variables for the index and top
+        self.index = 0
+        self.top = 0
 
     def __repr__(self) -> str:
         """Return an executable string representation of self."""
         return '{}(size={})'.format(self.__class__.__name__, self.size)
 
-    # def __len__(self) -> int:
-    #     """Return the number of items in the queue."""
-    #     return len(self.queue)
+    def __len__(self) -> int:
+        """Return the number of items in the queue."""
+        return self.top
 
     @property
     def size(self) -> int:
@@ -58,7 +75,28 @@ class ReplayQueue(object):
         a = int(a)
         r = int(r)
         # push the variables onto the queue
-        self.queue.append((s, a, r, d, s2))
+        self.s[self.index] = s.astype('uint8')
+        self.a[self.index] = int(a)
+        self.r[self.index] = int(r)
+        self.d[self.index] = d
+        self.s2[self.index] = s2.astype('uint8')
+        # increment the index
+        if self.index == self.size - 1:
+            self.index = 0
+        else:
+            self.index += 1
+        # increment the top pointer
+        if self.top < self.size:
+            self.top += 1
+
+    def current(self) -> tuple:
+        """Pop an item off the queue and return it."""
+        s = self.s[self.index]
+        a = self.a[self.index]
+        r = self.r[self.index]
+        d = self.d[self.index]
+        s2 = self.s2[self.index]
+        return s, a, r, d, s2
 
     def sample(self, size: int=32):
         """
@@ -71,10 +109,16 @@ class ReplayQueue(object):
             A random sample from the queue sampled uniformly
 
         """
-        # generate an index of items to extract
-        idx_batch = set(np.random.randint(0, len(self), size))
-        # extract the batch from the queue
-        return [val for i, val in enumerate(self.queue) if i in idx_batch]
+        # generate and index of items to sample
+        index = np.random.randint(0, len(self), size)
+        # extract the items for this batch
+        s = self.s[index]
+        a = self.a[index]
+        r = self.r[index]
+        d = self.d[index]
+        s2 = self.s2[index]
+
+        return s, a, r, d, s2
 
 
 # explicitly define the outward facing API of this module
