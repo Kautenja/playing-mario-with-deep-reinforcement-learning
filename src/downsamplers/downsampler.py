@@ -6,6 +6,9 @@ import numpy as np
 class Downsampler(object):
     """A class for down-sampling images from RGB to Y."""
 
+    # the representation of this object as a string of executable Python code
+    _R = '{}(y={}, x={}, cut={})'
+
     def __init__(self, y: int, x: int, cut: list=[]) -> None:
         """
         Create a new down-sampler.
@@ -22,6 +25,10 @@ class Downsampler(object):
         self.y = y
         self.x = x
         self.cut = cut
+
+    def __repr__(self) -> str:
+        """Return an executable string representation of self."""
+        return self._R.format(self.__class__.__name__, self.y, self.x, self.cut)
 
     def __call__(self, frame: np.ndarray, image_size: tuple) -> np.ndarray:
         """
