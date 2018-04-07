@@ -60,7 +60,7 @@ class JupyterCallback(object):
         # adjust the layout
         plt.tight_layout()
         # clear the Jupyter front-end and send the new plot
-        display.clear_output(wait=False)
+        display.clear_output(wait=True)
         plt.show()
 
 
