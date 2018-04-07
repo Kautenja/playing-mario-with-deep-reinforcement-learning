@@ -34,7 +34,7 @@ class ReplayQueue(object):
         # setup the queues
         self.s = np.zeros((size, *frame_size)).astype('uint8')
         self.a = np.zeros(size).astype('uint8')
-        self.r = np.zeros(size).astype('uint8')
+        self.r = np.zeros(size).astype('int8')
         self.d = np.zeros(size).astype(bool)
         self.s2 = np.zeros((size, *frame_size)).astype('uint8')
         # setup variables for the index and top
@@ -53,6 +53,18 @@ class ReplayQueue(object):
     def size(self) -> int:
         """Return the size of the queue."""
         return self._size
+
+    @property
+    def num_bytes(self) -> int:
+        """Return the number of byte this object consumes."""
+        from sys import getsizeof
+        s = getsizeof(self.s)
+        a = getsizeof(self.a)
+        r = getsizeof(self.r)
+        d = getsizeof(self.d)
+        s2 = getsizeof(self.s2)
+
+        return s + a + r + d + s2
 
     def push(self, s, a, r, d, s2) -> None:
         """
