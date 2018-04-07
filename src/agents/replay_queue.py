@@ -39,6 +39,12 @@ class ReplayQueue(object):
         """Return the size of the queue."""
         return self.queue.maxlen
 
+    @property
+    def num_bytes(self) -> int:
+        """Return the number of byte this object consumes."""
+        from sys import getsizeof
+        return sum(sum(getsizeof(itm) for itm in mem) for mem in self.queue)
+
     def push(self, s, a, r, d, s2) -> None:
         """
         Push a new experience onto the queue.
@@ -81,9 +87,6 @@ class ReplayQueue(object):
         idx_batch = set(np.random.randint(0, len(self), size))
         # extract the batch from the queue
         return [val for i, val in enumerate(self.queue) if i in idx_batch]
-
-
-
 
 
 # explicitly define the outward facing API of this module
