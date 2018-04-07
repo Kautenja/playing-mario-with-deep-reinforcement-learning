@@ -83,5 +83,8 @@ class ReplayQueue(object):
         return [val for i, val in enumerate(self.queue) if i in idx_batch]
 
 
+
+
+
 # explicitly define the outward facing API of this module
 __all__ = ['ReplayQueue']
