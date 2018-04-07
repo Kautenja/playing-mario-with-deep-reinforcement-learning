@@ -32,11 +32,11 @@ class ReplayQueue(object):
         # the size of frames
         frame_size = (*image_size, agent_history_length)
         # setup the queues
-        self.s = np.zeros((size, *frame_size)).astype('uint8')
-        self.a = np.zeros(size).astype('uint8')
-        self.r = np.zeros(size).astype('int8')
-        self.d = np.zeros(size).astype(bool)
-        self.s2 = np.zeros((size, *frame_size)).astype('uint8')
+        self.s = np.zeros((size, *frame_size)).astype(np.uint8)
+        self.a = np.zeros(size).astype(np.uint8)
+        self.r = np.zeros(size).astype(np.int8)
+        self.d = np.zeros(size).astype(np.bool)
+        self.s2 = np.zeros((size, *frame_size)).astype(np.uint8)
         # setup variables for the index and top
         self.index = 0
         self.top = 0
@@ -66,7 +66,13 @@ class ReplayQueue(object):
 
         return s + a + r + d + s2
 
-    def push(self, s, a, r, d, s2) -> None:
+    def push(self,
+        s: np.ndarray,
+        a: np.uint8,
+        r: np.int8,
+        d: bool,
+        s2: np.ndarray
+    ) -> None:
         """
         Push a new experience onto the queue.
 
@@ -81,22 +87,14 @@ class ReplayQueue(object):
             None
 
         """
-        # ensure types are the smallest possible before storing in the queue
-        s = s.astype('uint8')
-        s2 = s2.astype('uint8')
-        a = int(a)
-        r = int(r)
         # push the variables onto the queue
-        self.s[self.index] = s.astype('uint8')
-        self.a[self.index] = int(a)
-        self.r[self.index] = int(r)
+        self.s[self.index] = s
+        self.a[self.index] = a
+        self.r[self.index] = r
         self.d[self.index] = d
-        self.s2[self.index] = s2.astype('uint8')
+        self.s2[self.index] = s2
         # increment the index
-        if self.index == self.size - 1:
-            self.index = 0
-        else:
-            self.index += 1
+        self.index = (self.index + 1) % self.size
         # increment the top pointer
         if self.top < self.size:
             self.top += 1
@@ -108,9 +106,10 @@ class ReplayQueue(object):
         r = self.r[self.index]
         d = self.d[self.index]
         s2 = self.s2[self.index]
+
         return s, a, r, d, s2
 
-    def sample(self, size: int=32):
+    def sample(self, size: int=32) -> tuple:
         """
         Return a random sample of items from the queue.
 
