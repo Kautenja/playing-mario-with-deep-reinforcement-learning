@@ -1,6 +1,4 @@
 """An implementation of Deep Q-Learning."""
-import os
-import cv2
 import numpy as np
 import tensorflow as tf
 from typing import Callable
@@ -9,6 +7,7 @@ from pygame.time import Clock
 from keras.optimizers import RMSprop
 from src.models import build_deep_mind_model
 from src.base import AnnealingVariable
+from src.downsamplers import Downsampler
 from .agent import Agent
 from .replay_queue import ReplayQueue
 
@@ -17,6 +16,7 @@ from .replay_queue import ReplayQueue
 _REPR_TEMPLATE = """
 {}(
     env={},
+    downsample={},
     replay_memory_size={},
     agent_history_length={},
     discount_factor={},
@@ -37,7 +37,7 @@ NULL_OP = 0
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env,
+    def __init__(self, env, downsample: Downsampler,
         replay_memory_size: int=1000000,
         agent_history_length: int=4,
         discount_factor: float=0.99,
@@ -53,6 +53,7 @@ class DeepQAgent(Agent):
 
         Args:
             env: the environment to run on
+            downsample: the down-sampler for the Gym environment
             agent_history_length: the number of previous frames for the agent
                                   to make new decisions based on
             discount_factor: the discount factor, γ
@@ -72,6 +73,7 @@ class DeepQAgent(Agent):
 
         """
         self.env = env
+        self.downsample = downsample
         self.queue = ReplayQueue(replay_memory_size)
         self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
@@ -97,6 +99,7 @@ class DeepQAgent(Agent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
+            self.downsample,
             self.queue.size,
             self.agent_history_length,
             self.discount_factor,
@@ -108,48 +111,19 @@ class DeepQAgent(Agent):
             self.image_size
         )
 
-    # TODO: replace with a class that allows custom cropping and stuff?
-    def downsample(self,
-        frame: np.ndarray,
-        x: int=8,
-        y: int=14
-    ) -> np.ndarray:
-        """
-        Down-sample the given frame from RGB to B&W with a reduced size.
-
-        Args:
-            frame: the frame to down-sample
-            x: the number of x pixels to crop
-            y: the number of y pixels to crop
-
-        Returns:
-            a down-sample B&W frame
-
-        """
-        # convert the frame from RGB to gray scale
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        # crop the image
-        frame = frame[2*y:frame.shape[0] - y, x:frame.shape[1] - x]
-
-        # zero out specific colors
-        # 142 is the generic gray color
-        frame[frame == 142] = 0
-
-        # resize the frame to the expected shape
-        frame = cv2.resize(frame, self.image_size)
-
-        return frame
-
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
-        # reset the environment, duplicate the initial state based on the
-        # number of frames per action
-        initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
+        # reset the environment
+        frame = self.env.reset()
         # render this frame in the emulator
-        # self.env.render()
-        # reset the frame buffer with the initial state
-        self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
+        self.env.render()
+
+        # down-sample the frame to B&W and cropped to playable area
+        frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
+        # reset the frame buffer with the initial state repeated as necessary
+        self.frame_buffer = np.repeat(frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
+
         return self.frame_buffer
 
     def _next_state(self, action: int) -> tuple:
@@ -172,7 +146,7 @@ class DeepQAgent(Agent):
         self.env.render()
 
         # down-sample the state and convert it to the expected shape
-        state = self.downsample(state)[:, :, np.newaxis]
+        state = self.downsample(state, self.image_size)[:, :, np.newaxis]
         # add the state to the frame buffer
         self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
         # remove the last frame in the frame buffer
