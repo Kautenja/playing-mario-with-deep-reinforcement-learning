@@ -222,7 +222,7 @@ class DeepQAgent(Agent):
         # number of frames per action
         initial_frame = self.downsample(self.env.reset())[:, :, np.newaxis]
         # render this frame in the emulator
-        self.env.render()
+        # self.env.render()
         # reset the frame buffer with the initial state
         self.frame_buffer = np.repeat(initial_frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
