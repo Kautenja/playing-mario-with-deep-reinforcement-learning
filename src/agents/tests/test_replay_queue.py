@@ -9,37 +9,64 @@ from ..replay_queue import ReplayQueue
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-def arb_state():
-    s = np.ones((10, 10, 4))
+def ones() -> tuple:
+    """Return an arbitrary state of ones."""
+    s = np.ones((84, 84, 4))
     a = 1
-    r = 0
-    d = False
-    s2 = np.ones((10, 10, 4))
-    return s, a, r, d, s2
-
-
-def other_state():
-    s = np.zeros((10, 10, 4))
-    a = 3
     r = 1
     d = True
-    s2 = np.zeros((10, 10, 4))
+    s2 = np.ones((84, 84, 4))
     return s, a, r, d, s2
 
 
-def random_state(state=None):
-    s = np.random.randint(0, 256, (10, 10, 4)).astype('uint8')
+def zeros() -> tuple:
+    """Return an arbitrary state of zeros."""
+    s = np.zeros((84, 84, 4))
+    a = 0
+    r = 0
+    d = False
+    s2 = np.zeros((84, 84, 4))
+    return s, a, r, d, s2
+
+
+def random_state() -> tuple:
+    """Return an arbitrary randomized state"""
+    s = np.random.randint(0, 256, (84, 84, 4)).astype('uint8')
     a = np.random.randint(6)
     r = np.random.randint(2) - 1
     d = bool(np.random.randint(1))
-    s2 = np.random.randint(0, 256, (10, 10, 4)).astype('uint8')
+    s2 = np.random.randint(0, 256, (84, 84, 4)).astype('uint8')
     return s, a, r, d, s2
 
 
-class ReplyBuffer_init(TestCase):
+class ReplyBuffer__init__(TestCase):
     def test(self):
-        arb = ReplayQueue()
-        self.assertIsInstance(arb, object)
+        self.assertIsInstance(ReplayQueue(10), object)
+        self.assertIsInstance(ReplayQueue(size=10), object)
+
+
+class ReplyBuffer__repr__(TestCase):
+    def test(self):
+        self.assertEqual('ReplayQueue(size=4321)', repr(ReplayQueue(4321)))
+        self.assertEqual('ReplayQueue(size=1234)', repr(ReplayQueue(size=1234)))
+
+
+class ReplyBuffer__len__(TestCase):
+    def test(self):
+        arb = ReplayQueue(10)
+        self.assertEqual(0, len(arb))
+        arb.push(*zeros())
+        self.assertEqual(1, len(arb))
+
+        for index in range(2, 30):
+            if index < 10:
+                arb.push(*zeros())
+                self.assertEqual(index, len(arb))
+            else:
+                arb.push(*ones())
+                self.assertEqual(10, len(arb))
+
+        self.assertTrue(ones(), arb.current())
 
 
 class ReplyBuffer_is_bound(TestCase):
@@ -49,38 +76,33 @@ class ReplyBuffer_is_bound(TestCase):
             # a different item is added so that it will be at the bottom
             # when the loop finishes
             if i == 15:
-                arb.push(*other_state())
+                arb.push(*ones())
             else:
-                arb.push(*arb_state())
+                arb.push(*zeros())
 
         # there should only be 10 elements
         self.assertEqual(10, len(arb))
         # it should move the items along as new ones are added
-        self.assertEqual(other_state()[1], arb.deque()[1])
-
-
-class ReplyBuffer_len_(TestCase):
-    def test(self):
-        arb = ReplayQueue(10)
-        self.assertEqual(0, len(arb))
-        arb.push(*arb_state())
-        self.assertEqual(1, len(arb))
-        _ = arb.deque()
-        self.assertEqual(0, len(arb))
+        self.assertEqual(ones()[1], arb.current()[1])
 
 
 class ReplyBuffer_sample(TestCase):
     def test(self):
         arb = ReplayQueue(1000)
         for i in range(1000):
-            arb.push(*arb_state())
+            arb.push(*ones())
 
-        batch = arb.sample()
-        s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
+        s, a, r, d, s2 = arb.sample()
+
+        self.assertEqual(s.dtype, np.uint8)
+        self.assertEqual(a.dtype, np.uint8)
+        self.assertEqual(r.dtype, np.int8)
+        self.assertEqual(d.dtype, np.bool)
+        self.assertEqual(s2.dtype, np.uint8)
 
         sample_size = len(s)
 
-        exp_s, exp_a, exp_r, exp_d, exp_s2 = arb_state()
+        exp_s, exp_a, exp_r, exp_d, exp_s2 = ones()
 
         self.assertEqual([exp_a] * sample_size, list(a))
         self.assertEqual([exp_r] * sample_size, list(r))
@@ -98,22 +120,27 @@ class ReplyBuffer_sample_random(TestCase):
         for i in range(1000):
             arb.push(*random_state())
 
-        batch = arb.sample()
-        s, a, r, d, s2 = tuple(map(np.array, zip(*batch)))
+        s, a, r, d, s2 = arb.sample()
+
+        self.assertEqual(s.dtype, np.uint8)
+        self.assertEqual(a.dtype, np.uint8)
+        self.assertEqual(r.dtype, np.int8)
+        self.assertEqual(d.dtype, np.bool)
+        self.assertEqual(s2.dtype, np.uint8)
 
         # save the arrays as the expected arrays
-        # np.save('{}/arrays/s.npy'.format(DIR), s)
-        # np.save('{}/arrays/a.npy'.format(DIR), a)
-        # np.save('{}/arrays/r.npy'.format(DIR), r)
-        # np.save('{}/arrays/d.npy'.format(DIR), d)
-        # np.save('{}/arrays/s2.npy'.format(DIR), s2)
+        # np.save('{}/arrays/s_np.npy'.format(DIR), s)
+        # np.save('{}/arrays/a_np.npy'.format(DIR), a)
+        # np.save('{}/arrays/r_np.npy'.format(DIR), r)
+        # np.save('{}/arrays/d_np.npy'.format(DIR), d)
+        # np.save('{}/arrays/s2_np.npy'.format(DIR), s2)
 
         # load the expected arrays
-        exp_s = np.load('{}/arrays/s.npy'.format(DIR))
-        exp_a = np.load('{}/arrays/a.npy'.format(DIR))
-        exp_r = np.load('{}/arrays/r.npy'.format(DIR))
-        exp_d = np.load('{}/arrays/d.npy'.format(DIR))
-        exp_s2 = np.load('{}/arrays/s2.npy'.format(DIR))
+        exp_s = np.load('{}/arrays/s_np.npy'.format(DIR))
+        exp_a = np.load('{}/arrays/a_np.npy'.format(DIR))
+        exp_r = np.load('{}/arrays/r_np.npy'.format(DIR))
+        exp_d = np.load('{}/arrays/d_np.npy'.format(DIR))
+        exp_s2 = np.load('{}/arrays/s2_np.npy'.format(DIR))
 
         # check that the returned arrays are the expected ones
         self.assertTrue(np.array_equal(exp_s, s))
