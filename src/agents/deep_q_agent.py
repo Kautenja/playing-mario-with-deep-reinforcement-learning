@@ -333,10 +333,7 @@ class DeepQAgent(Agent):
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
-                callback(score, loss,
-                    self.discount_factor,
-                    self.exploration_rate.value
-                )
+                callback(score, loss)
             # update the progress bar
             progress.update(frames)
 
