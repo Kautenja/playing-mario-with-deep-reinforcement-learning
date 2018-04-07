@@ -22,24 +22,15 @@ class JupyterCallback(object):
         # setup caches for metrics
         self.scores = []
         self.losses = []
-        self.discount_factors = []
-        self.exploration_rates = []
         # create a list of tuples for plotting data
         self.metrics = [
             (self.scores, 'Reward'),
-            (self.losses, 'Loss'),
-            (self.discount_factors, 'Discount Factor ($\gamma$)'),
-            (self.exploration_rates, 'Exploration Rate ($\epsilon$)')
+            (self.losses, 'Loss')
         ]
         # set the figsize of this callback
         self.figsize = width, height_per_plot * len(self.metrics)
 
-    def __call__(self,
-        score: float,
-        loss: float,
-        discount_factor: float,
-        exploration_rate: float
-    ) -> None:
+    def __call__(self, score: float, loss: float) -> None:
         """
         Update the callback with the new score (from a finished episode).
 
@@ -56,8 +47,6 @@ class JupyterCallback(object):
         # append the score to the list
         self.scores.append(score)
         self.losses.append(loss)
-        self.discount_factors.append(discount_factor)
-        self.exploration_rates.append(exploration_rate)
         # create a figure
         plt.figure(figsize=self.figsize)
         for index, (metric, ylabel) in enumerate(self.metrics):
@@ -71,7 +60,7 @@ class JupyterCallback(object):
         # adjust the layout
         plt.tight_layout()
         # clear the Jupyter front-end and send the new plot
-        display.clear_output(wait=True)
+        display.clear_output(wait=False)
         plt.show()
 
 
