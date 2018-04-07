@@ -366,7 +366,7 @@ class DeepQAgent(Agent):
             # update the progress bar
             progress.update(frames)
 
-    # TODO: 5 min limit per game
+    # TODO: 5 min limit per game (or better, a frame limit)
     def play(self,
         games: int=30,
         exploration_rate: float=0.05,
