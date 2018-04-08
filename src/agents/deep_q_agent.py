@@ -174,20 +174,17 @@ class DeepQAgent(Agent):
             the predicted optimal action based on the frames
 
         """
-        # draw a number in [0, 1] and explore if it's less than the
-        # exploration rate
         if np.random.random() < exploration_rate:
-            # select a random action. the output shape of the network implies
-            # the action name by index, so use that shape as the upper bound
+            # select a random action and return it
             return self.env.action_space.sample()
         else:
-            # reshape the frames and make the mask
+            # reshape the frames to pass through the loss network
             frames = frames[np.newaxis, :, :, :]
+            # build an output mask that lets all action values pass through
             mask = np.ones((self.agent_history_length, self.env.action_space.n))
             # predict the values of each action
             actions = self.model.predict([frames, mask], batch_size=1)
-            # select the action with the highest estimated score as the
-            # optimal action
+            # return the action with the highest estimated future reward
             return np.argmax(actions)
 
     def observe(self, replay_start_size: int=50000) -> None:
