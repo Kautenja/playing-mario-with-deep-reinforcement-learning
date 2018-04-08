@@ -24,14 +24,12 @@ _REPR_TEMPLATE = """
     optimizer={},
     exploration_rate={},
     null_op_max={},
+    null_op={},
     loss={},
     image_size={},
+    render_mode={}
 )
 """.lstrip()
-
-
-# the operation for null ops
-NULL_OP = 0
 
 
 class DeepQAgent(Agent):
@@ -45,8 +43,10 @@ class DeepQAgent(Agent):
         optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         null_op_max: int=30,
-        loss=huber_loss,
-        image_size: tuple=(84, 84)
+        null_op: int=0,
+        loss: Callable=huber_loss,
+        image_size: tuple=(84, 84),
+        render_mode: str='human',
     ) -> None:
         """
         Initialize a new Deep Q Agent.
@@ -55,18 +55,26 @@ class DeepQAgent(Agent):
             env: the environment to run on
             downsample: the down-sampler for the Gym environment
             agent_history_length: the number of previous frames for the agent
-                                  to make new decisions based on
-            discount_factor: the discount factor, γ
+                                  to make new decisions based on. this will
+                                  set the number of filters in the CNN
+            discount_factor: the discount factor, γ, for discounting future 
+                             reward
             update_frequency: the number of actions between updates to the
-                              deep Q network
-            optimizer: the optimization method to use on the CNN
+                              deep Q network from replay memory
+            optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
-                              AnnealingVariable subclass
+                              AnnealingVariable subclass for scheduled decay
             null_op_max: the maximum number of random null ops at the start of
-                         each new game. this adds stochastic "human start" to
-                         the training and playing process for the agent
-            loss: the loss method to use from TF or Keras
+                         each new game. the agent performs null operations at 
+                         the beginning of training and validation episodes to 
+                         emulate a stochastic "human" start
+            null_op: the value indicating a null operation for null_op_max
+            loss: the loss method to use at the end of the CNN
             image_size: the size of the images to pass to the CNN
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                         -   'human': render in the emulator (default) 
+                         -   'rgb_array': render in the backend and return a
+                                          numpy array (server/Jupyter)
 
         Returns:
             None
@@ -81,8 +89,10 @@ class DeepQAgent(Agent):
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.null_op_max = null_op_max
+        self.null_op = null_op
         self.loss = loss
         self.image_size = image_size
+        self.render_mode = render_mode
         # setup the buffer for frames the agent uses to predict on
         self.frame_buffer = np.zeros((*image_size, agent_history_length))
         # build the neural model for estimating Q values
@@ -95,7 +105,7 @@ class DeepQAgent(Agent):
         )
 
     def __repr__(self) -> str:
-        """Return a debugging string of this agent."""
+        """Return an executable Python string to reproduce self."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
@@ -107,8 +117,10 @@ class DeepQAgent(Agent):
             self.optimizer,
             self.exploration_rate,
             self.null_op_max,
+            self.null_op,
             self.loss,
-            self.image_size
+            self.image_size,
+            self.render_mode
         )
 
     def _initial_state(self) -> np.ndarray:
@@ -116,7 +128,7 @@ class DeepQAgent(Agent):
         # reset the environment
         frame = self.env.reset()
         # render this frame in the emulator
-        self.env.render()
+        self.env.render(mode=self.render_mode)
 
         # down-sample the frame to B&W and cropped to playable area
         frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
@@ -143,7 +155,7 @@ class DeepQAgent(Agent):
         # make the step and observe the state, reward, done flag
         state, reward, done, _ = self.env.step(action=action)
         # render this frame in the emulator
-        self.env.render()
+        self.env.render(mode=self.render_mode)
 
         # down-sample the state and convert it to the expected shape
         state = self.downsample(state, self.image_size)[:, :, np.newaxis]
@@ -162,7 +174,7 @@ class DeepQAgent(Agent):
     def predict_action(self,
         frames: np.ndarray,
         exploration_rate: float
-    ) -> tuple:
+    ) -> int:
         """
         Predict an action from a stack of frames.
 
@@ -200,7 +212,8 @@ class DeepQAgent(Agent):
 
         """
         progress = tqdm(total=replay_start_size, unit='frame')
-        # loop until done
+        # loop indefinitely, the loop breaks when the number of
+        # frames passed is greater than replay_start_size
         while True:
             # reset the game and get the initial state
             state = self._initial_state()
@@ -210,7 +223,7 @@ class DeepQAgent(Agent):
             while not done:
                 # sample a random action to perform
                 action = self.env.action_space.sample()
-                # hold the action for the number of frames
+                # perform action and observe the reward and next state
                 next_state, reward, done = self._next_state(action)
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
@@ -222,16 +235,18 @@ class DeepQAgent(Agent):
                 progress.update(1)
                 # break out if done observing
                 if replay_start_size <= 0:
-                    # close the progress bar
                     progress.close()
                     return
 
-    def _replay(self, s, a, r, d, s2) -> float:
+    def _replay(self, 
+        s: np.ndarray, 
+        a: np.ndarray, 
+        r: np.ndarray, 
+        d: np.ndarray, 
+        s2: np.ndarray
+    ) -> float:
         """
         Train the network on a mini-batch of replay data.
-
-        Notes:
-            all arguments are arrays that should be of the same size
 
         Args:
             s: a batch of current states
@@ -244,7 +259,7 @@ class DeepQAgent(Agent):
             the loss as a result of the training
 
         """
-        # initialize target y values as a matrix of zeros
+        # initialize target y values
         y = np.zeros((len(s), self.env.action_space.n))
 
         # predict Q values for the next state of each memory in the batch and
@@ -259,6 +274,7 @@ class DeepQAgent(Agent):
 
         # use an identity of size action space, and index rows from it using
         # the action vector to produce a one-hot matrix representing the mask
+        # for actions in a
         action_mask = np.eye(self.env.action_space.n)[a]
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
@@ -273,10 +289,8 @@ class DeepQAgent(Agent):
         Train the network for a number of episodes (games).
 
         Args:
-            frames: the number of frames to play the game for
+            frames_to_play: the number of frames to play the game for
             batch_size: the size of the replay history batches
-            null_op_max: the max number of random null ops at the beginning
-                         of an episode to introduce stochasticity
             callback: an optional callback to get updates about the score,
                       loss, discount factor, and exploration rate every
                       episode
@@ -287,11 +301,10 @@ class DeepQAgent(Agent):
         """
         # the progress bar for the operation
         progress = tqdm(total=frames_to_play, unit='frame')
-        # loop indefinitely
+        # loop indefinitely, the loop ends with a break when the
+        # frame counter passes the provided number of frames
         while True:
-            # the done flag indicating that an episode has ended
             done = False
-            # metrics throughout this episode
             score = 0
             loss = 0
             frames = 0
@@ -299,16 +312,15 @@ class DeepQAgent(Agent):
             state = self._initial_state()
             # perform NOPs randomly
             for k in range(np.random.randint(0, self.null_op_max)):
-                state, reward, done = self._next_state(NULL_OP)
-            # loop until the episode ends
+                state, reward, done = self._next_state(self.null_op)
+
             while not done:
                 # predict the best action based on the current state
                 action = self.predict_action(state, self.exploration_rate.value)
                 # step the exploration rate forward
                 self.exploration_rate.step()
-                # fire the action and observe the next state, reward, and flag
+                # fire the action and observe the next state, reward, and done
                 next_state, reward, done = self._next_state(action)
-                # add the reward to the cumulative score
                 score += reward
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
@@ -317,13 +329,11 @@ class DeepQAgent(Agent):
                 # decrement the observation counter
                 frames_to_play -= 1
                 frames += 1
-                # update Q from replay
+                # update Q from replay every self.update_frequency
                 if frames_to_play % self.update_frequency == 0:
-                    # train the network on replay memory
                     loss += self._replay(*self.queue.sample(size=batch_size))
-                # break out if done observing
+                # break out if done training
                 if frames_to_play <= 0:
-                    # update and close the progress bar
                     progress.update(frames)
                     progress.close()
                     return
@@ -335,7 +345,7 @@ class DeepQAgent(Agent):
             progress.update(frames)
 
     def play(self,
-        games: int=30,
+        games: int=100,
         exploration_rate: float=0.05,
         fps: int=None
     ) -> np.ndarray:
@@ -349,24 +359,23 @@ class DeepQAgent(Agent):
                 - if None, the frame-rate will not be limited (i.e infinite)
 
         Returns:
-            an array of scores
+            an array of scores, one for each game
 
         """
-        # initialize a clock to keep the frame-rate
+        # initialize a clock to keep the frame-rate bounded
         clock = Clock()
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
         for game in tqdm(range(games), unit='game'):
+            done = False
+            score = 0
             # reset the game and get the initial state
             state = self._initial_state()
             # perform NOPs randomly
             for k in range(np.random.randint(0, self.null_op_max)):
-                state, reward, done = self._next_state(NULL_OP)
-            # the done flag indicating that a game has ended
-            done = False
-            score = 0
-            # loop until done
+                state, _, _ = self._next_state(self.null_op)
+
             while not done:
                 # predict the best action based on the current state
                 action = self.predict_action(state, exploration_rate)
