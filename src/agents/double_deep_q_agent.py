@@ -23,15 +23,13 @@ _REPR_TEMPLATE = """
     optimizer={},
     exploration_rate={},
     null_op_max={},
+    null_op={},
     loss={},
     image_size={},
+    render_mode={},
     target_update_freq={}
 )
 """.lstrip()
-
-
-# the operation for null ops
-NULL_OP = 0
 
 
 class DoubleDeepQAgent(DeepQAgent):
@@ -45,8 +43,10 @@ class DoubleDeepQAgent(DeepQAgent):
         optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         null_op_max: int=30,
+        null_op: int=0,
         loss=huber_loss,
         image_size: tuple=(84, 84),
+        render_mode: str='human',
         target_update_freq: int=10000
     ) -> None:
         """
@@ -56,18 +56,26 @@ class DoubleDeepQAgent(DeepQAgent):
             env: the environment to run on
             downsample: the down-sampler for the Gym environment
             agent_history_length: the number of previous frames for the agent
-                                  to make new decisions based on
-            discount_factor: the discount factor, γ
+                                  to make new decisions based on. this will
+                                  set the number of filters in the CNN
+            discount_factor: the discount factor, γ, for discounting future 
+                             reward
             update_frequency: the number of actions between updates to the
-                              deep Q network
-            optimizer: the optimization method to use on the CNN
+                              deep Q network from replay memory
+            optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
-                              AnnealingVariable subclass
+                              AnnealingVariable subclass for scheduled decay
             null_op_max: the maximum number of random null ops at the start of
-                         each new game. this adds stochastic "human start" to
-                         the training and playing process for the agent
-            loss: the loss method to use from TF or Keras
+                         each new game. the agent performs null operations at 
+                         the beginning of training and validation episodes to 
+                         emulate a stochastic "human" start
+            null_op: the value indicating a null operation for null_op_max
+            loss: the loss method to use at the end of the CNN
             image_size: the size of the images to pass to the CNN
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                         -   'human': render in the emulator (default) 
+                         -   'rgb_array': render in the backend and return a
+                                          numpy array (server/Jupyter)
             target_update_freq: the frequency with which to update the target
                                 network
 
@@ -84,8 +92,10 @@ class DoubleDeepQAgent(DeepQAgent):
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.null_op_max = null_op_max
+        self.null_op = null_op
         self.loss = loss
         self.image_size = image_size
+        self.render_mode = render_mode
         self.target_update_freq = target_update_freq
         # setup the buffer for frames the agent uses to predict on
         self.frame_buffer = np.zeros((*image_size, agent_history_length))
@@ -119,17 +129,22 @@ class DoubleDeepQAgent(DeepQAgent):
             self.optimizer,
             self.exploration_rate,
             self.null_op_max,
+            self.null_op,
             self.loss,
             self.image_size,
+            self.render_mode,
             self.target_update_freq
         )
 
-    def _replay(self, s, a, r, d, s2) -> float:
+    def _replay(self, 
+        s: np.ndarray, 
+        a: np.ndarray, 
+        r: np.ndarray, 
+        d: np.ndarray, 
+        s2: np.ndarray
+    ) -> float:
         """
         Train the network on a mini-batch of replay data.
-
-        Notes:
-            all arguments are arrays that should be of the same size
 
         Args:
             s: a batch of current states
@@ -142,7 +157,7 @@ class DoubleDeepQAgent(DeepQAgent):
             the loss as a result of the training
 
         """
-        # initialize target y values as a matrix of zeros
+        # initialize target y values
         y = np.zeros((len(s), self.env.action_space.n))
 
         # predict Q values for the next state of each memory in the batch and
@@ -171,10 +186,8 @@ class DoubleDeepQAgent(DeepQAgent):
         Train the network for a number of episodes (games).
 
         Args:
-            frames: the number of frames to play the game for
+            frames_to_play: the number of frames to play the game for
             batch_size: the size of the replay history batches
-            null_op_max: the max number of random null ops at the beginning
-                         of an episode to introduce stochasticity
             callback: an optional callback to get updates about the score,
                       loss, discount factor, and exploration rate every
                       episode
@@ -185,11 +198,9 @@ class DoubleDeepQAgent(DeepQAgent):
         """
         # the progress bar for the operation
         progress = tqdm(total=frames_to_play, unit='frame')
-        # loop indefinitely
+
         while True:
-            # the done flag indicating that an episode has ended
             done = False
-            # metrics throughout this episode
             score = 0
             loss = 0
             frames = 0
@@ -197,8 +208,8 @@ class DoubleDeepQAgent(DeepQAgent):
             state = self._initial_state()
             # perform NOPs randomly
             for k in range(np.random.randint(0, self.null_op_max)):
-                state, reward, done = self._next_state(NULL_OP)
-            # loop until the episode ends
+                state, _, _ = self._next_state(self.null_op)
+
             while not done:
                 # predict the best action based on the current state
                 action = self.predict_action(state, self.exploration_rate.value)
@@ -206,7 +217,6 @@ class DoubleDeepQAgent(DeepQAgent):
                 self.exploration_rate.step()
                 # fire the action and observe the next state, reward, and flag
                 next_state, reward, done = self._next_state(action)
-                # add the reward to the cumulative score
                 score += reward
                 # push the memory onto the replay queue
                 self.queue.push(state, action, reward, done, next_state)
@@ -223,7 +233,6 @@ class DoubleDeepQAgent(DeepQAgent):
                     self.target_model.set_weights(self.model.get_weights())
                 # break out if done observing
                 if frames_to_play <= 0:
-                    # update and close the progress bar
                     progress.update(frames)
                     progress.close()
                     return
