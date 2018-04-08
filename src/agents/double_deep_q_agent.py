@@ -1,10 +1,10 @@
 """An implementation of Double Deep Q-Learning."""
 import numpy as np
-import tensorflow as tf
 from typing import Callable
 from tqdm import tqdm
 from keras.optimizers import RMSprop
 from src.models import build_deep_mind_model
+from src.models.losses import huber_loss
 from src.base import AnnealingVariable
 from src.downsamplers import Downsampler
 from .replay_queue import ReplayQueue
@@ -45,7 +45,7 @@ class DoubleDeepQAgent(DeepQAgent):
         optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         null_op_max: int=30,
-        loss=tf.losses.huber_loss,
+        loss=huber_loss,
         image_size: tuple=(84, 84),
         target_update_freq: int=10000
     ) -> None:

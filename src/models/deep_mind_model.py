@@ -1,5 +1,4 @@
 """The Deep Mind Convolutional Neural Network (CNN) model."""
-import tensorflow as tf
 from keras.models import Model
 from keras.layers import Input
 from keras.layers import Lambda
@@ -9,13 +8,14 @@ from keras.layers import Activation
 from keras.layers import Multiply
 from keras.layers.convolutional import Conv2D
 from keras.optimizers import RMSprop
+from .losses import huber_loss
 
 
 def build_deep_mind_model(
     image_size: tuple=(84, 84),
     num_frames: int=4,
     num_actions: int=6,
-    loss=tf.losses.huber_loss,
+    loss=huber_loss,
     optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
 ) -> Model:
     """
