@@ -57,7 +57,7 @@ class DeepQAgent(Agent):
             agent_history_length: the number of previous frames for the agent
                                   to make new decisions based on. this will
                                   set the number of filters in the CNN
-            discount_factor: the discount factor, γ, for discounting future 
+            discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
                               deep Q network from replay memory
@@ -65,14 +65,14 @@ class DeepQAgent(Agent):
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
             null_op_max: the maximum number of random null ops at the start of
-                         each new game. the agent performs null operations at 
-                         the beginning of training and validation episodes to 
+                         each new game. the agent performs null operations at
+                         the beginning of training and validation episodes to
                          emulate a stochastic "human" start
             null_op: the value indicating a null operation for null_op_max
             loss: the loss method to use at the end of the CNN
             image_size: the size of the images to pass to the CNN
             render_mode: the mode for rendering frames in the OpenAI gym env
-                         -   'human': render in the emulator (default) 
+                         -   'human': render in the emulator (default)
                          -   'rgb_array': render in the backend and return a
                                           numpy array (server/Jupyter)
 
@@ -120,7 +120,7 @@ class DeepQAgent(Agent):
             self.null_op,
             self.loss,
             self.image_size,
-            self.render_mode
+            repr(self.render_mode)
         )
 
     def _initial_state(self) -> np.ndarray:
@@ -238,11 +238,11 @@ class DeepQAgent(Agent):
                     progress.close()
                     return
 
-    def _replay(self, 
-        s: np.ndarray, 
-        a: np.ndarray, 
-        r: np.ndarray, 
-        d: np.ndarray, 
+    def _replay(self,
+        s: np.ndarray,
+        a: np.ndarray,
+        r: np.ndarray,
+        d: np.ndarray,
         s2: np.ndarray
     ) -> float:
         """
