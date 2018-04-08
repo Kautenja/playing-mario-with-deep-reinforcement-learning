@@ -1,4 +1,5 @@
 """A queue for storing previous experiences to sample from."""
+from sys import getsizeof
 import numpy as np
 
 
@@ -50,14 +51,8 @@ class ReplayQueue(object):
     @property
     def num_bytes(self) -> int:
         """Return the number of byte this object consumes."""
-        from sys import getsizeof
-        s = getsizeof(self.s)
-        a = getsizeof(self.a)
-        r = getsizeof(self.r)
-        d = getsizeof(self.d)
-        s2 = getsizeof(self.s2)
-
-        return s + a + r + d + s2
+        items = [self.s, self.a, self.r, self.d, self.s2]
+        return sum(getsizeof(itm) for item in items)
 
     def push(self,
         s: np.ndarray,
@@ -94,13 +89,13 @@ class ReplayQueue(object):
 
     def current(self) -> tuple:
         """Pop an item off the queue and return it."""
-        s = self.s[self.index]
-        a = self.a[self.index]
-        r = self.r[self.index]
-        d = self.d[self.index]
-        s2 = self.s2[self.index]
-
-        return s, a, r, d, s2
+        return (
+            self.s[self.index],
+            self.a[self.index],
+            self.r[self.index],
+            self.d[self.index],
+            self.s2[self.index],
+        )
 
     def sample(self, size: int=32) -> tuple:
         """
@@ -113,16 +108,16 @@ class ReplayQueue(object):
             A random sample from the queue sampled uniformly
 
         """
-        # generate and index of items to sample
+        # generate a random index of items to sample
         index = np.random.randint(0, self.top, size)
-        # extract the items for this batch
-        s = self.s[index]
-        a = self.a[index]
-        r = self.r[index]
-        d = self.d[index]
-        s2 = self.s2[index]
 
-        return s, a, r, d, s2
+        return (
+            self.s[index],
+            self.a[index],
+            self.r[index],
+            self.d[index],
+            self.s2[index],
+        )
 
 
 # explicitly define the outward facing API of this module
