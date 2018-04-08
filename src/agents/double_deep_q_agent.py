@@ -121,7 +121,7 @@ class DoubleDeepQAgent(DeepQAgent):
             self.null_op_max,
             self.loss,
             self.image_size,
-            target_update_freq
+            self.target_update_freq
         )
 
     def _replay(self, s, a, r, d, s2) -> float:
