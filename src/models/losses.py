@@ -2,7 +2,7 @@
 from keras import backend as K
 
 
-def huber_loss(y, y_pred, delta: int=1.0):
+def huber_loss(y, y_pred, delta: float=1.0):
     """
     Return the Huber loss between tensors.
 
@@ -14,7 +14,7 @@ def huber_loss(y, y_pred, delta: int=1.0):
     Args:
         y: ground truth y labels
         y_pred: predicted y labels
-        delta: the
+        delta: the separating constant between MSE and MAE
 
     Returns:
         a scalar loss between the ground truth and predicted labels
