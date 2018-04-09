@@ -113,4 +113,5 @@ This will recursively find test cases in [src](src) and run them.
 
 #### Notebooks
 
-Jupyter notebooks can be found in the [ipynb](ipynb) directory.
+Jupyter notebooks that train agents and play games are in the
+[ipynb](ipynb) directory sorted by game.
