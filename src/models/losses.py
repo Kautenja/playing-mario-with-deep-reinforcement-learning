@@ -1,5 +1,4 @@
 """Loss functions for models in the project."""
-import tensorflow as tf
 from keras import backend as K
 
 
@@ -21,11 +20,15 @@ def huber_loss(y, y_pred, delta: int=1.0):
         a scalar loss between the ground truth and predicted labels
 
     """
+    # calculate the residuals
     residual = K.abs(y_pred - y)
+    # determine the result of the logical comparison to delta
     condition = K.less_equal(residual, delta)
-    then = 0.5 * K.square(residual)
-    otherwise = delta * residual - 0.5 * K.square(delta)
-    return K.switch(condition, then, otherwise)
+    # calculate the two possible returns (MSE and MAE)
+    then_this = 0.5 * K.square(residual)
+    else_this = delta * residual - 0.5 * K.square(delta)
+    # use the condition to determine the resulting tensor
+    return K.switch(condition, then_this, else_this)
 
 
 # explicitly define the outward facing API of this module
