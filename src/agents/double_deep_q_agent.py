@@ -198,8 +198,9 @@ class DoubleDeepQAgent(DeepQAgent):
         """
         # the progress bar for the operation
         progress = tqdm(total=frames_to_play, unit='frame')
+        progress.set_postfix(score='?', loss='?')
 
-        while True:
+        while frames_to_play > 0:
             done = False
             score = 0
             loss = 0
@@ -233,16 +234,16 @@ class DoubleDeepQAgent(DeepQAgent):
                     self.target_model.set_weights(self.model.get_weights())
                 # break out if done observing
                 if frames_to_play <= 0:
-                    progress.update(frames)
-                    progress.close()
-                    return
+                    break
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss)
             # update the progress bar
+            progress.set_postfix(score=score, loss=loss)
             progress.update(frames)
 
+        progress.close()
 
 # explicitly define the outward facing API of this module
 __all__ = ['DoubleDeepQAgent']

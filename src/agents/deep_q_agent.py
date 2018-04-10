@@ -129,6 +129,8 @@ class DeepQAgent(Agent):
         frame = self.env.reset()
         # render this frame in the emulator
         self.env.render(mode=self.render_mode)
+        # reset the lives counter
+        self.lives = None
 
         # down-sample the frame to B&W and cropped to playable area
         frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
@@ -153,7 +155,7 @@ class DeepQAgent(Agent):
 
         """
         # make the step and observe the state, reward, done flag
-        state, reward, done, _ = self.env.step(action=action)
+        state, reward, done, info = self.env.step(action=action)
         # render this frame in the emulator
         self.env.render(mode=self.render_mode)
 
@@ -164,6 +166,12 @@ class DeepQAgent(Agent):
         # remove the last frame in the frame buffer
         self.frame_buffer = self.frame_buffer[:, :, 1:]
 
+        # adjust the reward if a life was lost
+        if self.lives is None:
+            self.lives = info['ale.lives']
+        elif self.lives > info['ale.lives']:
+            reward = -1.0
+            self.lives = info['ale.lives']
         # assign a negative reward if terminal state
         reward = -1.0 if done else reward
         # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
@@ -301,9 +309,9 @@ class DeepQAgent(Agent):
         """
         # the progress bar for the operation
         progress = tqdm(total=frames_to_play, unit='frame')
-        # loop indefinitely, the loop ends with a break when the
-        # frame counter passes the provided number of frames
-        while True:
+        progress.set_postfix(score='?', loss='?')
+
+        while frames_to_play > 0:
             done = False
             score = 0
             loss = 0
@@ -334,15 +342,16 @@ class DeepQAgent(Agent):
                     loss += self._replay(*self.queue.sample(size=batch_size))
                 # break out if done training
                 if frames_to_play <= 0:
-                    progress.update(frames)
-                    progress.close()
-                    return
+                    break
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss)
             # update the progress bar
+            progress.set_postfix(score=score, loss=loss)
             progress.update(frames)
+
+        progress.close()
 
     def play(self,
         games: int=100,
