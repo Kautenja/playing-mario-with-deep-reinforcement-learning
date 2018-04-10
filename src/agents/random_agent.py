@@ -9,31 +9,40 @@ class RandomAgent(Agent):
     """An agent that behaves randomly."""
 
     # the representation template for the __repr__ method of this object
-    REPR = '{}(env={})'
+    REPR = '{}(env={}, render_mode={})'
 
-    def __init__(self, env) -> None:
+    def __init__(self, env, render_mode: str='human') -> None:
         """
         Initialize a new random Agent.
 
         Args:
             env: the environment to run on
+            render_mode: the mode for rendering frames in the environment
+                         -   'human': render in the emulator (default)
+                         -   'rgb_array': render in the back-end and return a
+                                          NumPy array (server/Jupyter)
 
         Returns:
             None
 
         """
         self.env = env
+        self.render_mode = render_mode
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
-        return self.REPR.format(self.__class__.__name__, self.env)
+        return self.REPR.format(
+            self.__class__.__name__,
+            self.env,
+            self.render_mode
+        )
 
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
         # reset the environment
         frame = self.env.reset()
         # render this frame in the emulator
-        self.env.render()
+        self.env.render(mode=self.render_mode)
 
         return frame
 
@@ -54,7 +63,7 @@ class RandomAgent(Agent):
         # make the step and observe the state, reward, done flag
         state, reward, done, _ = self.env.step(action=action)
         # render this frame in the emulator
-        self.env.render()
+        self.env.render(mode=self.render_mode)
 
         # assign a negative reward if terminal state
         reward = -1.0 if done else reward
@@ -82,12 +91,11 @@ class RandomAgent(Agent):
         scores = np.zeros(games)
         # iterate over the number of games
         for game in tqdm(range(games), unit='game'):
-            # reset the game and get the initial state
-            _ = self._initial_state()
-            # the done flag indicating that a game has ended
             done = False
             score = 0
-            # loop until done
+            # reset the game and get the initial state
+            _ = self._initial_state()
+
             while not done:
                 # pick a random action
                 action = self.env.action_space.sample()
