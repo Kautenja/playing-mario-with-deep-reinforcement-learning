@@ -5,11 +5,9 @@
 import os
 import sys
 import gym
-import numpy as np
 import pandas as pd
 from src.util import BaseCallback
 from src.agents import (
-    RandomAgent,
     DeepQAgent,
     DoubleDeepQAgent
 )
@@ -32,6 +30,7 @@ downsamplers = {
     'Breakout': downsample_breakout,
     'SpaceInvaders': downsample_space_invaders,
 }
+
 
 
 # load variables from the command line
@@ -61,6 +60,7 @@ if not os.path.exists(exp_directory):
 weights_file = '{}/weights.h5'.format(exp_directory)
 
 
+
 # build the environment
 env = gym.make('{}-v4'.format(game))
 # build the agent
@@ -68,18 +68,18 @@ agent = agents[agent_name](env, downsamplers[game], render_mode='rgb_array')
 
 # capture some metrics before training
 print('playing games for initial metrics')
-initial = pd.Series(agent.play(games=1))
+initial = pd.Series(agent.play())
 print(initial.describe())
 initial.to_csv('{}/initial.csv'.format(exp_directory))
 
 # observe some frames using random movement
-print('observing random frames before training')
-agent.observe(replay_start_size=50)
+print('observing frames before training')
+agent.observe()
 # train the agent
 try:
     print('beginning training')
     callback = BaseCallback()
-    agent.train(callback=callback, frames_to_play=1000)
+    agent.train(callback=callback)
 except KeyboardInterrupt:
     print('canceled training')
 # save the training results
@@ -92,10 +92,9 @@ agent.model.save_weights(weights_file, overwrite=True)
 
 # capture some metrics after training
 print('playing games for final metrics')
-final = pd.Series(agent.play(games=1))
+final = pd.Series(agent.play())
 print(final.describe())
 final.to_csv('{}/final.csv'.format(exp_directory))
 
 # close the environment to perform necessary cleanup
 env.close()
-
