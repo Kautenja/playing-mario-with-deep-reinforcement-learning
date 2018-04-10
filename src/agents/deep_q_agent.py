@@ -3,7 +3,7 @@ import numpy as np
 from typing import Callable
 from tqdm import tqdm
 from pygame.time import Clock
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam
 from src.models import build_deep_mind_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
@@ -36,11 +36,11 @@ class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
     def __init__(self, env, downsample: Downsampler,
-        replay_memory_size: int=1000000,
+        replay_memory_size: int=250000,
         agent_history_length: int=4,
         discount_factor: float=0.99,
         update_frequency: int=4,
-        optimizer=RMSprop(lr=0.00025, rho=0.95, epsilon=0.01),
+        optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         null_op_max: int=30,
         null_op: int=0,
@@ -281,7 +281,7 @@ class DeepQAgent(Agent):
         return self.model.train_on_batch([s, action_mask], y)
 
     def train(self,
-        frames_to_play: int=50000000,
+        frames_to_play: int=10000000,
         batch_size: int=32,
         callback: Callable=None,
     ) -> None:
