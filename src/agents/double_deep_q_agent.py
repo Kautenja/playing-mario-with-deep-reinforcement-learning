@@ -22,8 +22,6 @@ _REPR_TEMPLATE = """
     update_frequency={},
     optimizer={},
     exploration_rate={},
-    null_op_max={},
-    null_op={},
     loss={},
     image_size={},
     render_mode={},
@@ -42,8 +40,6 @@ class DoubleDeepQAgent(DeepQAgent):
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
-        null_op_max: int=30,
-        null_op: int=0,
         loss=huber_loss,
         image_size: tuple=(84, 84),
         render_mode: str='human',
@@ -65,11 +61,6 @@ class DoubleDeepQAgent(DeepQAgent):
             optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
-            null_op_max: the maximum number of random null ops at the start of
-                         each new game. the agent performs null operations at
-                         the beginning of training and validation episodes to
-                         emulate a stochastic "human" start
-            null_op: the value indicating a null operation for null_op_max
             loss: the loss method to use at the end of the CNN
             image_size: the size of the images to pass to the CNN
             render_mode: the mode for rendering frames in the OpenAI gym env
@@ -91,8 +82,6 @@ class DoubleDeepQAgent(DeepQAgent):
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
-        self.null_op_max = null_op_max
-        self.null_op = null_op
         self.loss = loss
         self.image_size = image_size
         self.render_mode = render_mode
@@ -128,8 +117,6 @@ class DoubleDeepQAgent(DeepQAgent):
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
-            self.null_op_max,
-            self.null_op,
             self.loss,
             self.image_size,
             repr(self.render_mode),
@@ -207,9 +194,6 @@ class DoubleDeepQAgent(DeepQAgent):
             frames = 0
             # reset the game and get the initial state
             state = self._initial_state()
-            # perform NOPs randomly
-            for k in range(np.random.randint(0, self.null_op_max)):
-                state, _, _ = self._next_state(self.null_op)
 
             while not done:
                 # predict the best action based on the current state
@@ -244,6 +228,7 @@ class DoubleDeepQAgent(DeepQAgent):
             progress.update(frames)
 
         progress.close()
+
 
 # explicitly define the outward facing API of this module
 __all__ = ['DoubleDeepQAgent']

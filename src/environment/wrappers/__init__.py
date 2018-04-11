@@ -1,5 +1,5 @@
 """Wrappers used in this experiment."""
-from .clip_rewards_env import ClipRewardEnv
+from .clip_reward_env import ClipRewardEnv
 from .fire_reset_env import FireResetEnv
 from .noop_reset_env import NoopResetEnv
 from .penalized_death_env import PenalizeDeathEnv
