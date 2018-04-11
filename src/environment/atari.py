@@ -4,15 +4,17 @@ from src.environment.wrappers import (
     NoopResetEnv,
     PenalizeDeathEnv,
     ClipRewardEnv,
-    FireResetEnv
+    FireResetEnv,
+    DownsampleEnv
 )
 
 
 def build_atari_environment(game_name: str,
     env_spec: str='-v4',
+    image_size: tuple=(84, 84),
     noop_max: int=30,
     death_penalty: int=-1,
-    clip_rewards: bool=True
+    clip_rewards: bool=True,
 ):
     """
     Build and return a configured Atari environment.
@@ -32,6 +34,8 @@ def build_atari_environment(game_name: str,
     # apply the wrapper for firing at the beginning of games that require
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
+    # apply a down-sampler for the given game
+    env = DownsampleEnv(env, image_size, **DownsampleEnv.metadata[game_name])
     # apply the death penalty feature if enabled
     if death_penalty is not None:
         env = PenalizeDeathEnv(env, penalty=death_penalty)

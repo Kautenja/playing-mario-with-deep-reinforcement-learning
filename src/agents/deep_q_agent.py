@@ -7,7 +7,6 @@ from keras.optimizers import Adam
 from src.models import build_deep_mind_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
-from src.downsamplers import Downsampler
 from .agent import Agent
 from .replay_queue import ReplayQueue
 
@@ -16,7 +15,6 @@ from .replay_queue import ReplayQueue
 _REPR_TEMPLATE = """
 {}(
     env={},
-    downsample={},
     replay_memory_size={},
     agent_history_length={},
     discount_factor={},
@@ -33,7 +31,7 @@ _REPR_TEMPLATE = """
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env, downsample: Downsampler,
+    def __init__(self, env,
         replay_memory_size: int=250000,
         agent_history_length: int=4,
         discount_factor: float=0.99,
@@ -49,7 +47,6 @@ class DeepQAgent(Agent):
 
         Args:
             env: the environment to run on
-            downsample: the down-sampler for the Gym environment
             agent_history_length: the number of previous frames for the agent
                                   to make new decisions based on. this will
                                   set the number of filters in the CNN
@@ -72,7 +69,6 @@ class DeepQAgent(Agent):
 
         """
         self.env = env
-        self.downsample = downsample
         self.queue = ReplayQueue(replay_memory_size)
         self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
@@ -98,7 +94,6 @@ class DeepQAgent(Agent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.downsample,
             self.queue.size,
             self.agent_history_length,
             self.discount_factor,
@@ -117,8 +112,6 @@ class DeepQAgent(Agent):
         # render this frame in the emulator
         self.env.render(mode=self.render_mode)
 
-        # down-sample the frame to B&W and cropped to playable area
-        frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
         # reset the frame buffer with the initial state repeated as necessary
         self.frame_buffer = np.repeat(frame, self.agent_history_length, axis=2)
         # return the frame buffer as the state
@@ -144,8 +137,6 @@ class DeepQAgent(Agent):
         # render this frame in the emulator
         self.env.render(mode=self.render_mode)
 
-        # down-sample the state and convert it to the expected shape
-        state = self.downsample(state, self.image_size)[:, :, np.newaxis]
         # add the state to the frame buffer
         self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
         # remove the last frame in the frame buffer
