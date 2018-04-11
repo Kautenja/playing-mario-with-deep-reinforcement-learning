@@ -2,9 +2,6 @@
 from .downsampler import Downsampler
 
 
-# A Pong down-sampler with a little bid of padding on the playable areas
-# downsample_pong = Downsampler(y=(30, 10), x=(5, 5), cut=[107, 87])
-
 # A Pong down-sampler with a very tight crop to the playable areas
 downsample_pong = Downsampler(y=(34, 16), x=(15, 15), cut=[107, 87])
 
@@ -17,7 +14,7 @@ downsample_space_invaders = Downsampler(y=(0, 15), x=(0, 1), cut=[])
 
 # explicitly define the outward facing API for this package
 __all__ = [
-    'PongDownsampler',
+    'Downsampler',
     'downsample_pong',
     'downsample_breakout',
     'downsample_space_invaders'
