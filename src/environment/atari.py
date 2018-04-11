@@ -1,6 +1,6 @@
 """Methods for setting up an Atari environment."""
 import gym
-from .wrappers import (
+from src.environment.wrappers import (
     NoopResetEnv,
     PenalizeDeathEnv,
     ClipRewardEnv,
@@ -38,3 +38,5 @@ def build_atari_environment(game_name: str,
     # clip the rewards in {-1, 0, +1} if the feature is enabled
     if clip_rewards:
         env = ClipRewardEnv(env)
+
+    return env

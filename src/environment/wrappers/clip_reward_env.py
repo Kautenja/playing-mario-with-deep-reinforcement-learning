@@ -1,5 +1,6 @@
 """An environment wrapper to clip rewards."""
 import gym
+import numpy as np
 
 
 class ClipRewardEnv(gym.RewardWrapper):

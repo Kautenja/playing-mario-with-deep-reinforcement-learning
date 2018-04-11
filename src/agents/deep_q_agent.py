@@ -23,8 +23,6 @@ _REPR_TEMPLATE = """
     update_frequency={},
     optimizer={},
     exploration_rate={},
-    null_op_max={},
-    null_op={},
     loss={},
     image_size={},
     render_mode={}
@@ -42,8 +40,6 @@ class DeepQAgent(Agent):
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
-        null_op_max: int=30,
-        null_op: int=0,
         loss: Callable=huber_loss,
         image_size: tuple=(84, 84),
         render_mode: str='human',
@@ -64,11 +60,6 @@ class DeepQAgent(Agent):
             optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
-            null_op_max: the maximum number of random null ops at the start of
-                         each new game. the agent performs null operations at
-                         the beginning of training and validation episodes to
-                         emulate a stochastic "human" start
-            null_op: the value indicating a null operation for null_op_max
             loss: the loss method to use at the end of the CNN
             image_size: the size of the images to pass to the CNN
             render_mode: the mode for rendering frames in the OpenAI gym env
@@ -88,8 +79,6 @@ class DeepQAgent(Agent):
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
-        self.null_op_max = null_op_max
-        self.null_op = null_op
         self.loss = loss
         self.image_size = image_size
         self.render_mode = render_mode
@@ -116,8 +105,6 @@ class DeepQAgent(Agent):
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
-            self.null_op_max,
-            self.null_op,
             self.loss,
             self.image_size,
             repr(self.render_mode)
@@ -129,8 +116,6 @@ class DeepQAgent(Agent):
         frame = self.env.reset()
         # render this frame in the emulator
         self.env.render(mode=self.render_mode)
-        # reset the lives counter
-        self.lives = None
 
         # down-sample the frame to B&W and cropped to playable area
         frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
@@ -165,17 +150,6 @@ class DeepQAgent(Agent):
         self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
         # remove the last frame in the frame buffer
         self.frame_buffer = self.frame_buffer[:, :, 1:]
-
-        # adjust the reward if a life was lost
-        if self.lives is None:
-            self.lives = info['ale.lives']
-        elif self.lives > info['ale.lives']:
-            reward = -1.0
-            self.lives = info['ale.lives']
-        # assign a negative reward if terminal state
-        reward = -1.0 if done else reward
-        # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
-        reward = np.sign(reward)
 
         return self.frame_buffer, reward, done
 
@@ -318,9 +292,6 @@ class DeepQAgent(Agent):
             frames = 0
             # reset the game and get the initial state
             state = self._initial_state()
-            # perform NOPs randomly
-            for k in range(np.random.randint(0, self.null_op_max)):
-                state, reward, done = self._next_state(self.null_op)
 
             while not done:
                 # predict the best action based on the current state
@@ -381,9 +352,6 @@ class DeepQAgent(Agent):
             score = 0
             # reset the game and get the initial state
             state = self._initial_state()
-            # perform NOPs randomly
-            for k in range(np.random.randint(0, self.null_op_max)):
-                state, _, _ = self._next_state(self.null_op)
 
             while not done:
                 # predict the best action based on the current state
