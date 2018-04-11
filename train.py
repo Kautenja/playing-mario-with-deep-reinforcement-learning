@@ -1,6 +1,6 @@
 """Usage:
 
-    python train.py <agent name> <game name> <output directory>
+    python train.py <agent name> <game name> <results directory>
 """
 import os
 import sys
