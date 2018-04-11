@@ -7,15 +7,8 @@ import sys
 import gym
 import pandas as pd
 from src.util import BaseCallback
-from src.agents import (
-    DeepQAgent,
-    DoubleDeepQAgent
-)
-from src.downsamplers import (
-    downsample_pong,
-    downsample_breakout,
-    downsample_space_invaders
-)
+from src.agents import DeepQAgent, DoubleDeepQAgent
+from src.environment.atari import build_atari_environment
 
 
 # a mapping of string names to agents
@@ -23,14 +16,6 @@ agents = {
     'DeepQAgent': DeepQAgent,
     'DoubleDeepQAgent': DoubleDeepQAgent,
 }
-
-# down-samplers for each game
-downsamplers = {
-    'Pong': downsample_pong,
-    'Breakout': downsample_breakout,
-    'SpaceInvaders': downsample_space_invaders,
-}
-
 
 
 # load variables from the command line
@@ -62,9 +47,9 @@ weights_file = '{}/weights.h5'.format(exp_directory)
 
 
 # build the environment
-env = gym.make('{}-v4'.format(game))
+env = build_atari_environment(game)
 # build the agent
-agent = agents[agent_name](env, downsamplers[game], render_mode='rgb_array')
+agent = agents[agent_name](env)
 
 # capture some metrics before training
 print('playing games for initial metrics')

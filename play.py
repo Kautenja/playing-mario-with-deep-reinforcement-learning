@@ -6,28 +6,14 @@ import os
 import sys
 import gym
 from gym.wrappers import Monitor
-from src.agents import (
-    DeepQAgent,
-    DoubleDeepQAgent
-)
-from src.downsamplers import (
-    downsample_pong,
-    downsample_breakout,
-    downsample_space_invaders
-)
+from src.agents import DeepQAgent, DoubleDeepQAgent
+from src.environment.atari import build_atari_environment
 
 
 # a mapping of string names to agents
 agents = {
-    'DeepQAgent': DeepQAgent,
-    'DoubleDeepQAgent': DoubleDeepQAgent,
-}
-
-# down-samplers for each game
-downsamplers = {
-    'Pong': downsample_pong,
-    'Breakout': downsample_breakout,
-    'SpaceInvaders': downsample_space_invaders,
+    DeepQAgent.__name__: DeepQAgent,
+    DoubleDeepQAgent.__name__: DoubleDeepQAgent,
 }
 
 
@@ -50,13 +36,10 @@ if not os.path.exists(weights_file):
 
 
 # build the environment
-env = gym.make('{}-v4'.format(game))
+env = build_atari_environment(game)
 env = Monitor(env, '{}/monitor'.format(exp_directory), force=True)
 # build the agent without any replay memory (not needed to play from model)
-agent = agents[agent_name](env, downsamplers[game],
-    replay_memory_size=0,
-    render_mode='rgb_array',
-)
+agent = agents[agent_name](env, replay_memory_size=0)
 # load the weights
 agent.model.load_weights(weights_file)
 # play some games
