@@ -16,13 +16,11 @@ _REPR_TEMPLATE = """
 {}(
     env={},
     replay_memory_size={},
-    agent_history_length={},
     discount_factor={},
     update_frequency={},
     optimizer={},
     exploration_rate={},
     loss={},
-    image_size={},
     render_mode={}
 )
 """.lstrip()
@@ -33,13 +31,11 @@ class DeepQAgent(Agent):
 
     def __init__(self, env,
         replay_memory_size: int=250000,
-        agent_history_length: int=4,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         loss: Callable=huber_loss,
-        image_size: tuple=(84, 84),
         render_mode: str='human',
     ) -> None:
         """
@@ -47,9 +43,6 @@ class DeepQAgent(Agent):
 
         Args:
             env: the environment to run on
-            agent_history_length: the number of previous frames for the agent
-                                  to make new decisions based on. this will
-                                  set the number of filters in the CNN
             discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
@@ -58,7 +51,6 @@ class DeepQAgent(Agent):
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
             loss: the loss method to use at the end of the CNN
-            image_size: the size of the images to pass to the CNN
             render_mode: the mode for rendering frames in the OpenAI gym env
                          -   'human': render in the emulator (default)
                          -   'rgb_array': render in the backend and return a
@@ -70,20 +62,19 @@ class DeepQAgent(Agent):
         """
         self.env = env
         self.queue = ReplayQueue(replay_memory_size)
-        self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.loss = loss
-        self.image_size = image_size
         self.render_mode = render_mode
-        # setup the buffer for frames the agent uses to predict on
-        self.frame_buffer = np.zeros((*image_size, agent_history_length))
+        # build an output mask that lets all action values pass through
+        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
+        self.predict_mask = np.ones(mask_shape)
         # build the neural model for estimating Q values
         self.model = build_deep_mind_model(
-            image_size=image_size,
-            num_frames=agent_history_length,
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
@@ -95,28 +86,20 @@ class DeepQAgent(Agent):
             self.__class__.__name__,
             self.env,
             self.queue.size,
-            self.agent_history_length,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
             self.loss,
-            self.image_size,
             repr(self.render_mode)
         )
 
     def _initial_state(self) -> np.ndarray:
         """Reset the environment and return the initial state."""
-        # reset the environment
-        frame = self.env.reset()
-        # render this frame in the emulator
+        state = self.env.reset()
         self.env.render(mode=self.render_mode)
 
-        # reset the frame buffer with the initial state repeated as necessary
-        self.frame_buffer = np.repeat(frame, self.agent_history_length, axis=2)
-        # return the frame buffer as the state
-
-        return self.frame_buffer
+        return state
 
     def _next_state(self, action: int) -> tuple:
         """
@@ -132,17 +115,10 @@ class DeepQAgent(Agent):
                 - the terminal flag
 
         """
-        # make the step and observe the state, reward, done flag
         state, reward, done, info = self.env.step(action=action)
-        # render this frame in the emulator
         self.env.render(mode=self.render_mode)
 
-        # add the state to the frame buffer
-        self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
-        # remove the last frame in the frame buffer
-        self.frame_buffer = self.frame_buffer[:, :, 1:]
-
-        return self.frame_buffer, reward, done
+        return state, reward, done
 
     def predict_action(self,
         frames: np.ndarray,
@@ -165,10 +141,8 @@ class DeepQAgent(Agent):
         else:
             # reshape the frames to pass through the loss network
             frames = frames[np.newaxis, :, :, :]
-            # build an output mask that lets all action values pass through
-            mask = np.ones((self.agent_history_length, self.env.action_space.n))
             # predict the values of each action
-            actions = self.model.predict([frames, mask], batch_size=1)
+            actions = self.model.predict([frames, self.predict_mask], batch_size=1)
             # return the action with the highest estimated future reward
             return np.argmax(actions)
 

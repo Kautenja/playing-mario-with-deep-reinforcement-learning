@@ -63,7 +63,6 @@ class DownsampleEnv(gym.ObservationWrapper):
         frame = cv2.resize(frame, self.image_size, interpolation=cv2.INTER_AREA)
 
         return frame[:, :, np.newaxis]
-        # return frame[:, :, None]
 
 
 # explicitly define the outward facing API of this module
