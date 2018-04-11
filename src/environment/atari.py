@@ -2,10 +2,11 @@
 import gym
 from src.environment.wrappers import (
     NoopResetEnv,
+    FireResetEnv,
+    DownsampleEnv,
     PenalizeDeathEnv,
     ClipRewardEnv,
-    FireResetEnv,
-    DownsampleEnv
+    FrameStackEnv
 )
 
 
@@ -15,6 +16,7 @@ def build_atari_environment(game_name: str,
     noop_max: int=30,
     death_penalty: int=-1,
     clip_rewards: bool=True,
+    agent_history_length: int=4
 ):
     """
     Build and return a configured Atari environment.
@@ -42,5 +44,8 @@ def build_atari_environment(game_name: str,
     # clip the rewards in {-1, 0, +1} if the feature is enabled
     if clip_rewards:
         env = ClipRewardEnv(env)
+    # apply the back history of frames if the feature is enabled
+    if agent_history_length is not None:
+        env = FrameStackEnv(env, agent_history_length)
 
     return env

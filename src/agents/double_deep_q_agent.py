@@ -15,13 +15,11 @@ _REPR_TEMPLATE = """
 {}(
     env={},
     replay_memory_size={},
-    agent_history_length={},
     discount_factor={},
     update_frequency={},
     optimizer={},
     exploration_rate={},
     loss={},
-    image_size={},
     render_mode={},
     target_update_freq={}
 )
@@ -33,7 +31,6 @@ class DoubleDeepQAgent(DeepQAgent):
 
     def __init__(self, env,
         replay_memory_size: int=250000,
-        agent_history_length: int=4,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
@@ -48,9 +45,6 @@ class DoubleDeepQAgent(DeepQAgent):
 
         Args:
             env: the environment to run on
-            agent_history_length: the number of previous frames for the agent
-                                  to make new decisions based on. this will
-                                  set the number of filters in the CNN
             discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
@@ -73,29 +67,28 @@ class DoubleDeepQAgent(DeepQAgent):
         """
         self.env = env
         self.queue = ReplayQueue(replay_memory_size)
-        self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.loss = loss
-        self.image_size = image_size
         self.render_mode = render_mode
         self.target_update_freq = target_update_freq
-        # setup the buffer for frames the agent uses to predict on
-        self.frame_buffer = np.zeros((*image_size, agent_history_length))
+        # build an output mask that lets all action values pass through
+        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
+        self.predict_mask = np.ones(mask_shape)
         # build the neural model for estimating Q values
         self.model = build_deep_mind_model(
-            image_size=image_size,
-            num_frames=agent_history_length,
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
         )
         # build the target model for estimating target values
         self.target_model = build_deep_mind_model(
-            image_size=image_size,
-            num_frames=agent_history_length,
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
@@ -107,13 +100,11 @@ class DoubleDeepQAgent(DeepQAgent):
             self.__class__.__name__,
             self.env,
             self.queue.size,
-            self.agent_history_length,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
             self.loss,
-            self.image_size,
             repr(self.render_mode),
             self.target_update_freq
         )
