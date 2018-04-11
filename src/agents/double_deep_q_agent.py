@@ -6,7 +6,6 @@ from keras.optimizers import Adam
 from src.models import build_deep_mind_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
-from src.downsamplers import Downsampler
 from .replay_queue import ReplayQueue
 from .deep_q_agent import DeepQAgent
 
@@ -15,7 +14,6 @@ from .deep_q_agent import DeepQAgent
 _REPR_TEMPLATE = """
 {}(
     env={},
-    downsample={},
     replay_memory_size={},
     agent_history_length={},
     discount_factor={},
@@ -33,7 +31,7 @@ _REPR_TEMPLATE = """
 class DoubleDeepQAgent(DeepQAgent):
     """The Double Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env, downsample: Downsampler,
+    def __init__(self, env,
         replay_memory_size: int=250000,
         agent_history_length: int=4,
         discount_factor: float=0.99,
@@ -50,7 +48,6 @@ class DoubleDeepQAgent(DeepQAgent):
 
         Args:
             env: the environment to run on
-            downsample: the down-sampler for the Gym environment
             agent_history_length: the number of previous frames for the agent
                                   to make new decisions based on. this will
                                   set the number of filters in the CNN
@@ -75,7 +72,6 @@ class DoubleDeepQAgent(DeepQAgent):
 
         """
         self.env = env
-        self.downsample = downsample
         self.queue = ReplayQueue(replay_memory_size)
         self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
@@ -110,7 +106,6 @@ class DoubleDeepQAgent(DeepQAgent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.downsample,
             self.queue.size,
             self.agent_history_length,
             self.discount_factor,
