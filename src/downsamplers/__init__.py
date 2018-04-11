@@ -14,7 +14,7 @@ downsample_space_invaders = Downsampler(y=(0, 15), x=(0, 1), cut=[])
 
 # explicitly define the outward facing API for this package
 __all__ = [
-    'PongDownsampler',
+    'Downsampler',
     'downsample_pong',
     'downsample_breakout',
     'downsample_space_invaders'
