@@ -4,7 +4,6 @@
 """
 import os
 import sys
-import gym
 import pandas as pd
 from src.util import BaseCallback
 from src.agents import DeepQAgent, DoubleDeepQAgent
@@ -30,11 +29,6 @@ except IndexError:
 # validate the agent name
 if agent_name not in agents.keys():
     print('invalid agent')
-    sys.exit(-1)
-
-# validate the game
-if game not in downsamplers.keys():
-    print('invalid game')
     sys.exit(-1)
 
 # setup the experiment directory
