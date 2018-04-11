@@ -15,13 +15,13 @@ from .replay_queue import ReplayQueue
 _REPR_TEMPLATE = """
 {}(
     env={},
+    render_mode={}
     replay_memory_size={},
     discount_factor={},
     update_frequency={},
     optimizer={},
     exploration_rate={},
     loss={},
-    render_mode={}
 )
 """.lstrip()
 
@@ -29,20 +29,23 @@ _REPR_TEMPLATE = """
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env,
+    def __init__(self, env, render_mode: str='rgb_array',
         replay_memory_size: int=250000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         loss: Callable=huber_loss,
-        render_mode: str='human',
     ) -> None:
         """
         Initialize a new Deep Q Agent.
 
         Args:
             env: the environment to run on
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                         -   'human': render in the emulator (default)
+                         -   'rgb_array': render in the backend and return a
+                                          numpy array (server/Jupyter)
             discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
@@ -51,23 +54,19 @@ class DeepQAgent(Agent):
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
             loss: the loss method to use at the end of the CNN
-            render_mode: the mode for rendering frames in the OpenAI gym env
-                         -   'human': render in the emulator (default)
-                         -   'rgb_array': render in the backend and return a
-                                          numpy array (server/Jupyter)
 
         Returns:
             None
 
         """
         self.env = env
+        self.render_mode = render_mode
         self.queue = ReplayQueue(replay_memory_size)
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.loss = loss
-        self.render_mode = render_mode
         # build an output mask that lets all action values pass through
         mask_shape = (env.observation_space.shape[-1], env.action_space.n)
         self.predict_mask = np.ones(mask_shape)
@@ -85,66 +84,14 @@ class DeepQAgent(Agent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
+            repr(self.render_mode),
             self.queue.size,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
-            self.loss,
-            repr(self.render_mode)
+            self.loss.__name__,
         )
-
-    def _initial_state(self) -> np.ndarray:
-        """Reset the environment and return the initial state."""
-        state = self.env.reset()
-        self.env.render(mode=self.render_mode)
-
-        return state
-
-    def _next_state(self, action: int) -> tuple:
-        """
-        Return the next state based on the given action.
-
-        Args:
-            action: the action to perform for some frames
-
-        Returns:
-            a tuple of:
-                - the next state
-                - the reward as a result of the action
-                - the terminal flag
-
-        """
-        state, reward, done, info = self.env.step(action=action)
-        self.env.render(mode=self.render_mode)
-
-        return state, reward, done
-
-    def predict_action(self,
-        frames: np.ndarray,
-        exploration_rate: float
-    ) -> int:
-        """
-        Predict an action from a stack of frames.
-
-        Args:
-            frames: the stack of frames to predict Q values from
-            exploration_rate: the exploration rate for epsilon greedy selection
-
-        Returns:
-            the predicted optimal action based on the frames
-
-        """
-        if np.random.random() < exploration_rate:
-            # select a random action and return it
-            return self.env.action_space.sample()
-        else:
-            # reshape the frames to pass through the loss network
-            frames = frames[np.newaxis, :, :, :]
-            # predict the values of each action
-            actions = self.model.predict([frames, self.predict_mask], batch_size=1)
-            # return the action with the highest estimated future reward
-            return np.argmax(actions)
 
     def observe(self, replay_start_size: int=50000) -> None:
         """
@@ -226,6 +173,32 @@ class DeepQAgent(Agent):
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
+
+    def predict_action(self,
+        frames: np.ndarray,
+        exploration_rate: float
+    ) -> int:
+        """
+        Predict an action from a stack of frames.
+
+        Args:
+            frames: the stack of frames to predict Q values from
+            exploration_rate: the exploration rate for epsilon greedy selection
+
+        Returns:
+            the predicted optimal action based on the frames
+
+        """
+        if np.random.random() < exploration_rate:
+            # select a random action and return it
+            return self.env.action_space.sample()
+        else:
+            # reshape the frames to pass through the loss network
+            frames = frames[np.newaxis, :, :, :]
+            # predict the values of each action
+            actions = self.model.predict([frames, self.predict_mask], batch_size=1)
+            # return the action with the highest estimated future reward
+            return np.argmax(actions)
 
     def train(self,
         frames_to_play: int=10000000,

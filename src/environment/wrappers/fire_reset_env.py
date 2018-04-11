@@ -3,6 +3,8 @@ import gym
 
 
 class FireResetEnv(gym.Wrapper):
+    """An environment wrapper to fire on reset."""
+
     def __init__(self, env):
         """Take action on reset for environments that are fixed until firing."""
         gym.Wrapper.__init__(self, env)

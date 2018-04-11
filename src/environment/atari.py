@@ -22,7 +22,13 @@ def build_atari_environment(game_name: str,
     Build and return a configured Atari environment.
 
     Args:
-        TODO
+        game_name: the name of the Atari game to make
+        env_spec: the specification for the environment
+        image_size: the size to down-sample images to
+        noop_max: the max number of random no-ops at the beginning of a game
+        death_penatly: the penalty for losing a life in a game
+        clip_rewards: whether to clip rewards in {-1, 0, +1}
+        agent_history_length: the size of the frame buffer for the agent
 
     Returns:
         a gym environment configured for this experiment
@@ -49,3 +55,7 @@ def build_atari_environment(game_name: str,
         env = FrameStackEnv(env, agent_history_length)
 
     return env
+
+
+# explicitly specify the outward facing API of this module
+__all__ = [build_atari_environment.__name__]
