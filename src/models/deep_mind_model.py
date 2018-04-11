@@ -25,7 +25,7 @@ def build_deep_mind_model(
         Color Space: this CNN expects single channel images (B&W)
 
     Args:
-        input_shape: the shape of the image states for the model
+        image_size: the shape of the image states for the model
                      Atari games are (192, 160), but DeepMind reduced the
                      size to (84, 84) to reduce computational load
         num_frames: the number of frames being stacked together
