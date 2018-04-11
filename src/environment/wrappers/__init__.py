@@ -1,4 +1,13 @@
-"""Wrappers used in this experiment."""
+"""
+Wrappers used in this experiment.
+
+All of the wrappers in this package derive from, or are heavily inspired by
+the wrappers found here:
+https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
+
+These are provided by OpenAI baselines as a means of recreating some of the
+DeepMind functionality.
+"""
 from .clip_reward_env import ClipRewardEnv
 from .fire_reset_env import FireResetEnv
 from .noop_reset_env import NoopResetEnv

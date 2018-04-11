@@ -14,13 +14,13 @@ from .deep_q_agent import DeepQAgent
 _REPR_TEMPLATE = """
 {}(
     env={},
+    render_mode={}
     replay_memory_size={},
     discount_factor={},
     update_frequency={},
     optimizer={},
     exploration_rate={},
     loss={},
-    render_mode={},
     target_update_freq={}
 )
 """.lstrip()
@@ -29,15 +29,13 @@ _REPR_TEMPLATE = """
 class DoubleDeepQAgent(DeepQAgent):
     """The Double Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env,
+    def __init__(self, env, render_mode: str='rgb_array',
         replay_memory_size: int=250000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
         loss=huber_loss,
-        image_size: tuple=(84, 84),
-        render_mode: str='human',
         target_update_freq: int=10000
     ) -> None:
         """
@@ -45,6 +43,10 @@ class DoubleDeepQAgent(DeepQAgent):
 
         Args:
             env: the environment to run on
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                         -   'human': render in the emulator (default)
+                         -   'rgb_array': render in the backend and return a
+                                          numpy array (server/Jupyter)
             discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
@@ -53,11 +55,6 @@ class DoubleDeepQAgent(DeepQAgent):
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
             loss: the loss method to use at the end of the CNN
-            image_size: the size of the images to pass to the CNN
-            render_mode: the mode for rendering frames in the OpenAI gym env
-                         -   'human': render in the emulator (default)
-                         -   'rgb_array': render in the backend and return a
-                                          numpy array (server/Jupyter)
             target_update_freq: the frequency with which to update the target
                                 network
 
@@ -66,13 +63,13 @@ class DoubleDeepQAgent(DeepQAgent):
 
         """
         self.env = env
+        self.render_mode = render_mode
         self.queue = ReplayQueue(replay_memory_size)
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.loss = loss
-        self.render_mode = render_mode
         self.target_update_freq = target_update_freq
         # build an output mask that lets all action values pass through
         mask_shape = (env.observation_space.shape[-1], env.action_space.n)
@@ -99,14 +96,14 @@ class DoubleDeepQAgent(DeepQAgent):
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
+            repr(self.render_mode),
             self.queue.size,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
-            self.loss,
-            repr(self.render_mode),
-            self.target_update_freq
+            self.loss.__name__,
+            self.target_update_freq,
         )
 
     def _replay(self,

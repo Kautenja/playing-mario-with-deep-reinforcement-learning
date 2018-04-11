@@ -5,7 +5,7 @@ import numpy as np
 
 
 class DownsampleEnv(gym.ObservationWrapper):
-    """Downsample frames to a B&W with a cropped size and colors removed."""
+    """An environment that down-samples frames."""
 
     # metadata for the down-samplers for each game
     metadata = {
