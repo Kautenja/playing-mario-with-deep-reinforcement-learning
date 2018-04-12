@@ -4,7 +4,6 @@
 """
 import os
 import sys
-import gym
 from gym.wrappers import Monitor
 from src.agents import DeepQAgent, A3CAgent
 from src.environment.atari import build_atari_environment
