@@ -63,22 +63,21 @@ class ReplayQueue(object):
             A random sample from the queue sampled uniformly
 
         """
-        # generate an index of items to extract
-        idx_batch = set(np.random.randint(0, self.top, size))
+        # initialize lists for each component of the batch
         s = [None] * size
         a = [None] * size
         r = [None] * size
         d = [None] * size
         s2 = [None] * size
-
-        for batch_idx, idx in enumerate(idx_batch):
-            _s, _a, _r, _d, _s2 = self.queue[idx]
-            s[batch_idx] = np.array(_s, copy=False)
-            a[batch_idx] = np.array(_a, copy=False)
-            r[batch_idx] = _r
-            d[batch_idx] = _d
-            s2[batch_idx] = np.array(_s2, copy=False)
-
+        # iterate over the indexes and copy references to the arrays
+        for batch, sample in enumerate(np.random.randint(0, self.top, size)):
+            _s, _a, _r, _d, _s2 = self.queue[sample]
+            s[batch] = np.array(_s, copy=False)
+            a[batch] = np.array(_a, copy=False)
+            r[batch] = _r
+            d[batch] = _d
+            s2[batch] = np.array(_s2, copy=False)
+        # convert the lists to arrays for returning for training
         return np.array(s), np.array(a), np.array(r), np.array(d), np.array(s2)
 
 
