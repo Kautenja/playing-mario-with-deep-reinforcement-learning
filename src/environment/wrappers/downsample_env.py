@@ -53,14 +53,15 @@ class DownsampleEnv(gym.ObservationWrapper):
         )
 
     def observation(self, frame):
-        # convert the frame from RGB to gray scale
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         # crop the image to the playable space
         frame = frame[self.y[0]:-self.y[1], self.x[0]:-self.x[1]]
+        # convert the frame from RGB to gray scale
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         # zero out specific colors
         frame[np.in1d(frame, self.cut).reshape(frame.shape)] = 0
-        # resize the frame to the expected shape
-        frame = cv2.resize(frame, self.image_size, interpolation=cv2.INTER_AREA)
+        # resize the frame to the expected shape. bilinear is the default
+        # interpolation method
+        frame = cv2.resize(frame, self.image_size)
 
         return frame[:, :, np.newaxis]
 
