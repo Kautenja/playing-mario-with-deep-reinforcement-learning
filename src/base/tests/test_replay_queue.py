@@ -11,31 +11,31 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 
 def ones() -> tuple:
     """Return an arbitrary state of ones."""
-    s = np.ones((84, 84, 4))
+    s = np.ones((84, 84, 4), dtype=np.uint8)
     a = 1
     r = 1
     d = True
-    s2 = np.ones((84, 84, 4))
+    s2 = np.ones((84, 84, 4), dtype=np.uint8)
     return s, a, r, d, s2
 
 
 def zeros() -> tuple:
     """Return an arbitrary state of zeros."""
-    s = np.zeros((84, 84, 4))
+    s = np.zeros((84, 84, 4), dtype=np.uint8)
     a = 0
     r = 0
     d = False
-    s2 = np.zeros((84, 84, 4))
+    s2 = np.zeros((84, 84, 4), dtype=np.uint8)
     return s, a, r, d, s2
 
 
 def random_state() -> tuple:
     """Return an arbitrary randomized state"""
-    s = np.random.randint(0, 256, (84, 84, 4)).astype('uint8')
+    s = np.random.randint(0, 256, (84, 84, 4)).astype(np.uint8)
     a = np.random.randint(6)
     r = np.random.randint(2) - 1
     d = bool(np.random.randint(1))
-    s2 = np.random.randint(0, 256, (84, 84, 4)).astype('uint8')
+    s2 = np.random.randint(0, 256, (84, 84, 4)).astype(np.uint8)
     return s, a, r, d, s2
 
 
@@ -54,19 +54,19 @@ class ReplyBuffer__repr__(TestCase):
 class ReplyBuffer__len__(TestCase):
     def test(self):
         arb = ReplayQueue(10)
-        self.assertEqual(0, len(arb))
+        self.assertEqual(0, arb.top)
         arb.push(*zeros())
-        self.assertEqual(1, len(arb))
+        self.assertEqual(1, arb.top)
 
         for index in range(2, 30):
             if index < 10:
                 arb.push(*zeros())
-                self.assertEqual(index, len(arb))
+                self.assertEqual(index, arb.top)
             else:
                 arb.push(*ones())
-                self.assertEqual(10, len(arb))
+                self.assertEqual(10, arb.top)
 
-        self.assertTrue(ones(), arb.current())
+        self.assertTrue(ones(), arb.queue[arb.index])
 
 
 class ReplyBuffer_is_bound(TestCase):
@@ -81,9 +81,9 @@ class ReplyBuffer_is_bound(TestCase):
                 arb.push(*zeros())
 
         # there should only be 10 elements
-        self.assertEqual(10, len(arb))
+        self.assertEqual(10, arb.top)
         # it should move the items along as new ones are added
-        self.assertEqual(ones()[1], arb.current()[1])
+        self.assertEqual(ones()[1], arb.queue[arb.index][1])
 
 
 class ReplyBuffer_sample(TestCase):
