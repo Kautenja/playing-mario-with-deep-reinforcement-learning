@@ -6,14 +6,14 @@ import os
 import sys
 import pandas as pd
 from src.util import BaseCallback
-from src.agents import DeepQAgent, DoubleDeepQAgent
+from src.agents import DeepQAgent, A3CAgent
 from src.environment.atari import build_atari_environment
 
 
 # a mapping of string names to agents
 agents = {
-    'DeepQAgent': DeepQAgent,
-    'DoubleDeepQAgent': DoubleDeepQAgent,
+    DeepQAgent.__name__: DeepQAgent,
+    A3CAgent.__name__: A3CAgent,
 }
 
 
