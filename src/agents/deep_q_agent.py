@@ -4,7 +4,7 @@ from typing import Callable
 from tqdm import tqdm
 from pygame.time import Clock
 from keras.optimizers import Adam
-from src.models import build_deep_mind_model
+from src.models import build_deep_q_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
 from .agent import Agent
@@ -71,7 +71,7 @@ class DeepQAgent(Agent):
         mask_shape = (env.observation_space.shape[-1], env.action_space.n)
         self.predict_mask = np.ones(mask_shape)
         # build the neural model for estimating Q values
-        self.model = build_deep_mind_model(
+        self.model = build_deep_q_model(
             image_size=env.observation_space.shape[:2],
             num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
