@@ -11,7 +11,7 @@ class Agent(object):
 
         Args:
             env: the environment for the agent to experience
-            render_mode: the method for rendering frames from the backend
+            render_mode: the method for rendering frames from the emulator
 
         Returns:
             None
@@ -33,7 +33,7 @@ class Agent(object):
         Reset the environment and return the initial state.
 
         Returns:
-            the initial state of the game as an ndarray
+            the initial state of the game
 
         """
         state = self.env.reset()
@@ -52,14 +52,14 @@ class Agent(object):
             a tuple of:
                 - the next state
                 - the reward as a result of the action
-                - the terminal flag
+                - a flag determining end of episode
 
         """
-        state, reward, done, info = self.env.step(action=action)
+        state, reward, done, _ = self.env.step(action=action)
         self.env.render(mode=self.render_mode)
 
         return state, reward, done
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['Agent']
+__all__ = [Agent.__name__]
