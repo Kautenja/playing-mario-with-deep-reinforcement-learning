@@ -33,7 +33,7 @@ class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
     def __init__(self, env, render_mode: str='rgb_array',
-        replay_memory_size: int=250000,
+        replay_memory_size: int=750000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
