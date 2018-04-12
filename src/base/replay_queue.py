@@ -73,12 +73,18 @@ class ReplayQueue(object):
         for batch, sample in enumerate(np.random.randint(0, self.top, size)):
             _s, _a, _r, _d, _s2 = self.queue[sample]
             s[batch] = np.array(_s, copy=False)
-            a[batch] = np.array(_a, copy=False)
+            a[batch] = _a
             r[batch] = _r
             d[batch] = _d
             s2[batch] = np.array(_s2, copy=False)
         # convert the lists to arrays for returning for training
-        return np.array(s), np.array(a), np.array(r), np.array(d), np.array(s2)
+        return (
+            np.array(s),
+            np.array(a, dtype=np.uint8),
+            np.array(r, dtype=np.int8),
+            np.array(d, dtype=np.bool),
+            np.array(s2),
+        )
 
 
 # explicitly define the outward facing API of this module
