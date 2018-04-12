@@ -5,6 +5,7 @@ from tqdm import tqdm
 from pygame.time import Clock
 from keras.optimizers import Adam
 from src.models import build_deep_q_model
+from src.models import build_dueling_deep_q_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
 from .agent import Agent
@@ -22,6 +23,8 @@ _REPR_TEMPLATE = """
     optimizer={},
     exploration_rate={},
     loss={},
+    target_update_freq={},
+    dueling_network={}
 )
 """.lstrip()
 
@@ -35,7 +38,9 @@ class DeepQAgent(Agent):
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
-        loss: Callable=huber_loss,
+        loss=huber_loss,
+        target_update_freq: int=10000,
+        dueling_network: bool=True
     ) -> None:
         """
         Initialize a new Deep Q Agent.
@@ -54,6 +59,9 @@ class DeepQAgent(Agent):
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
             loss: the loss method to use at the end of the CNN
+            target_update_freq: the frequency with which to update the target
+                                network
+            dueling_network: whether to use the dueling architecture
 
         Returns:
             None
@@ -67,11 +75,25 @@ class DeepQAgent(Agent):
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
         self.loss = loss
+        self.target_update_freq = target_update_freq
+        self.dueling_network = dueling_network
         # build an output mask that lets all action values pass through
         mask_shape = (env.observation_space.shape[-1], env.action_space.n)
         self.predict_mask = np.ones(mask_shape)
+        if dueling_network:
+            build_model = build_dueling_deep_q_model
+        else:
+            build_model = build_deep_q_model
         # build the neural model for estimating Q values
-        self.model = build_deep_q_model(
+        self.model = build_model(
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
+            num_actions=env.action_space.n,
+            loss=loss,
+            optimizer=optimizer
+        )
+        # build the target model for estimating target values
+        self.target_model = build_model(
             image_size=env.observation_space.shape[:2],
             num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
@@ -80,7 +102,7 @@ class DeepQAgent(Agent):
         )
 
     def __repr__(self) -> str:
-        """Return an executable Python string to reproduce self."""
+        """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
@@ -91,6 +113,8 @@ class DeepQAgent(Agent):
             self.optimizer,
             self.exploration_rate,
             self.loss.__name__,
+            self.target_update_freq,
+            self.dueling_network
         )
 
     def observe(self, replay_start_size: int=50000) -> None:
@@ -159,7 +183,7 @@ class DeepQAgent(Agent):
         # predict Q values for the next state of each memory in the batch and
         # take the maximum value. dont mask any outputs, i.e. use ones
         all_mask = np.ones((len(s), self.env.action_space.n))
-        Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
+        Q = np.max(self.target_model.predict_on_batch([s2, all_mask]), axis=1)
         # terminal states have a Q value of zero by definition
         Q[d] = 0
         # set the y value for each sample to the reward of the selected
@@ -168,7 +192,6 @@ class DeepQAgent(Agent):
 
         # use an identity of size action space, and index rows from it using
         # the action vector to produce a one-hot matrix representing the mask
-        # for actions in a
         action_mask = np.eye(self.env.action_space.n)[a]
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
@@ -236,7 +259,7 @@ class DeepQAgent(Agent):
                 action = self.predict_action(state, self.exploration_rate.value)
                 # step the exploration rate forward
                 self.exploration_rate.step()
-                # fire the action and observe the next state, reward, and done
+                # fire the action and observe the next state, reward, and flag
                 next_state, reward, done = self._next_state(action)
                 score += reward
                 # push the memory onto the replay queue
@@ -246,10 +269,13 @@ class DeepQAgent(Agent):
                 # decrement the observation counter
                 frames_to_play -= 1
                 frames += 1
-                # update Q from replay every self.update_frequency
+                # update Q from replay
                 if frames_to_play % self.update_frequency == 0:
                     loss += self._replay(*self.queue.sample(size=batch_size))
-                # break out if done training
+                # update Target Q from online Q
+                if frames_to_play % self.target_update_freq == 0:
+                    self.target_model.set_weights(self.model.get_weights())
+                # break out if done observing
                 if frames_to_play <= 0:
                     break
 
