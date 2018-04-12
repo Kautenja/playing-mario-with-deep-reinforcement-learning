@@ -8,8 +8,8 @@ from src.models import build_deep_q_model
 from src.models import build_dueling_deep_q_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
+from src.base import ReplayQueue
 from .agent import Agent
-from .replay_queue import ReplayQueue
 
 
 # the format string for this objects representation
