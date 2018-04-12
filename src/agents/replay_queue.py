@@ -1,103 +1,58 @@
 """A queue for storing previous experiences to sample from."""
-from sys import getsizeof
+from collections import deque
 import numpy as np
 
 
 class ReplayQueue(object):
-    """A queue for storing previous experiences to sample from."""
+    """A replay queue for replaying previous experiences."""
 
-    def __init__(self,
-        size: int=250000,
-        image_size: tuple=(84, 84),
-        history_length: int=4
-    ) -> None:
+    def __init__(self, size: int) -> None:
         """
         Initialize a new replay buffer with a given size.
 
         Args:
-            size: the maximum number of experiences to store
-            image_size: the size of the images to store
-            history_length: the length of frame history for an agent
+            size: the size of the replay buffer
+                  (the number of previous experiences to store)
 
         Returns:
             None
 
         """
-        # assign size to self
-        self._size = size
+        # initialize the queue data-structure as a list of nil values
+        self.queue = [None] * size
         # setup variables for the index and top
         self.index = 0
         self.top = 0
-        # setup the queues
-        self.s = np.zeros((size, *image_size, history_length), dtype=np.uint8)
-        self.a = np.zeros(size, dtype=np.uint8)
-        self.r = np.zeros(size, dtype=np.int8)
-        self.d = np.zeros(size, dtype=np.bool)
-        self.s2 = np.zeros((size, *image_size, history_length), dtype=np.uint8)
 
     def __repr__(self) -> str:
         """Return an executable string representation of self."""
         return '{}(size={})'.format(self.__class__.__name__, self.size)
 
-    def __len__(self) -> int:
-        """Return the number of items in the queue."""
-        return self.top
-
     @property
     def size(self) -> int:
         """Return the size of the queue."""
-        return self._size
+        return len(self.queue)
 
-    @property
-    def num_bytes(self) -> int:
-        """Return the number of byte this object consumes."""
-        items = [self.s, self.a, self.r, self.d, self.s2]
-        return sum(getsizeof(itm) for item in items)
-
-    def push(self,
-        s: np.ndarray,
-        a: np.uint8,
-        r: np.int8,
-        d: np.bool,
-        s2: np.ndarray
-    ) -> None:
+    def push(self, *args) -> None:
         """
         Push a new experience onto the queue.
 
         Args:
-            s: the current state
-            a: the action to get from state to next state
-            r: the reward as a result of the action
-            d: a flag indicating if the episode (game) has ended
-            s2: the next state as a result of the action from state
+            *args: the experience s, a, r, d, s2
 
         Returns:
             None
 
         """
         # push the variables onto the queue
-        self.s[self.index] = s
-        self.a[self.index] = a
-        self.r[self.index] = r
-        self.d[self.index] = d
-        self.s2[self.index] = s2
+        self.queue[self.index] = args
         # increment the index
         self.index = (self.index + 1) % self.size
         # increment the top pointer
         if self.top < self.size:
             self.top += 1
 
-    def current(self) -> tuple:
-        """Pop an item off the queue and return it."""
-        return (
-            self.s[self.index],
-            self.a[self.index],
-            self.r[self.index],
-            self.d[self.index],
-            self.s2[self.index],
-        )
-
-    def sample(self, size: int=32) -> tuple:
+    def sample(self, size: int=32) -> bool:
         """
         Return a random sample of items from the queue.
 
@@ -108,17 +63,24 @@ class ReplayQueue(object):
             A random sample from the queue sampled uniformly
 
         """
-        # generate a random index of items to sample
-        index = np.random.randint(0, self.top, size)
+        # generate an index of items to extract
+        idx_batch = set(np.random.randint(0, self.top, size))
+        s = [None] * size
+        a = [None] * size
+        r = [None] * size
+        d = [None] * size
+        s2 = [None] * size
 
-        return (
-            self.s[index],
-            self.a[index],
-            self.r[index],
-            self.d[index],
-            self.s2[index],
-        )
+        for batch_idx, idx in enumerate(idx_batch):
+            _s, _a, _r, _d, _s2 = self.queue[idx]
+            s[batch_idx] = np.array(_s, copy=False)
+            a[batch_idx] = np.array(_a, copy=False)
+            r[batch_idx] = _r
+            d[batch_idx] = _d
+            s2[batch_idx] = np.array(_s2, copy=False)
+
+        return np.array(s), np.array(a), np.array(r), np.array(d), np.array(s2)
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['ReplayQueue']
+__all__ = [ReplayQueue.__name__]
