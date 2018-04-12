@@ -67,4 +67,4 @@ class DownsampleEnv(gym.ObservationWrapper):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['DownsampleEnvs']
+__all__ = [DownsampleEnv.__name__]
