@@ -2,7 +2,7 @@
 from .agent import Agent
 
 
-class A3C_Agent(Agent):
+class A3CAgent(Agent):
     """An implementation of Asynchronous Advantage Actor-Critic (A3C)."""
 
     def __init__(self) -> None:
@@ -11,4 +11,4 @@ class A3C_Agent(Agent):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['A3C_Agent']
+__all__ = ['A3CAgent']
