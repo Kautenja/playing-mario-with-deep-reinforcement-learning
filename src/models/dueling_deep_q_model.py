@@ -63,8 +63,8 @@ def build_dueling_deep_q_model(
 
     # merge the layers together
     avg_advantage = Lambda(lambda x: K.mean(x, keepdims=True))(advantage)
-    Q = Add()([value, advantage])
-    Q = Subtract()([Q, avg_advantage])
+    Q = Subtract()([advantage, avg_advantage])
+    Q = Add()([Q, value])
 
     # build the mask using the functional API
     mask_input = Input((num_actions,), name='mask')
@@ -72,9 +72,9 @@ def build_dueling_deep_q_model(
     output = Multiply()([Q, mask_input])
 
     # build the model
-    model = Model(inputs=[cnn_input, mask_input], outputs=[output])
+    model = Model(inputs=[cnn_input, mask_input], outputs=output)
     # compile the model with the default loss and optimization technique
-    # model.compile(loss=loss, optimizer=optimizer)
+    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
