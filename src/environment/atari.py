@@ -1,19 +1,21 @@
 """Methods for setting up an Atari environment."""
 import gym
 from src.environment.wrappers import (
-    NoopResetEnv,
-    FireResetEnv,
-    DownsampleEnv,
-    PenalizeDeathEnv,
     ClipRewardEnv,
-    FrameStackEnv
+    DownsampleEnv,
+    FireResetEnv,
+    FrameStackEnv,
+    MaxFrameskipEnv,
+    NoopResetEnv,
+    PenalizeDeathEnv,
 )
 
 
 def build_atari_environment(game_name: str,
-    env_spec: str='-v4',
+    is_validation: bool=False,
     image_size: tuple=(84, 84),
     noop_max: int=30,
+    skip_frames: int=4,
     death_penalty: int=-1,
     clip_rewards: bool=True,
     agent_history_length: int=4
@@ -23,9 +25,10 @@ def build_atari_environment(game_name: str,
 
     Args:
         game_name: the name of the Atari game to make
-        env_spec: the specification for the environment
+        is_validation: whether to use the validation or training environment
         image_size: the size to down-sample images to
         noop_max: the max number of random no-ops at the beginning of a game
+        skip_frames: the number of frames to hold each action for
         death_penatly: the penalty for losing a life in a game
         clip_rewards: whether to clip rewards in {-1, 0, +1}
         agent_history_length: the size of the frame buffer for the agent
@@ -35,10 +38,16 @@ def build_atari_environment(game_name: str,
 
     """
     # make the initial environment
-    env = gym.make(game_name + env_spec)
+    if is_validation:
+        env = gym.make('{}NoFrameskip-v10'.format(game_name))
+    else:
+        env = gym.make('{}NoFrameskip-v4'.format(game_name))
     # apply the no op max feature if enabled
     if noop_max is not None:
         env = NoopResetEnv(env, noop_max=noop_max)
+    # apply the frame skip feature if enabled
+    if skip_frames is not None:
+        env = MaxFrameskipEnv(env, skip=skip_frames)
     # apply the wrapper for firing at the beginning of games that require
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)

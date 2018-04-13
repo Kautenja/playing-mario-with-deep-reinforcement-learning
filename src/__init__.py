@@ -24,9 +24,9 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         nondeterministic = game == 'elevator_action' and obs_type == 'ram'
 
         gym.envs.registration.register(
-            id='{}-v10'.format(name),
+            id='{}NoFrameskip-v10'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type},
+            kwargs={'game': game, 'obs_type': obs_type, 'frameskip': 1},
             max_episode_steps=18000,
             nondeterministic=nondeterministic,
         )
