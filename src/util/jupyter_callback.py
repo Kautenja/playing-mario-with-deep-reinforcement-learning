@@ -65,4 +65,4 @@ class JupyterCallback(object):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['JupyterCallback']
+__all__ = [JupyterCallback.__name__]
