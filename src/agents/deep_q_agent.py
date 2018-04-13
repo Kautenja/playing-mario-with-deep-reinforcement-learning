@@ -4,30 +4,27 @@ from typing import Callable
 from tqdm import tqdm
 from pygame.time import Clock
 from keras.optimizers import Adam
-from src.models import build_deep_mind_model
+from src.models import build_deep_q_model
+from src.models import build_dueling_deep_q_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
-from src.downsamplers import Downsampler
+from src.base import ReplayQueue
 from .agent import Agent
-from .replay_queue import ReplayQueue
 
 
 # the format string for this objects representation
 _REPR_TEMPLATE = """
 {}(
     env={},
-    downsample={},
+    render_mode={}
     replay_memory_size={},
-    agent_history_length={},
     discount_factor={},
     update_frequency={},
     optimizer={},
     exploration_rate={},
-    null_op_max={},
-    null_op={},
     loss={},
-    image_size={},
-    render_mode={}
+    target_update_freq={},
+    dueling_network={}
 )
 """.lstrip()
 
@@ -35,28 +32,25 @@ _REPR_TEMPLATE = """
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env, downsample: Downsampler,
-        replay_memory_size: int=250000,
-        agent_history_length: int=4,
+    def __init__(self, env, render_mode: str='rgb_array',
+        replay_memory_size: int=750000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
         exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
-        null_op_max: int=30,
-        null_op: int=0,
-        loss: Callable=huber_loss,
-        image_size: tuple=(84, 84),
-        render_mode: str='human',
+        loss=huber_loss,
+        target_update_freq: int=10000,
+        dueling_network: bool=True
     ) -> None:
         """
         Initialize a new Deep Q Agent.
 
         Args:
             env: the environment to run on
-            downsample: the down-sampler for the Gym environment
-            agent_history_length: the number of previous frames for the agent
-                                  to make new decisions based on. this will
-                                  set the number of filters in the CNN
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                         -   'human': render in the emulator (default)
+                         -   'rgb_array': render in the backend and return a
+                                          numpy array (server/Jupyter)
             discount_factor: the discount factor, γ, for discounting future
                              reward
             update_frequency: the number of actions between updates to the
@@ -64,148 +58,64 @@ class DeepQAgent(Agent):
             optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
                               AnnealingVariable subclass for scheduled decay
-            null_op_max: the maximum number of random null ops at the start of
-                         each new game. the agent performs null operations at
-                         the beginning of training and validation episodes to
-                         emulate a stochastic "human" start
-            null_op: the value indicating a null operation for null_op_max
             loss: the loss method to use at the end of the CNN
-            image_size: the size of the images to pass to the CNN
-            render_mode: the mode for rendering frames in the OpenAI gym env
-                         -   'human': render in the emulator (default)
-                         -   'rgb_array': render in the backend and return a
-                                          numpy array (server/Jupyter)
+            target_update_freq: the frequency with which to update the target
+                                network
+            dueling_network: whether to use the dueling architecture
 
         Returns:
             None
 
         """
         self.env = env
-        self.downsample = downsample
+        self.render_mode = render_mode
         self.queue = ReplayQueue(replay_memory_size)
-        self.agent_history_length = agent_history_length
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
         self.exploration_rate = exploration_rate
-        self.null_op_max = null_op_max
-        self.null_op = null_op
         self.loss = loss
-        self.image_size = image_size
-        self.render_mode = render_mode
-        # setup the buffer for frames the agent uses to predict on
-        self.frame_buffer = np.zeros((*image_size, agent_history_length))
+        self.target_update_freq = target_update_freq
+        self.dueling_network = dueling_network
+        # build an output mask that lets all action values pass through
+        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
+        self.predict_mask = np.ones(mask_shape)
+        if dueling_network:
+            build_model = build_dueling_deep_q_model
+        else:
+            build_model = build_deep_q_model
         # build the neural model for estimating Q values
-        self.model = build_deep_mind_model(
-            image_size=image_size,
-            num_frames=agent_history_length,
+        self.model = build_model(
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
+            num_actions=env.action_space.n,
+            loss=loss,
+            optimizer=optimizer
+        )
+        # build the target model for estimating target values
+        self.target_model = build_model(
+            image_size=env.observation_space.shape[:2],
+            num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n,
             loss=loss,
             optimizer=optimizer
         )
 
     def __repr__(self) -> str:
-        """Return an executable Python string to reproduce self."""
+        """Return a debugging string of this agent."""
         return _REPR_TEMPLATE.format(
             self.__class__.__name__,
             self.env,
-            self.downsample,
+            repr(self.render_mode),
             self.queue.size,
-            self.agent_history_length,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
             self.exploration_rate,
-            self.null_op_max,
-            self.null_op,
-            self.loss,
-            self.image_size,
-            repr(self.render_mode)
+            self.loss.__name__,
+            self.target_update_freq,
+            self.dueling_network
         )
-
-    def _initial_state(self) -> np.ndarray:
-        """Reset the environment and return the initial state."""
-        # reset the environment
-        frame = self.env.reset()
-        # render this frame in the emulator
-        self.env.render(mode=self.render_mode)
-        # reset the lives counter
-        self.lives = None
-
-        # down-sample the frame to B&W and cropped to playable area
-        frame = self.downsample(frame, self.image_size)[:, :, np.newaxis]
-        # reset the frame buffer with the initial state repeated as necessary
-        self.frame_buffer = np.repeat(frame, self.agent_history_length, axis=2)
-        # return the frame buffer as the state
-
-        return self.frame_buffer
-
-    def _next_state(self, action: int) -> tuple:
-        """
-        Return the next state based on the given action.
-
-        Args:
-            action: the action to perform for some frames
-
-        Returns:
-            a tuple of:
-                - the next state
-                - the reward as a result of the action
-                - the terminal flag
-
-        """
-        # make the step and observe the state, reward, done flag
-        state, reward, done, info = self.env.step(action=action)
-        # render this frame in the emulator
-        self.env.render(mode=self.render_mode)
-
-        # down-sample the state and convert it to the expected shape
-        state = self.downsample(state, self.image_size)[:, :, np.newaxis]
-        # add the state to the frame buffer
-        self.frame_buffer = np.concatenate((self.frame_buffer, state), axis=2)
-        # remove the last frame in the frame buffer
-        self.frame_buffer = self.frame_buffer[:, :, 1:]
-
-        # adjust the reward if a life was lost
-        if self.lives is None:
-            self.lives = info['ale.lives']
-        elif self.lives > info['ale.lives']:
-            reward = -1.0
-            self.lives = info['ale.lives']
-        # assign a negative reward if terminal state
-        reward = -1.0 if done else reward
-        # clip the reward based on its sign. i.e. clip in [-1, 0, 1]
-        reward = np.sign(reward)
-
-        return self.frame_buffer, reward, done
-
-    def predict_action(self,
-        frames: np.ndarray,
-        exploration_rate: float
-    ) -> int:
-        """
-        Predict an action from a stack of frames.
-
-        Args:
-            frames: the stack of frames to predict Q values from
-            exploration_rate: the exploration rate for epsilon greedy selection
-
-        Returns:
-            the predicted optimal action based on the frames
-
-        """
-        if np.random.random() < exploration_rate:
-            # select a random action and return it
-            return self.env.action_space.sample()
-        else:
-            # reshape the frames to pass through the loss network
-            frames = frames[np.newaxis, :, :, :]
-            # build an output mask that lets all action values pass through
-            mask = np.ones((self.agent_history_length, self.env.action_space.n))
-            # predict the values of each action
-            actions = self.model.predict([frames, mask], batch_size=1)
-            # return the action with the highest estimated future reward
-            return np.argmax(actions)
 
     def observe(self, replay_start_size: int=50000) -> None:
         """
@@ -273,7 +183,7 @@ class DeepQAgent(Agent):
         # predict Q values for the next state of each memory in the batch and
         # take the maximum value. dont mask any outputs, i.e. use ones
         all_mask = np.ones((len(s), self.env.action_space.n))
-        Q = np.max(self.model.predict_on_batch([s2, all_mask]), axis=1)
+        Q = np.max(self.target_model.predict_on_batch([s2, all_mask]), axis=1)
         # terminal states have a Q value of zero by definition
         Q[d] = 0
         # set the y value for each sample to the reward of the selected
@@ -282,11 +192,36 @@ class DeepQAgent(Agent):
 
         # use an identity of size action space, and index rows from it using
         # the action vector to produce a one-hot matrix representing the mask
-        # for actions in a
         action_mask = np.eye(self.env.action_space.n)[a]
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
+
+    def predict_action(self,
+        frames: np.ndarray,
+        exploration_rate: float
+    ) -> int:
+        """
+        Predict an action from a stack of frames.
+
+        Args:
+            frames: the stack of frames to predict Q values from
+            exploration_rate: the exploration rate for epsilon greedy selection
+
+        Returns:
+            the predicted optimal action based on the frames
+
+        """
+        if np.random.random() < exploration_rate:
+            # select a random action and return it
+            return self.env.action_space.sample()
+        else:
+            # reshape the frames to pass through the loss network
+            frames = frames[np.newaxis, :, :, :]
+            # predict the values of each action
+            actions = self.model.predict([frames, self.predict_mask], batch_size=1)
+            # return the action with the highest estimated future reward
+            return np.argmax(actions)
 
     def train(self,
         frames_to_play: int=10000000,
@@ -318,16 +253,13 @@ class DeepQAgent(Agent):
             frames = 0
             # reset the game and get the initial state
             state = self._initial_state()
-            # perform NOPs randomly
-            for k in range(np.random.randint(0, self.null_op_max)):
-                state, reward, done = self._next_state(self.null_op)
 
             while not done:
                 # predict the best action based on the current state
                 action = self.predict_action(state, self.exploration_rate.value)
                 # step the exploration rate forward
                 self.exploration_rate.step()
-                # fire the action and observe the next state, reward, and done
+                # fire the action and observe the next state, reward, and flag
                 next_state, reward, done = self._next_state(action)
                 score += reward
                 # push the memory onto the replay queue
@@ -337,10 +269,13 @@ class DeepQAgent(Agent):
                 # decrement the observation counter
                 frames_to_play -= 1
                 frames += 1
-                # update Q from replay every self.update_frequency
+                # update Q from replay
                 if frames_to_play % self.update_frequency == 0:
                     loss += self._replay(*self.queue.sample(size=batch_size))
-                # break out if done training
+                # update Target Q from online Q
+                if frames_to_play % self.target_update_freq == 0:
+                    self.target_model.set_weights(self.model.get_weights())
+                # break out if done observing
                 if frames_to_play <= 0:
                     break
 
@@ -381,9 +316,6 @@ class DeepQAgent(Agent):
             score = 0
             # reset the game and get the initial state
             state = self._initial_state()
-            # perform NOPs randomly
-            for k in range(np.random.randint(0, self.null_op_max)):
-                state, _, _ = self._next_state(self.null_op)
 
             while not done:
                 # predict the best action based on the current state
