@@ -24,6 +24,21 @@ class DownsampleEnv(gym.ObservationWrapper):
             'x': (0, 1),
             'cut': []
         },
+        'Enduro': {
+            'y': (0, 55),
+            'x': (9, 1),
+            'cut': []
+        },
+        'Asteroids': {
+            'y': (18, 20),
+            'x': (0, 1),
+            'cut': []
+        },
+        'Seaquest': {
+            'y': (7, 23),
+            'x': (8, 1),
+            'cut': []
+        },
     }
 
     def __init__(self, env, image_size: tuple, y: int, x: int, cut: list=[]):
