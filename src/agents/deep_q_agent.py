@@ -224,7 +224,7 @@ class DeepQAgent(Agent):
             return np.argmax(actions)
 
     def train(self,
-        frames_to_play: int=10000000,
+        frames_to_play: int=5000000,
         batch_size: int=32,
         callback: Callable=None,
     ) -> None:
