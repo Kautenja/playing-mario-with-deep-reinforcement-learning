@@ -20,8 +20,8 @@ agents = {
 try:
     exp_directory = sys.argv[1]
     dirs = exp_directory.split('/')
-    agent_name = dirs[-1]
-    game = dirs[-2]
+    agent_name = dirs[-2]
+    game = dirs[-3]
 except IndexError:
     print(__doc__)
     sys.exit(-1)
