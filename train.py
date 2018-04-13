@@ -4,6 +4,7 @@
 """
 import os
 import sys
+import datetime
 import pandas as pd
 from src.util import BaseCallback
 from src.agents import DeepQAgent, A3CAgent
@@ -32,18 +33,20 @@ if agent_name not in agents.keys():
     sys.exit(-1)
 
 # setup the experiment directory
-exp_directory = '{}/{}/{}'.format(exp_directory, game, agent_name)
+now = datetime.datetime.today().strftime('%Y-%m-%d_%H-%M')
+exp_directory = '{}/{}/{}/{}'.format(exp_directory, game, agent_name, now)
 if not os.path.exists(exp_directory):
     os.makedirs(exp_directory)
-# set up the weights file
-weights_file = '{}/weights.h5'.format(exp_directory)
-
+print('writing results to {}'.format(repr(exp_directory)))
 
 
 # build the environment
 env = build_atari_environment(game)
 # build the agent
 agent = agents[agent_name](env)
+# write some info about the agent to disk
+with open('{}/agent.py'.format(exp_directory), 'w') as agent_file:
+    agent_file.write(repr(agent))
 
 # capture some metrics before training
 print('playing games for initial metrics')
@@ -58,7 +61,7 @@ agent.observe()
 try:
     print('beginning training')
     callback = BaseCallback()
-    agent.train(callback=callback)
+    agent.train(callback=callback, frames_to_play=5000000)
 except KeyboardInterrupt:
     print('canceled training')
 # save the training results
@@ -67,7 +70,7 @@ scores.to_csv('{}/scores.csv'.format(exp_directory))
 losses = pd.Series(callback.losses)
 losses.to_csv('{}/losses.csv'.format(exp_directory))
 # save the weights to disk
-agent.model.save_weights(weights_file, overwrite=True)
+agent.model.save_weights('{}/weights.h5'.format(exp_directory), overwrite=True)
 
 # capture some metrics after training
 print('playing games for final metrics')
