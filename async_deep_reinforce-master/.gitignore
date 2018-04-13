@@ -1,0 +1,4 @@
+*.pyc
+tmp/*
+old/*
+checkpoints*/*
