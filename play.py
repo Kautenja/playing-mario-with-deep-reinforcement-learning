@@ -42,5 +42,5 @@ agent = agents[agent_name](env, replay_memory_size=0)
 # load the weights
 agent.model.load_weights(weights_file)
 # play some games
-scores = agent.play(games=2)
+scores = agent.play()
 print(scores)
