@@ -11,37 +11,31 @@ class DownsampleEnv(gym.ObservationWrapper):
     metadata = {
         'Pong': {
             'y': (34, 16),
-            'x': (15, 15),
-            'cut': [107, 87]
+            'x': (15, 15)
         },
         'Breakout': {
             'y': (32, 14),
-            'x': (8, 8),
-            'cut': [142]
+            'x': (8, 8)
         },
         'SpaceInvaders': {
             'y': (0, 15),
-            'x': (0, 1),
-            'cut': []
+            'x': (0, 1)
         },
         'Enduro': {
             'y': (0, 55),
-            'x': (9, 1),
-            'cut': []
+            'x': (9, 1)
         },
         'Asteroids': {
             'y': (18, 20),
-            'x': (0, 1),
-            'cut': []
+            'x': (0, 1)
         },
         'Seaquest': {
             'y': (7, 23),
-            'x': (8, 1),
-            'cut': []
+            'x': (8, 1)
         },
     }
 
-    def __init__(self, env, image_size: tuple, y: int, x: int, cut: list=[]):
+    def __init__(self, env, image_size: tuple, y: int, x: int):
         """
         Create a new down-sampler.
 
@@ -49,7 +43,6 @@ class DownsampleEnv(gym.ObservationWrapper):
             image_size: the size to output frames as
             y: the coordinates of the Y padding (y_top, y_bottom)
             x: the coordinates of the X padding (x_left, x_right)
-            cut: the shades of gray to cancel out to solid black
 
         Returns:
             None
@@ -59,7 +52,6 @@ class DownsampleEnv(gym.ObservationWrapper):
         self.image_size = image_size
         self.y = y
         self.x = x
-        self.cut = cut
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
@@ -72,8 +64,6 @@ class DownsampleEnv(gym.ObservationWrapper):
         frame = frame[self.y[0]:-self.y[1], self.x[0]:-self.x[1]]
         # convert the frame from RGB to gray scale
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        # zero out specific colors
-        frame[np.in1d(frame, self.cut).reshape(frame.shape)] = 0
         # resize the frame to the expected shape. bilinear is the default
         # interpolation method
         frame = cv2.resize(frame, self.image_size)
