@@ -33,7 +33,7 @@ class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
     def __init__(self, env, render_mode: str='rgb_array',
-        replay_memory_size: int=750000,
+        replay_memory_size: int=1000000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
@@ -132,7 +132,7 @@ class DeepQAgent(Agent):
         progress = tqdm(total=replay_start_size, unit='frame')
         # loop indefinitely, the loop breaks when the number of
         # frames passed is greater than replay_start_size
-        while True:
+        while replay_start_size > 0:
             # reset the game and get the initial state
             state = self._initial_state()
             # the done flag indicating that an episode has ended
@@ -151,10 +151,8 @@ class DeepQAgent(Agent):
                 replay_start_size -= 1
                 # update the progress bar
                 progress.update(1)
-                # break out if done observing
-                if replay_start_size <= 0:
-                    progress.close()
-                    return
+
+        progress.close()
 
     def _replay(self,
         s: np.ndarray,
@@ -224,7 +222,7 @@ class DeepQAgent(Agent):
             return np.argmax(actions)
 
     def train(self,
-        frames_to_play: int=5000000,
+        frames_to_play: int=10000000,
         batch_size: int=32,
         callback: Callable=None,
     ) -> None:
@@ -275,9 +273,6 @@ class DeepQAgent(Agent):
                 # update Target Q from online Q
                 if frames_to_play % self.target_update_freq == 0:
                     self.target_model.set_weights(self.model.get_weights())
-                # break out if done observing
-                if frames_to_play <= 0:
-                    break
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
