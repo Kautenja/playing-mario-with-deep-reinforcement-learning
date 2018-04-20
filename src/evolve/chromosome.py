@@ -1,4 +1,5 @@
 """An abstraction of a chromosome for evolving Deep Q networks."""
+from copy import deepcopy
 import numpy as np
 
 
@@ -103,6 +104,16 @@ class DeepQChromosome(object):
 
         """
         return self.fitness == other.fitness
+
+    def copy(self):
+        """Return a copy of this chromosome"""
+        return DeepQChromosome(
+            self.env,
+            self.model,
+            deepcopy(self.theta),
+            self.sigma,
+            self.frames_to_play
+        )
 
     def get_from_model(self, model) -> None:
         """

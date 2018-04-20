@@ -4,8 +4,8 @@ from typing import Callable
 from tqdm import tqdm
 from pygame.time import Clock
 from src.models import build_deep_q_model
-from .agent import Agent
 from src.evolve.chromosome import DeepQChromosome
+from .agent import Agent
 
 
 class GeneticAgent(Agent):
@@ -82,23 +82,24 @@ class GeneticAgent(Agent):
         for _ in tqdm(range(generations), unit='generation'):
             # take the elite as the first member and reevaluate to better
             # estimate the fitness
-            elite = population[0]
-            elite.evaluate(repetitions=self.elite_repetitions)
+            self.elite = population[0]
+            self.elite.evaluate(repetitions=self.elite_repetitions)
             # select parents with truncation selection
             parents = population[:self.truncation_size]
             # select the children
-            children = [None] * i
-            for i in self.population_size:
-                children[i] = deepcopy(np.random.choice(parents))
+            children = [None] * self.population_size
+            for i in range(self.population_size):
+                children[i] = np.random.choice(parents).copy()
                 children[i].mutate()
             # select survivors in the population
-            population = sorted(population + children, reverse=True)
-            population = population_size[:self.population_size]
+            population = sorted([self.elite] + population + children, reverse=True)
+            population = population[:self.population_size]
             # pass the population to the callback
             if callable(callback):
                 callback(population)
 
-        return population
+        # set the elite to self after
+        self.elite.set_to_model(self.model)
 
     def play(self, games: int=100, fps: int=None) -> np.ndarray:
         """
