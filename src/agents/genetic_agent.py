@@ -14,9 +14,9 @@ class GeneticAgent(Agent):
     def __init__(self,
         env,
         render_mode: str='rgb_array',
-        population_size: int=100,
-        truncation_size: int=50,
-        elite_repetitions: int=30,
+        population_size: int=30,
+        truncation_size: int=15,
+        elite_repetitions: int=10,
     ) -> None:
         """
         Initialize a new Genetic Agent.
@@ -40,7 +40,7 @@ class GeneticAgent(Agent):
         self.elite_repetitions = elite_repetitions
         # build the neural model for estimating Q values
         mask_shape = (env.observation_space.shape[-1], env.action_space.n)
-        self.predict_mask = np.ones(mask_shape)
+        self.mask = np.ones(mask_shape)
         self.model = build_deep_q_model(
             image_size=env.observation_space.shape[:2],
             num_frames=env.observation_space.shape[-1],
@@ -54,24 +54,6 @@ class GeneticAgent(Agent):
             self.env,
             repr(self.render_mode),
         )
-
-    def predict_action(self, frames: np.ndarray) -> int:
-        """
-        Predict an action from a stack of frames.
-
-        Args:
-            frames: the stack of frames to predict Q values from
-
-        Returns:
-            the predicted optimal action based on the frames
-
-        """
-        # reshape the frames to pass through the loss network
-        frames = frames[np.newaxis, :, :, :]
-        # predict the values of each action
-        actions = self.model.predict([frames, self.predict_mask], batch_size=1)
-        # return the action with the highest estimated future reward
-        return np.argmax(actions)
 
     def train(self,
         generations: int=500,
@@ -91,7 +73,9 @@ class GeneticAgent(Agent):
 
         """
         # setup the initial population of chromosomes
-        population = [DeepQChromosome('random') for _ in range(self.population_size)]
+        population = [None] * self.population_size
+        for i in range(self.population_size):
+            population[i] = DeepQChromosome(self.env, self.model, 'random')
         population = sorted(population, reverse=True)
 
         # run for the number of generations
@@ -116,45 +100,44 @@ class GeneticAgent(Agent):
 
         return population
 
-    # def play(self, games: int=100, fps: int=None) -> np.ndarray:
-    #     """
-    #     Run the agent without training for a number of games.
+    def play(self, games: int=100, fps: int=None) -> np.ndarray:
+        """
+        Run the agent without training for a number of games.
 
-    #     Args:
-    #         games: the number of games to play
-    #         fps: the frame-rate to limit game play to
-    #             - if None, the frame-rate will not be limited (i.e infinite)
+        Args:
+            games: the number of games to play
+            fps: the frame-rate to limit game play to
+                - if None, the frame-rate will not be limited (i.e infinite)
 
-    #     Returns:
-    #         an array of scores, one for each game
+        Returns:
+            an array of scores, one for each game
 
-    #     """
-    #     # initialize a clock to keep the frame-rate bounded
-    #     clock = Clock()
-    #     # a list to keep track of the scores
-    #     scores = np.zeros(games)
-    #     # iterate over the number of games
-    #     for game in tqdm(range(games), unit='game'):
-    #         done = False
-    #         score = 0
-    #         # reset the game and get the initial state
-    #         state = self._initial_state()
+        """
+        # initialize a clock to keep the frame-rate bounded
+        clock = Clock()
+        # a list to keep track of the scores
+        scores = np.zeros(games)
+        # iterate over the number of games
+        for game in tqdm(range(games), unit='game'):
+            done = False
+            score = 0
+            # reset the game and get the initial state
+            state = self._initial_state()
 
-    #         while not done:
-    #             # predict the best action based on the current state
-    #             action = self.predict_action(state)
-    #             # hold the action for the number of frames
-    #             next_state, reward, done = self._next_state(action)
-    #             score += reward
-    #             # set the state to the new state
-    #             state = next_state
-    #             # bound the frame rate if there is an fps provided
-    #             if fps is not None:
-    #                 clock.tick(fps)
-    #         # push the score onto the history
-    #         scores[game] = score
+            while not done:
+                state = state[np.newaxis, :, :, :]
+                actions = self.model.predict([state, self.mask], batch_size=1)
+                action = np.argmax(actions)
+                # hold the action for the number of frames
+                state, reward, done = self._next_state(action)
+                score += reward
+                # bound the frame rate if there is an fps provided
+                if fps is not None:
+                    clock.tick(fps)
+            # push the score onto the history
+            scores[game] = score
 
-    #     return scores
+        return scores
 
 
 __all__ = [
