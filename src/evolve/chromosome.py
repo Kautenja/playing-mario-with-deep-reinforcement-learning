@@ -28,7 +28,7 @@ class DeepQChromosome(object):
     def __init__(self,
         env, model,
         theta: list=None,
-        sigma: float=0.2,
+        sigma: float=0.0005,
         frames_to_play: int=20000,
     ) -> None:
         """
@@ -160,32 +160,22 @@ class DeepQChromosome(object):
             self._fitness = self.evaluate()
         return self._fitness
 
-    def evaluate(self, repetitions: int=None) -> float:
+    def evaluate(self, cache_fitness: bool=False) -> float:
         """
         Evaluate the chromosome for a given env and model frame.
 
         Args:
-            repetitions:
+            cache_fitness: whether to cache to fitness in `self.fitness`
 
         Returns:
-            the score of 1 episode or after frames_to_play frames,
-            whichever occurs first
+            the score after 1 episode
 
         """
-        # if we're repeating, go ahead and do so
-        if repetitions is not None and repetitions > 1:
-            score = np.mean([self.evaluate(1) for _ in range(repetitions)])
-            # set the fitness
-            if self._fitness is None or score > self._fitness:
-                self._fitness = score
-
-            return self._fitness
         # set the model with the weights from self
         self.set_to_model(self.model)
         # run an episode in the emulator
         done = False
         score = 0
-        loss = 0
         frames = 0
         # reset the game and get the initial state
         state = self.env.reset()
@@ -205,11 +195,29 @@ class DeepQChromosome(object):
             if frames >= self.frames_to_play:
                 break
 
-        # if there are no repetitions, then set the fitness
-        if repetitions is None and self._fitness is None:
+        if cache_fitness:
             self._fitness = score
 
         return score
+
+    def evaluate_multiple(self, games: int=None) -> float:
+        """
+        Evaluate the chromosome for a given env and model frame multiple times.
+
+        Args:
+            repetitions: the number of times to repeat to
+
+        Returns:
+            the mean score after `repetitions` episode
+
+        """
+        # if we're repeating, go ahead and do so
+        score = np.mean([self.evaluate(False) for _ in range(games)])
+        # set the fitness if it is None or the current score exceeds it
+        if self._fitness is None or score > self._fitness:
+            self._fitness = score
+
+        return self._fitness
 
 
 __all__ = [

@@ -11,12 +11,11 @@ from .agent import Agent
 class GeneticAgent(Agent):
     """The Genetic learning algorithm."""
 
-    def __init__(self,
-        env,
+    def __init__(self, env,
         render_mode: str='rgb_array',
-        population_size: int=30,
-        truncation_size: int=15,
-        elite_repetitions: int=10,
+        population_size: int=30,   # 5000
+        truncation_size: int=10,
+        elite_repetitions: int=10, # 30
     ) -> None:
         """
         Initialize a new Genetic Agent.
@@ -28,6 +27,9 @@ class GeneticAgent(Agent):
                          -   'rgb_array': render in the backend and return a
                                           numpy array (server/Jupyter)
             population_size: the size of the population N.
+            truncation_size: the size of the number of top parents to select T.
+            elite_repetitions: the number of times to validate the elite per
+                               generation
 
         Returns:
             None
@@ -39,17 +41,18 @@ class GeneticAgent(Agent):
         self.truncation_size = truncation_size
         self.elite_repetitions = elite_repetitions
         # build the neural model for estimating Q values
-        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
-        self.mask = np.ones(mask_shape)
         self.model = build_deep_q_model(
             image_size=env.observation_space.shape[:2],
             num_frames=env.observation_space.shape[-1],
             num_actions=env.action_space.n
         )
+        # the mask of ones for (not) masking predictions
+        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
+        self.mask = np.ones(mask_shape)
 
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
-        return """{}(env={}, render_mode={})""".lstrip().format(
+        return '{}(env={}, render_mode={})'.format(
             self.__class__.__name__,
             self.env,
             repr(self.render_mode),
@@ -80,26 +83,30 @@ class GeneticAgent(Agent):
 
         # run for the number of generations
         for _ in tqdm(range(generations), unit='generation'):
-            # take the elite as the first member and reevaluate to better
-            # estimate the fitness
-            self.elite = population[0]
-            self.elite.evaluate(repetitions=self.elite_repetitions)
-            # select parents with truncation selection
+            # take the elite as the first member
+            elite = population[0]
+            # re-evaluate the elite multiple time to better estimate its value
+            elite.evaluate_multiple(self.elite_repetitions)
+            # select parents with truncation selection. i.e. select the top
+            # T members of the population as parents
             parents = population[:self.truncation_size]
-            # select the children
+            # select the N - 1 children from the parents using mutation
             children = [None] * self.population_size
-            for i in range(self.population_size):
+            for i in range(self.population_size - 1):
+                # select a child uniformly randomly from the set of parents
                 children[i] = np.random.choice(parents).copy()
+                # mutate the child
                 children[i].mutate()
-            # select survivors in the population
-            population = sorted([self.elite] + population + children, reverse=True)
-            population = population[:self.population_size]
+            # the Nth child is the elite member
+            children[-1] = elite
+            # the children become the next population (full replacement)
+            population = sorted(children, reverse=True)
             # pass the population to the callback
             if callable(callback):
                 callback(population)
 
-        # set the elite to self after
-        self.elite.set_to_model(self.model)
+        # set the elite to the model after training completes
+        elite.set_to_model(self.model)
 
     def play(self, games: int=100, fps: int=None) -> np.ndarray:
         """
