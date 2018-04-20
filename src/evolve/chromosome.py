@@ -61,6 +61,9 @@ class DeepQChromosome(object):
         self.sigma = sigma
         self.frames_to_play = frames_to_play
         self._fitness = None
+        # build a mask for masking predictions from the network
+        mask_shape = env.observation_space.shape[-1], env.action_space.n
+        self.mask = np.ones(mask_shape)
 
     def __lt__(self, other) -> bool:
         """
@@ -159,8 +162,8 @@ class DeepQChromosome(object):
 
         """
         # if we're repeating, go ahead and do so
-        if repetitions is not None:
-            score = np.mean(self.evaluate(1) for _ in range(repetitions))
+        if repetitions is not None and repetitions > 1:
+            score = np.mean([self.evaluate(1) for _ in range(repetitions)])
             # set the fitness
             if self._fitness is None or score > self._fitness:
                 self._fitness = score
@@ -180,8 +183,7 @@ class DeepQChromosome(object):
         while not done:
             # predict an action from a stack of frames
             state = state[np.newaxis, :, :, :]
-            mask = np.ones((env.observation_space.shape[-1], env.action_space.n))
-            actions = self.model.predict([state, mask], batch_size=1)
+            actions = self.model.predict([state, self.mask], batch_size=1)
             action = np.argmax(actions)
             # fire the action and observe the next state, reward, and flag
             state, reward, done, _ = self.env.step(action=action)
