@@ -1,0 +1,53 @@
+' a component diagram describing the pipeline in this experiment.
+' reference: http://plantuml.com/component-diagram
+@startuml
+
+skinparam packageArrowColor Black
+skinparam nodeArrowColor Black
+skinparam componentArrowColor Black
+skinparam databaseArrowColor Black
+
+skinparam package {
+    backgroundColor LightGray
+}
+
+skinparam node {
+    backgroundColor White
+}
+
+skinparam database {
+    backgroundColor LightCoral
+}
+
+skinparam component {
+    backgroundColor White
+    borderColor Black
+}
+
+node Agent {
+
+}
+Agent -> Action
+
+component Action {
+
+}
+Action -> Environment
+
+node Environment {
+
+}
+Environment --> State
+Environment --> Reward
+
+component State {
+
+}
+State -> Agent
+
+component Reward {
+
+}
+Reward -> Agent
+
+@enduml
