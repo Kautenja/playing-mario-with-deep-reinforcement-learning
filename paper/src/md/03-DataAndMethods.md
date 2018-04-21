@@ -108,15 +108,16 @@ Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in A}Q(s', a') - Q(s, 
 
 Deep-Q approximates the $Q$ table using a neural network and updates states
 by back-propagating the error as a result of the loss function shown in
-Eqn. \ref{eqn:deep-q-alg}. We define the expected label $y = r + Q(s', a')$ as
-the expected future reward, and the predicted label $\hat{y} = Q(s, a)$ as
-the estimated future reward for the current state action pair.
+Eqn. \ref{eqn:deep-q-alg}. We define the ground truth label
+$y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a')$ as the expected future reward, and the
+predicted label $\hat{y} = Q(s, a)$ as the estimated future reward for the
+current state action pair. Following \cite{human-level-control-through-deep-rl},
+we clip the gradient to $[-1, 1]$ using _Huber Loss (Eqn. \ref{eqn:huber})_
+with a $\delta = 1$.
 
 \begin{equation}
 L_i(\theta_i) =
-\mathbb{E}_{e' \sim U(D)} \bigg[
-\bigg( r + \gamma \max_{a' \in A} Q(s', a', \theta) - Q(s, a, \theta) \bigg)^2
-\bigg]
+\mathbb{E}_{(s, a, r, d, s') \sim U(D)} \bigg[ L_{\delta}(y, \hat{y}) \bigg]
 \label{eqn:deep-q-alg}
 \end{equation}
 
@@ -125,6 +126,7 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
       \frac{1}{2} (y - \hat{y})^2                & |y - \hat{y}| \leq \delta \\
       \delta |y - \hat{y}| - \frac{1}{2}\delta^2 & \textbf{otherwise} \\
 \end{cases}
+\label{eqn:huber}
 \end{equation}
 
 -   bootstrapping
