@@ -23,7 +23,7 @@ class MaxFrameskipEnv(gym.Wrapper):
         self._obs_buffer = np.zeros((2, *env.observation_space.shape), dtype=np.uint8)
         self._skip = skip
 
-    def step(self, action):
+    def _step(self, action):
         """Repeat action, sum reward, and max over last observations."""
         # the total reward from `skip` frames having `action` held on them
         total_reward = 0.0
@@ -45,12 +45,6 @@ class MaxFrameskipEnv(gym.Wrapper):
         max_frame = self._obs_buffer.max(axis=0)
 
         return max_frame, total_reward, done, info
-
-    def reset(self):
-        return self.env.reset()
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
 
 
 # explicitly define the outward facing API of this module

@@ -13,9 +13,9 @@ class GeneticAgent(Agent):
 
     def __init__(self, env,
         render_mode: str='rgb_array',
-        population_size: int=30,   # 5000
+        population_size: int=5000,
         truncation_size: int=10,
-        elite_repetitions: int=10, # 30
+        elite_repetitions: int=30,
     ) -> None:
         """
         Initialize a new Genetic Agent.
