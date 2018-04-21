@@ -58,7 +58,8 @@ and an arbitrary $k \geq 1$. This study uses a value $l = 4$ for all games.
 \includegraphics[width=0.6\textwidth]{img/frame-skip}
 \caption{The process for skipping and stacking frames. An agent reacts every
 $k$ frames, holding an action during intermediary frames. The agent then keeps
-the last $l$ frames it reacted to as the current state.}
+the last $l$ frames it reacted to as the current state. This figure implies
+an arbitrary $k$ value, but an $l$ value of $3$.}
 \label{fig:frame-skip}
 \end{figure}
 
@@ -131,6 +132,21 @@ update target network
 approximate state value and action value then define a novel layer for
 aggregating them into Q values over all actions.
 
+<!--
 ## Hardware Configuration
 
-\cite{OhioSupercomputerCenter1987}
+We use two distinct hardware configurations in our experiment. For the Atari
+range of experiments, we use the servers of \cite{OhioSupercomputerCenter1987}.
+
+TODO: get specs of the servers
+
+The \cite{OhioSupercomputerCenter1987} provides no super user access, necessary
+to install the NES emulator, FCEUX, used in the Mario experiment. We instead
+run this experiment locally on a workstation with a 4.2GHz Intel Core i5,
+nVidia GTX1070, and 32GB of 3200MHz RAM. Unlike the Atari emulator, which is
+written in Python, FCEUX is a standalone application that supports plugins
+written in Lua. To interface with our Python stack, the use of a client server
+pattern between game engine process and the agent process. Unfortunately, this
+overhead drastically impedes the agent's ability to interact with the
+environment. We note a slowdown of $\approx 8$x as compared to the Atari
+emulator based on agent frame rate. -->
