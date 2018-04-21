@@ -6,9 +6,8 @@ from src.environment.wrappers import (
     FrameStackEnv,
     MaxFrameskipEnv,
     NoopResetEnv,
-    PenalizeDeathEnv,
 )
-from super_mario.wrappers import ToDiscreteWrapper
+from super_mario.wrappers import ToDiscreteWrapper, PenalizeDeathEnv
 
 
 def build_nes_environment(game_name: str,
@@ -44,6 +43,9 @@ def build_nes_environment(game_name: str,
     # apply a down-sampler for the given game
     downsampler = DownsampleEnv.metadata[game_name.split('-')[0]]
     env = DownsampleEnv(env, image_size, **downsampler)
+    # apply the death penalty feature if enabled
+    if death_penalty is not None:
+        env = PenalizeDeathEnv(env, penalty=death_penalty)
     # clip the rewards in {-1, 0, +1} if the feature is enabled
     if clip_rewards:
         env = ClipRewardEnv(env)
