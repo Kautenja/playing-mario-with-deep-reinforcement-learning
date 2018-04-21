@@ -33,6 +33,10 @@ class DownsampleEnv(gym.ObservationWrapper):
             'y': (7, 23),
             'x': (8, 1)
         },
+        'SuperMarioBros': {
+            'y': (0, 1),
+            'x': (0, 1)
+        }
     }
 
     def __init__(self, env, image_size: tuple, y: int, x: int):
@@ -55,11 +59,10 @@ class DownsampleEnv(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(image_size[1], image_size[0], 1),
-            dtype=np.uint8
+            shape=(image_size[1], image_size[0], 1)
         )
 
-    def observation(self, frame):
+    def _observation(self, frame):
         # crop the image to the playable space
         frame = frame[self.y[0]:-self.y[1], self.x[0]:-self.x[1]]
         # convert the frame from RGB to gray scale
