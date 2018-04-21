@@ -68,9 +68,15 @@ an arbitrary $k$ value, but an $l$ value of $3$.}
 \label{fig:frame-skip}
 \end{figure}
 
+## Reward Clipping
+
+\cite{human-level-control-through-deep-rl} found that clipping the rewards
+at each step into ${-1, 0, 1}$ enables the algorithm's hyperparameters to
+generalize across a broad range of reward spaces. We apply the same reward
+clipping in our Atari and Super Mario Bros experiments.
+
 ## Experience Replay
 
-<!-- TODO: update value of N if we use Mario. -->
 <!-- TODO: check FCEUX spelling and reference -->
 <!-- TODO: note that prioritized is better, ran out of time -->
 
@@ -89,7 +95,7 @@ hardware restrictions imposed by FCEUX, the NES emulator.
 
 ## Deep-Q Learning
 
-Although traditional Q-learning is effective in some classical reinforcement
+Although traditional Q-learning excels in some classical reinforcement
 learning problems, the quality table suffers from the state complexity of
 NP-Hard tasks such as playing games using pixel space.
 \cite{human-level-control-through-deep-rl} presented the Deep-Q algorithm to
@@ -106,17 +112,34 @@ Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in A}Q(s', a') - Q(s, 
 \label{eqn:q-alg}
 \end{equation}
 
-Deep-Q approximates the $Q$ table using a neural network and updates states
-by back-propagating the error as a result of the loss function shown in
-Eqn. \ref{eqn:deep-q-alg}. We define the ground truth label
-$y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a')$ as the expected future reward, and the
-predicted label $\hat{y} = Q(s, a)$ as the estimated future reward for the
-current state action pair. Following \cite{human-level-control-through-deep-rl},
-we clip the gradient to $[-1, 1]$ using _Huber Loss (Eqn. \ref{eqn:huber})_
-with a $\delta = 1$.
+Deep-Q approximates the $Q$ table using a neural network bearing weights
+$\theta$. And, it updates by back-propagating error from mini-batches of
+uniformly sampled replay data from $D$. For an arbitrary mini-batch, we define
+ground truth labels $y$ and predicted labels $\hat{y}$ in Eqns.
+\ref{eqn:deep-q-y} and \ref{eqn:deep-q-y-hat} respectively. Differing from
+\cite{human-level-control-through-deep-rl}, we use the boolean $d$ to zero
+out estimations of any future rewards from states $s$ that are terminal. We
+use the same model presented by  \cite{human-level-control-through-deep-rl}
+shown in Fig. \ref{fig:dqn}
 
 \begin{equation}
-L_i(\theta_i) =
+y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a', \theta)
+\label{eqn:deep-q-y}
+\end{equation}
+
+\begin{equation}
+\hat{y} = Q(s, a, \theta)
+\label{eqn:deep-q-y-hat}
+\end{equation}
+
+With definitions for ground truth and predicted labels $y$, $\hat{y}$, we
+define the loss function in Eqn. \ref{eqn:deep-q-alg}. Following
+\cite{human-level-control-through-deep-rl}, we clip the gradient in the
+continuous range $[-1, 1]$ using _Huber Loss (Eqn. \ref{eqn:huber})_ with a
+$\delta = 1$.
+
+\begin{equation}
+L(\theta) =
 \mathbb{E}_{(s, a, r, d, s') \sim U(D)} \bigg[ L_{\delta}(y, \hat{y}) \bigg]
 \label{eqn:deep-q-alg}
 \end{equation}
@@ -129,20 +152,34 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 \label{eqn:huber}
 \end{equation}
 
--   bootstrapping
--   bellman optimality
--   table
--   approximate table
--   NP completeness of problem
+<!-- #### Replay Rate
+
+The agent updates the network weights from replay memory every $R$ _states_.
+In this way, we reduce overfitting and early convergence to suboptimal
+policies. -->
 
 ### Double Deep-Q Learning
 
-update target network
+\cite{human-level-control-through-deep-rl} show that updates to the same
+network that also defines target labels results in instable learning. A
+simple resolution to this problem, Double Deep-Q Learning, introduces an
+identical model $\theta_{target}$ for determining the ground truth labels
+shown in Eqn. \ref{eqn:double-deep-q-y}. Back-propagation continues to update
+$\theta$ which replaces $\theta_{target}$ every $T$ experiences. Our
+experiments apply a standard $T = 1e4$.
+
+\begin{equation}
+y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a', \theta_{target})
+\label{eqn:double-deep-q-y}
+\end{equation}
 
 ### Dueling Deep-Q Learning
 
-approximate state value and action value then define a novel layer for
-aggregating them into Q values over all actions.
+A final improvement to the Deep-Q architecture, Dueling Deep-Q Learning,
+replaces the neural network itself with a new model that estimates scalar
+state values in addition to action values. It then uses a novel layer to
+combine these estimates into Q values.
+
 
 <!--
 ## Hardware Configuration
