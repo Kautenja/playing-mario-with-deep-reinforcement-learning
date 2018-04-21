@@ -11,16 +11,23 @@ http://erikdemaine.org/papers/Mario_FUN2016/paper.pdf
 
 ## Reinforcement Learning Model
 
-The task of playing a game to maximize score closely models a _Markov
-decision process (MDP)_ shown in Fig. \ref{fig:mdp}.
+The task of playing a video game like those on the Atari 2600 or the Nintendo
+Entertainment System (NES) to maximize score closely models a _Markov
+decision process (MDP)_ shown in Fig. \ref{fig:mdp}. In this case, an agent
+experiences a game in pixel space $\mathcal{S}$ to produce actions among a
+discrete action space $\mathcal{A}$ corresponding to combinations of buttons
+on a controller. Games define different reward spaces $\mathcal{R}$, but
+typically the agent receives positive rewards for scoring points or moving
+forward in a level; and negative rewards for losing points, backtracking in a
+level, or losing a life.
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/mdp}
 \caption{The general form of a Markov decision process (MDP). An agent
-produces an action that actuates some environment. The environment produces a
-new state, and a reward that the agent observes. The process repeats
-indefinitely.}
+produces an action $a \in \mathcal{A}$ that actuates some environment. The
+environment produces a new state $s \in \mathcal{S}$, and a reward
+$r \in \mathcal{R}$ that the agent observes. The process repeats indefinitely.}
 \label{fig:mdp}
 \end{figure}
 
@@ -156,11 +163,28 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 \label{eqn:huber}
 \end{equation}
 
-<!-- #### Replay Rate
+#### Replay Rate
+
+<!-- TODO: reference why the replay rate -->
+<!-- TODO: extend? move somewhere else? -->
 
 The agent updates the network weights from replay memory every $R$ _states_.
-In this way, we reduce overfitting and early convergence to suboptimal
-policies. -->
+In this way, we reduce over-fitting and early convergence to suboptimal
+policies.
+
+#### $\epsilon$-greedy
+
+<!-- TODO: math value for the number of states to reduce. -->
+
+When predicting actions in training and validation, the agent uses an
+$\epsilon$-greedy policy to encourage exploration. That is to say, with some
+probability $\epsilon$, an agent produces a random action instead of the
+greedy action from the Q network. $\epsilon$ decays time to allow the agent
+to take slow control of the environment.
+\cite{human-level-control-through-deep-rl} decay $\epsilon$ over $1e6$ states
+from $1.0$ to $0.1$ using a _linear_ schedule. For validation, they employ a
+static $\epsilon = 0.05$. We use the same values, but decay $\epsilon$ using
+a _geometric_ schedule.
 
 ### Double Deep-Q Learning
 
