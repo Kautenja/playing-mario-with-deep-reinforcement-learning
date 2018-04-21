@@ -105,10 +105,10 @@ the Q-learning algorithm. The algorithm replaces the quality value for the
 current state action pair $(s, a)$ with the sum of the current quality
 estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and estimated
 future reward $Q(s', a')$ from the next state $s'$ over all possible actions
-$a' \in A$.
+$a' \in \mathcal{A}$.
 
 \begin{equation}
-Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in A}Q(s', a') - Q(s, a) \bigg)
+Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a) \bigg)
 \label{eqn:q-alg}
 \end{equation}
 
@@ -123,7 +123,7 @@ use the same model presented by  \cite{human-level-control-through-deep-rl}
 shown in Fig. \ref{fig:dqn}
 
 \begin{equation}
-y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a', \theta)
+y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta)
 \label{eqn:deep-q-y}
 \end{equation}
 
@@ -169,16 +169,29 @@ $\theta$ which replaces $\theta_{target}$ every $T$ experiences. Our
 experiments apply a standard $T = 1e4$.
 
 \begin{equation}
-y = r + (1 - d) \gamma \max_{a' \in A} Q(s', a', \theta_{target})
+y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
 \label{eqn:double-deep-q-y}
 \end{equation}
 
 ### Dueling Deep-Q Learning
 
-A final improvement to the Deep-Q architecture, Dueling Deep-Q Learning,
-replaces the neural network itself with a new model that estimates scalar
-state values in addition to action values. It then uses a novel layer to
-combine these estimates into Q values.
+\cite{dueling-deep-q} presented an additional improvement to the Deep-Q
+architecture, the Dueling Deep-Q Network, which replaces the densely connected
+network with a new model that separates the data int two separate densely
+connected networks, one that estimates a scalar state value $V(s, \theta)$,
+and another that estimates action advantage values $A(s, a, \theta)$. It
+combines these independent streams into the $Q$ value $Q(s, a, \theta)$ using
+the computational layer described in Eqn. \ref{eqn:dueling-deep-q}.
+
+\begin{equation}
+Q(s, a, \theta) = V(s, \theta) +
+\bigg( A(s, a, \theta) - \frac{1}{\mathcal{A}} \sum_{a' \in \mathcal{A}} A(s, a', \theta) \bigg)
+\label{eqn:dueling-deep-q}
+\end{equation}
+
+
+Fig. \ref{fig:dueling-dqn} provides a graphical representation of this new
+architecture.
 
 
 <!--
