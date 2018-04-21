@@ -108,7 +108,11 @@ future reward $Q(s', a')$ from the next state $s'$ over all possible actions
 $a' \in \mathcal{A}$.
 
 \begin{equation}
-Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a) \bigg)
+Q(s, a) \gets
+Q(s, a) +
+\alpha \bigg(
+r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a)
+\bigg)
 \label{eqn:q-alg}
 \end{equation}
 
@@ -181,18 +185,20 @@ network with a new model that separates the data int two separate densely
 connected networks, one that estimates a scalar state value $V(s, \theta)$,
 and another that estimates action advantage values $A(s, a, \theta)$. It
 combines these independent streams into the $Q$ value $Q(s, a, \theta)$ using
-the computational layer described in Eqn. \ref{eqn:dueling-deep-q}.
+the computational layer described in Eqn. \ref{eqn:dueling-deep-q}. Fig.
+\ref{fig:dueling-dqn} provides a graphical representation of this new
+architecture. \cite{dueling-deep-q} showed that the Dueling Deep-Q Network
+performs better than the standard Deep-Q Architecture when the action space
+was large.
 
 \begin{equation}
 Q(s, a, \theta) = V(s, \theta) +
-\bigg( A(s, a, \theta) - \frac{1}{\mathcal{A}} \sum_{a' \in \mathcal{A}} A(s, a', \theta) \bigg)
+\bigg(
+A(s, a, \theta) -
+\frac{1}{\mathcal{A}} \sum_{a' \in |\mathcal{A}|} A(s, a', \theta)
+\bigg)
 \label{eqn:dueling-deep-q}
 \end{equation}
-
-
-Fig. \ref{fig:dueling-dqn} provides a graphical representation of this new
-architecture.
-
 
 <!--
 ## Hardware Configuration
