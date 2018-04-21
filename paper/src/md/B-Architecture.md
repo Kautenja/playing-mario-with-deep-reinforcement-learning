@@ -1,5 +1,3 @@
-\appendix
-
 # Architectures
 
 \begin{figure}[!htp]
@@ -19,7 +17,9 @@ $\approx 4e6$ weights.}
 \begin{figure}[!htp]
 \centering
 \includegraphics[width=0.8\textwidth]{img/dueling-dqn}
-\caption{The Dueling Deep-Q Network (DQN) presented by TODO This network has
-$\approx 8e6$ weights.}
+\caption{The Dueling Deep-Q Network (DQN) presented by \cite{dueling-deep-q}.
+The densely connected model separates the data into two streams that estimate
+state value and action advantage respectively.
+This network has $\approx 8e6$ weights.}
 \label{fig:dueling-dqn}
 \end{figure}
