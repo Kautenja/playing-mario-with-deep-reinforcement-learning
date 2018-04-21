@@ -1,3 +1,8 @@
+<!--
+    NP-something SMB
+http://erikdemaine.org/papers/Mario_FUN2016/paper.pdf
+ -->
+
 # Data & Methods
 
 <!-- TODO: discuss games and tasks? -->
@@ -96,26 +101,31 @@ estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and estimated
 future reward $Q(s', a')$ from the next state $s'$ over all possible actions
 $a' \in A$.
 
-<!-- TODO: too wordy? -->
-<!-- TODO: is it worth talking about Bellman -->
-
-<!-- This algorithm employs a greedy policy to always
-select the action that maximizes future reward. It is worth noting that the
-process of updating the $Q$ table from its own estimates is a process known
-as bootstrapping. -->
-
 \begin{equation}
 Q(s, a) \gets Q(s, a) + \alpha \bigg(r + \gamma \max_{a' \in A}Q(s', a') - Q(s, a) \bigg)
 \label{eqn:q-alg}
 \end{equation}
 
-The Deep-Q algorithm
+Deep-Q approximates the $Q$ table using a neural network and updates states
+by back-propagating the error as a result of the loss function shown in
+Eqn. \ref{eqn:deep-q-alg}. We define the expected label $y = r + Q(s', a')$ as
+the expected future reward, and the predicted label $\hat{y} = Q(s, a)$ as
+the estimated future reward for the current state action pair.
 
-<!-- \begin{equation}
-Q(s', a') \gets (1 - \alpha)Q(s_t, a_t) + \alpha \bigg(r_t, + \gamma • \max_{a \in A}Q(s_{t+1}, a) \bigg)
+\begin{equation}
+L_i(\theta_i) =
+\mathbb{E}_{e' \sim U(D)} \bigg[
+\bigg( r + \gamma \max_{a' \in A} Q(s', a', \theta) - Q(s, a, \theta) \bigg)^2
+\bigg]
 \label{eqn:deep-q-alg}
 \end{equation}
- -->
+
+\begin{equation}
+L_{\delta}(y, \hat{y}) = \begin{cases}
+      \frac{1}{2} (y - \hat{y})^2                & |y - \hat{y}| \leq \delta \\
+      \delta |y - \hat{y}| - \frac{1}{2}\delta^2 & \textbf{otherwise} \\
+\end{cases}
+\end{equation}
 
 -   bootstrapping
 -   bellman optimality
