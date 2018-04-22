@@ -46,10 +46,21 @@ noisy inputs result in a far noisier output signal.
 \includegraphics[width=0.95\textwidth]{img/games/Pong/training}
 \caption{Per-episode training results for the Double \ac{DDQN} on the game
 \textbf{Pong}. The agent converges to the optimal policy relatively quickly
-around episode 1100.}
+around episode 2000.}
 \label{fig:train-Pong}
 \end{figure}
 
 ## Super Mario Bros.
 
-TODO:
+We were unable to collect data to visualize the learning process for Super
+Mario Bros. on a per episode basis. However, we note that a random agent
+produces mean validation score $TODO$, while a trained agent produces a
+validation score of $TODO$. Because Super Mario Bros is arguably more complex
+than all of the Atari 2600 games, it's fair to assume that it should need
+more training time or potentially a network with larger capacity to better
+fit the space. We note the complexity of the reward scheme in Super Mario
+Bros. as a potential future research direction. Without a strong and
+effective reward signal, the agent cannot competently learn the correct task.
+We simply reward agents for moving right and penalize them for moving left or
+dying. Future work can explore rewarding the agent for killing enemies or
+collecting coins and penalizing the agent for losing time on the clock.
