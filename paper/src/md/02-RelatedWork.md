@@ -48,16 +48,16 @@ complex games like **Seaquest** that Deep-$Q$ methods struggle with.
 ## Engineering Support
 
 Modeling a video game as a reinforcement learning task embodies a wealth of
-complicated engineering problems. \cite{ale1} approach the issue of
+complicated engineering problems. \cite{ale1} approached the issue of
 integrating an Atari 2600 emulator with Python using low-level C++ code in a
-framework called the _\ac{ALE}_. \cite{ale2} later refine \ac{ALE} by
+framework called the _\ac{ALE}_. \cite{ale2} later refined \ac{ALE} by
 introducing new features like probabilistic frame skipping.
-\cite{open-ai-gym} popularize the use of \ac{ALE} with their intuitively
+\cite{open-ai-gym} popularized the use of \ac{ALE} with their intuitively
 simple, but powerful API for designing reinforcement agents in Python entitled
-_Open.ai Gym_. \cite{openai-baselines} use Open.ai Gym as a framework to
-recreate baselines of reinforcement learning papers. They provide extensions
+_Open.ai Gym_. \cite{openai-baselines} used Open.ai Gym as a framework to
+recreate baselines of reinforcement learning papers. They provided extensions
 to the default environments in Open.ai Gym to model environments used in
-research papers. \cite{ppaquette} extend Open.ai Gym with an emulator for
+research papers. \cite{ppaquette} extended Open.ai Gym with an emulator for
 playing \ac{NES} games. Namely, this framework provides an interface to the
 classic \ac{NES} game, \ac{SMB}. It interacts with an instance of the
 \ac{NES} emulator, \cite{fceux}, via a client-server pattern. It is worth
@@ -66,12 +66,11 @@ compared to games in \ac{ALE}.
 
 ### Deep Learning Infrastructure
 
-\cite{keras} maintain Keras, a high level interface to deep learning back-ends
+\cite{keras} designed Keras, a high level interface to deep learning back-ends
 in Python. This framework enables the fast construction of computational
 graphs. And, it generalizes across popular back-ends including Theano,
 TensorFlow, and CNTK. Our study applies the TensorFlow back-end.
-\cite{OhioSupercomputerCenter1987} provide an array of $160$ GPU nodes each
-bearing an nVidia P100 GPU, 28 core Intel Xeon CPU, and 132GB of RAM. Our
-study runs experiments involving Atari 2600 on these machines, but not those
-using \ac{NES} due to complications with FCEUX.
-
+\cite{OhioSupercomputerCenter1987} constructed an array of $160$ GPU nodes,
+each bearing an nVidia P100 GPU, 28 core Intel Xeon CPU, and 132GB of RAM.
+Our study runs experiments involving Atari 2600 on these machines, but not t
+hose using \ac{NES} due to complications with FCEUX.
