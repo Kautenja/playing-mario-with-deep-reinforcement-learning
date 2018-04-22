@@ -56,6 +56,10 @@ proposal: build_folder
 paper: build_folder
 	$(call make_pdf,paper)
 
+# make the presentation
+presentation: build_folder
+	$(call make_pdf,presentation)
+
 #
 # MARK: Python code
 #
