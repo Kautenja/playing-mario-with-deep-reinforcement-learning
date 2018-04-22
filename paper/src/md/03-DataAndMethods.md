@@ -33,7 +33,17 @@ indefinitely.}
 \label{fig:mdp}
 \end{figure}
 
-<!-- TODO: transition section about emulators / environment setup or design -->
+## Game Environment
+
+We explore two distinct game environments in this study: the Atari 2600, and
+the \ac{NES}. From the Atari 2600 we select five games: _Enduro_, _Breakout_,
+_Pong_, _Seaquest_, and _Space Invaders_. From the \ac{NES} we select one
+single game _Super Mario Bros_ due to hardware and time restrictions. We
+interface with both environments using Open.ai Gym to allow agents to
+easily generalize across the different environments with no alterations. We
+note that the emulator for running \ac{NES} games, FCEUX, is up to $8x$ slower
+than the Atari emulator due to a poorly designed client-server pattern that
+enables the Python stack to communicate with the Lua based emulator.
 
 ## Preprocessing
 
@@ -224,21 +234,3 @@ A(s, a, \theta) -
 \bigg)
 \label{eqn:dueling-deep-q}
 \end{equation}
-
-
-<!-- ## Hardware Configuration
-
-We use two distinct hardware configurations in our experiment. For the Atari
-range of experiments, we use the servers of
-\cite{OhioSupercomputerCenter1987}. These machines feature 2.40 GHz 28 core
-Intel Xeon, nVidia P100, and 132GB of RAM. The
-\cite{OhioSupercomputerCenter1987} provides no super user access, necessary
-to install the \ac{NES} emulator, FCEUX, used in the Mario experiment. We
-instead run this experiment locally on a workstation with a 4.2GHz quad core
-Intel Core i5, nVidia GTX1070, and 32GB of RAM. Unlike the Atari emulator,
-which is written in Python, FCEUX is a standalone application that supports
-plug-ins written in Lua. A client-server pattern interfaces the \ac{NES}
-emulator with our Python stack. Unfortunately, this network overhead
-drastically impedes the agent's ability to interact with the environment. We
-note a slowdown of $\approx 8$x as compared to the Atari emulator based on
-agent frame rate. -->
