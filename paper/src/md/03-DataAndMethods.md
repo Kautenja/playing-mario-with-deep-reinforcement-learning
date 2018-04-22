@@ -71,6 +71,10 @@ frames that are skipped with held actions are never seen by the agent. Fig.
 \ref{fig:frame-skip} illustrates roughly how this process works for $l = 3$
 and an arbitrary $k \geq 1$. This study uses a value $l = 4$ for all games.
 
+<!-- TODO: lower case s -->
+<!-- TODO: better diagram with tikz -->
+<!-- TODO: what about the max? -->
+
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/frame-skip}
