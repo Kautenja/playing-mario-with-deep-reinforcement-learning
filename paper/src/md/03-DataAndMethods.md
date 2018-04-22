@@ -121,7 +121,7 @@ NP-Hard tasks such as playing games using pixel space.
 combat this weakness by confidently estimating the quality table using a
 \ac{DNN}. Eqn. \ref{eqn:q-alg} shows the original formulation of the
 Q-learning algorithm. The algorithm replaces the quality value for the
-current state action pair $(s, a)$ with the sum of the current quality
+current state-action pair $(s, a)$ with the sum of the current quality
 estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and estimated
 future reward $Q(s', a')$ from the next state $s'$ over all possible actions
 $a' \in \mathcal{A}$.
@@ -138,9 +138,9 @@ r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a)
 Deep-Q approximates the $Q$ table using a \ac{DNN} bearing weights $\theta$.
 And, it updates by back-propagating error from mini-batches of replay data
 $D' \sim U(D)$. For each sample in an arbitrary mini-batch $D'$, we define a
-ground truth target $y$ (Eqn. \ref{eqn:deep-q-y}) and predicted value $\hat{y}$
-(Eqn. \ref{eqn:deep-q-y-hat}). We use the same \ac{DQN} presented by
-\cite{human-level-control-through-deep-rl} shown in Fig. \ref{fig:dqn}.
+ground truth target $y$ (Eqn. \ref{eqn:deep-q-y}) and predicted value
+$\hat{y}$ (Eqn. \ref{eqn:deep-q-y-hat}). We use the same \ac{DQN} presented
+by \cite{human-level-control-through-deep-rl} shown in Fig. \ref{fig:dqn}.
 
 \begin{equation}
 y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta)
@@ -197,8 +197,8 @@ a _geometric_ schedule.
 
 \cite{human-level-control-through-deep-rl} show that updates to the same
 \ac{DQN} that defines targets results in unstable learning. A simple
-resolution to this problem, Double Deep-Q Learning, introduces an identical
-model $\theta_{target}$ for determining the ground truth labels shown in
+resolution to this problem, Double Deep-$Q$ Learning, introduces an identical
+model $\theta_{target}$ for determining the ground truth targets shown in
 Eqn. \ref{eqn:double-deep-q-y}. Back-propagation continues to update $\theta$
 which replaces $\theta_{target}$ every $T$ experiences. Our experiments apply
 a standard $T = 1e4$.
@@ -212,14 +212,16 @@ y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
 
 \cite{dueling-deep-q} presented an additional improvement to the \ac{DQN},
 the Dueling Deep-Q Network, which replaces the densely connected network with
-a new model that separates the data into two distinct networks, one that
+a new model that separates the data into two distinct streams, one that
 estimates a scalar state value $V(s, \theta)$, and another that estimates
 action advantage values $A(s, a, \theta)$. It combines these independent
-streams into the $Q$ value $Q(s, a, \theta)$ using the computational layer
+streams into the value $Q(s, a, \theta)$ using the computational layer
 described in Eqn. \ref{eqn:dueling-deep-q}. Fig. \ref{fig:dueling-dqn}
 provides a graphical representation of this architecture.
 \cite{dueling-deep-q} showed that the Dueling Deep-Q Network performs better
-than the standard Deep-Q Architecture when the action space was large.
+than the standard Deep-Q Architecture when the action space was large. We
+anticipate this improvement to help in the Mario environment which features
+$|\mathcal{A} = 14|$.
 
 \begin{equation}
 Q(s, a, \theta) = V(s, \theta) +
