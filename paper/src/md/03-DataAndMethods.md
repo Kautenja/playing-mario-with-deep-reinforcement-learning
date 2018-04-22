@@ -132,11 +132,10 @@ r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a)
 
 Deep-Q approximates the $Q$ table using a \ac{DNN} bearing weights $\theta$.
 And, it updates by back-propagating error from mini-batches of replay data
-$D' \sim U(D)$. For an arbitrary mini-batch $D'$, we define a ground truth
-targets $y$ (Eqns. \ref{eqn:deep-q-y}) and predicted value $\hat{y}$
-(\ref{eqn:deep-q-y-hat}) for each sample in $D'$. We use the same \ac{DQN}
-presented by \cite{human-level-control-through-deep-rl} shown in Fig.
-\ref{fig:dqn}
+$D' \sim U(D)$. For each sample in an arbitrary mini-batch $D'$, we define a
+ground truth target $y$ (Eqn. \ref{eqn:deep-q-y}) and predicted value $\hat{y}$
+(Eqn. \ref{eqn:deep-q-y-hat}). We use the same \ac{DQN} presented by
+\cite{human-level-control-through-deep-rl} shown in Fig. \ref{fig:dqn}.
 
 \begin{equation}
 y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta)
@@ -148,10 +147,10 @@ y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta)
 \label{eqn:deep-q-y-hat}
 \end{equation}
 
-With definitions for ground truth and predicted labels $y$, $\hat{y}$, we
+With definitions of target values $y$ and estimated values $\hat{y}$, we
 define the loss function in Eqn. \ref{eqn:deep-q-alg}. Following
-\cite{human-level-control-through-deep-rl}, we clip the gradient in the
-continuous range $[-1, 1]$ using _Huber Loss (Eqn. \ref{eqn:huber})_ with a
+\cite{human-level-control-through-deep-rl}, we clip the gradient within the
+continuous range $[-1, 1]$ using _Huber Loss (Eqn. \ref{eqn:huber})_ with
 $\delta = 1$.
 
 \begin{equation}
@@ -184,8 +183,8 @@ policies.
 When predicting actions in training and validation, the agent uses an
 $\epsilon$-greedy policy to encourage exploration. That is to say, with some
 probability $\epsilon$, an agent produces a random action instead of the
-greedy action from the Q network. $\epsilon$ decays time to allow the agent
-to take slow control of the environment.
+greedy action from the \ac{DQN}. $\epsilon$ decays over time to allow the
+agent to take slow control of the environment.
 \cite{human-level-control-through-deep-rl} decay $\epsilon$ over $1e6$ states
 from $1.0$ to $0.1$ using a _linear_ schedule. For validation, they employ a
 static $\epsilon = 0.05$. We use the same values, but decay $\epsilon$ using
