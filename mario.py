@@ -39,7 +39,7 @@ if not os.path.exists(plot_dir):
 env = build_nes_environment(game_name)
 env.configure(lock=Lock())
 env = Monitor(env, '{}/monitor'.format(exp_directory), force=True)
-
+print(env.observation_space.shape)
 
 agent = agents[agent_name](env, render_mode=render_mode)
 agent

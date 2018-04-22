@@ -11,8 +11,7 @@ from super_mario.wrappers import ToDiscreteWrapper, PenalizeDeathEnv
 
 
 def build_nes_environment(game_name: str,
-    image_size: tuple=(100, 100),
-    skip_frames: int=4,
+    image_size: tuple=(84, 84),
     death_penalty: int=-1,
     clip_rewards: bool=True,
     agent_history_length: int=4
