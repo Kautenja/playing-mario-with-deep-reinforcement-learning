@@ -112,9 +112,9 @@ Atari experiments, but use a replay queue size of $N = 5e5$ in the Mario
 experiment due to hardware restrictions imposed by running on a local
 workstation.
 
-## Deep-Q Learning
+## Deep-$Q$ Learning
 
-Although traditional Q-learning excels in some classical reinforcement
+Although traditional $Q$-learning excels in some classical reinforcement
 learning problems, the quality table suffers from the state complexity of
 NP-Hard tasks such as playing games using pixel space.
 \cite{human-level-control-through-deep-rl} presented the \ac{DQN} to
