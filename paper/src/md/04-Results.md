@@ -8,25 +8,13 @@ training frames $T$ and performance metrics such as the loss and reward of
 each training episode. We can however, validate an untrained and trained
 agent to confirm learning.
 
-\begin{figure}[!ht]
-\begin{minipage}{\textwidth}
-%
-\begin{minipage}{0.45\textwidth}
-\includegraphics[width=\textwidth]{img/games/Breakout/initial}
-\captionof*{figure}{Initial scores.}
-\end{minipage}
-%
-\hfill
-%
-\begin{minipage}{0.45\textwidth}
-\includegraphics[width=\textwidth]{img/games/Breakout/final}
-\captionof*{figure}{Final scores.}
-\end{minipage}
-%
-\end{minipage}
-\caption{Scores of the Double \ac{DDQN} on $100$ validation games of
-\textbf{Breakout} before and after training for $1e7$ frames.}
-\label{fig:results-Breakout}
-\end{figure}
+Table: Validation results of Double \ac{DDQN} before and after training to
+play games for $1e7$ frames.
 
-
++---------+------------+----------+----------+------------+-----------------+
+|         |   Breakout |   Enduro |     Pong |   Seaquest |   SpaceInvaders |
++=========+============+==========+==========+============+=================+
+| Final   |   85.4343  |  1184.06 |  19.6364 | 263.818    |         52.9899 |
++---------+------------+----------+----------+------------+-----------------+
+| Initial |   -3.43434 |     0    | -21      |   0.585859 |          6.9899 |
++---------+------------+----------+----------+------------+-----------------+
