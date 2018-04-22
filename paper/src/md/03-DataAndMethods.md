@@ -25,10 +25,11 @@ level, or dying.
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/mdp}
-\caption{The general form of a \ac{MDP}. An agent produces an action
-$a \in \mathcal{A}$ that actuates some environment. The environment produces
-a new state $s \in \mathcal{S}$, and a reward $r \in \mathcal{R}$ that the
-agent observes. The process repeats indefinitely.}
+\caption{The general form of a \ac{MDP}. An agent in state
+$s \in \mathcal{S}$ produces an action $a \in \mathcal{A}$ that actuates some
+environment. The environment produces a new state $s' \in \mathcal{S}$, and a
+reward $r \in \mathcal{R}$ that the agent observes. The process repeats
+indefinitely.}
 \label{fig:mdp}
 \end{figure}
 
