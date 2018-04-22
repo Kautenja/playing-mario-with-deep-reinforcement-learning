@@ -34,7 +34,7 @@ the \ac{NES}. From the Atari 2600 we select five games: _Enduro_, _Breakout_,
 _Pong_, _Seaquest_, and _Space Invaders_. From the \ac{NES} we select one
 game, \ac{SMB}, due to hardware and time restrictions. We interface with both
 environments using Open.ai Gym to allow agents to easily generalize across
-the different environments with no alterations. We note that the emulator for
+the different environments with no alteration. We note that the emulator for
 running \ac{NES} games, FCEUX, is up to $8x$ slower than the Atari emulator
 due to a poorly designed client-server pattern that enables he Python stack
 to communicate with the Lua based emulator.
