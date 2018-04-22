@@ -1,5 +1,9 @@
 \clearpage
 
+<!-- TODO: show input size of (84 x 84 x l) tensor frames. -->
+<!-- TODO: better diagrams with tikz -->
+<!-- TODO: ReLu in diagrams and captions -->
+
 # Architectures
 
 \begin{figure}[!htp]
@@ -9,12 +13,14 @@
 \cite{human-level-control-through-deep-rl}. A stack of $l$ frames passes
 through 3 convolutional layers to extract features from pixel space. The
 extracted features are flattened and passed to a densely connected network to
-map the pixel state to a discrete action $a \in A$. The output of the network
-is a vector of estimated rewards where the index $i$ in the vector represents
-the estimated future reward from $s$ taking action $a_i$. This network has
-$\approx 4e6$ weights.}
+map the pixel state to a discrete action space $\mathcal{A}$. The output of
+the network is a $|\mathcal{A}|$-dimensional vector of estimated future
+rewards where the index $i$ in the vector represents the reward from taking
+action $a_i$. This network has $\approx 4e6$ weights.}
 \label{fig:dqn}
 \end{figure}
+
+<!-- TODO: describe V, A, Q in diagram and in the caption -->
 
 \begin{figure}[!htp]
 \centering
