@@ -1,10 +1,4 @@
-# Evolutionary Search for Reinforcement Agents
-
-<!-- Project Badges -->
-[![build-status][]][build-server]
-
-[build-status]: https://travis-ci.com/Kautenja/deep-learning-project.svg?token=FCkX2qMNHzx2qWEzZZMP&branch=master
-[build-server]: https://travis-ci.com/Kautenja/deep-learning-project
+# Playing Atari 2600 & Super Mario Bros. with Deep Reinforcement Learning
 
 
 
@@ -92,26 +86,20 @@ deactivate
 
 #### Dependencies
 
-[requirements.txt](requirements.txt) lists the Python dependencies for the project with frozen versions. To install
-dependencies:
+[requirements.txt](requirements.txt) lists the Python dependencies for the
+project with frozen versions. To install dependencies:
 
 ```shell
 python -m pip install -r requirements.txt
 ```
 
-**NOTE** if you're NOT using `virtualenv`, ensure that `python` aliases python3; python2 is not supported.
+**NOTE** if you're NOT using `virtualenv`, ensure that `python` aliases
+python3; python2 is not supported.
 
 #### Test Cases
 
-To execute the unittest suite for the project run:
+To execute the `unittest` suite for the project run:
 
 ```shell
 make test
 ```
-
-This will recursively find test cases in [src](src) and run them.
-
-#### Notebooks
-
-Jupyter notebooks that train agents and play games are in the
-[ipynb](ipynb) directory sorted by game.
