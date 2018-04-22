@@ -110,7 +110,10 @@ replacement (i.e. $D' = \{e_1, ..., e_n\} \sim U(D)$).
 experiences with mini-batches of size $n = 32$. We match these values in our
 Atari experiments, but use a replay queue size of $N = 5e5$ in the Mario
 experiment due to hardware restrictions imposed by running on a local
-workstation.
+workstation. Although \cite{human-level-control-through-deep-rl} report the
+best results using RMSprop to optimize loss, we apply Adam in all of our
+experiments with values $\alpha = 2e$-$5$, $\beta_1 = 0.9$, and
+$\beta_2 = 0.99$.
 
 ## Deep-$Q$ Learning
 
