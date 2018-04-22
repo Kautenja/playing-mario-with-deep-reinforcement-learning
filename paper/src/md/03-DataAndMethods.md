@@ -93,24 +93,26 @@ our Atari and Super Mario Bros experiments.
 ## Experience Replay
 
 To build a dataset for training an agent's reward estimator, we use an
-experience replay queue. An agent in some state $s$ performs an action $a$ to
-produce a new state $s'$, a reward $r$, and a flag denoting whether the
-episode (game) has ended $d$. The agent stores the experience as the tuple
-$e = (s, a, r, d, s')$ in a FIFO queue $D = {e_1, ..., e_N}$ of at most $N$
+experience replay queue. An agent in some state $s \in \mathcal{S}$ performs
+an action $a \in \mathcal{A}$ to produce a new state $s' \in \mathcal{S}$, a
+reward $r \in {-1, 0, 1}$, and a flag denoting whether the episode (game) has
+ended $d \in {0, 1}$. The agent stores the experience as a tuple
+$e = (s, a, r, d, s')$ in a FIFO queue $D = \{e_1, ..., e_N\}$ of at most $N$
 total experiences. To generate training data, the agent randomly draws a
 mini-batch $D'$ of $n$ experiences using a uniform distribution with
 replacement (i.e. $D' = \{e_1, ..., e_n\} \sim U(D)$).
 \cite{human-level-control-through-deep-rl} apply $N = 1e6$ previous
 experiences with mini-batches of size $n = 32$. We match these values in our
-Atari experiments, but use a size of $N = 5e5$ in the Mario experiment due to
-hardware restrictions imposed by FCEUX, the \ac{NES} emulator.
+Atari experiments, but use a replay queue size of $N = 5e5$ in the Mario
+experiment due to hardware restrictions imposed by running on a local
+workstation.
 
 ## Deep-Q Learning
 
 Although traditional Q-learning excels in some classical reinforcement
 learning problems, the quality table suffers from the state complexity of
 NP-Hard tasks such as playing games using pixel space.
-\cite{human-level-control-through-deep-rl} presented the Deep-Q algorithm to
+\cite{human-level-control-through-deep-rl} presented the \ac{DQN} to
 combat this weakness by confidently estimating the quality table using a
 \ac{DNN}. Eqn. \ref{eqn:q-alg} shows the original formulation of the
 Q-learning algorithm. The algorithm replaces the quality value for the
@@ -128,15 +130,13 @@ r + \gamma \max_{a' \in \mathcal{A}}Q(s', a') - Q(s, a)
 \label{eqn:q-alg}
 \end{equation}
 
-Deep-Q approximates the $Q$ table using a neural network bearing weights
-$\theta$. And, it updates by back-propagating error from mini-batches of
-uniformly sampled replay data from $D$. For an arbitrary mini-batch, we define
-ground truth labels $y$ and predicted labels $\hat{y}$ in Eqns.
-\ref{eqn:deep-q-y} and \ref{eqn:deep-q-y-hat} respectively. Differing from
-\cite{human-level-control-through-deep-rl}, we use the boolean $d$ to zero
-out estimations of any future rewards from states $s$ that are terminal. We
-use the same model presented by  \cite{human-level-control-through-deep-rl}
-shown in Fig. \ref{fig:dqn}
+Deep-Q approximates the $Q$ table using a \ac{DNN} bearing weights $\theta$.
+And, it updates by back-propagating error from mini-batches of replay data
+$D' \sim U(D)$. For an arbitrary mini-batch $D'$, we define a ground truth
+targets $y$ (Eqns. \ref{eqn:deep-q-y}) and predicted value $\hat{y}$
+(\ref{eqn:deep-q-y-hat}) for each sample in $D'$. We use the same \ac{DQN}
+presented by \cite{human-level-control-through-deep-rl} shown in Fig.
+\ref{fig:dqn}
 
 \begin{equation}
 y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta)
