@@ -33,17 +33,19 @@ indefinitely.}
 \label{fig:mdp}
 \end{figure}
 
+<!-- TODO: transition section about emulators / environment setup or design -->
+
 ## Preprocessing
 
 Following the work of \cite{human-level-control-through-deep-rl}, we apply a
 down-sampling function $\phi(s)$ to each frame produced by the emulator.
 $\phi(s)$ first crops the RGB image to the playable area of the screen. We
 parameterize $\phi(s)$ with pairs $x_{\phi} = (x_l, x_r)$ of the horizontal
-pixels to crop and $y_{\phi} = (y_t, y_b)$ of the vertical pixels to crop
-from the RGB image. After cropping, $\phi(s)$ down-samples the RGB image to a
-single black & white channel (Y) and resizes the image to $84 \times 84$
-using a bilinear interpolation. This down-sampling function helps reduce
-dimensionality of states to better utilize hardware.
+pixels to crop and $y_{\phi} = (y_t, y_b)$ of the vertical pixels to crop.
+After cropping, $\phi(s)$ down-samples the RGB image to a single black & white
+channel (Y) and resizes the image to $84 \times 84$ pixels using bilinear
+interpolation. $\phi(s)$ reduces dimensionality of states to better utilize
+hardware.
 
 ## Frame Skipping
 
