@@ -55,7 +55,8 @@ mechanism holds each action produced by the agent for $k$ frames, returning
 the total reward over the $k$ frames. We use the point-wise maximum between
 the last two frames as the next state to account for flickering sprites.
 Intermediary frames are dropped, the agent never sees them. Matching
-\cite{human-level-control-through-deep-rl}, we apply $k = 4$ to all tasks.
+\cite{human-level-control-through-deep-rl}, we apply $k = 4$ to all Atari
+tasks. However, we get better performance on \ac{NES} tasks using $k = 1$.
 
 ## Frame Stacking
 
@@ -226,21 +227,20 @@ A(s, a, \theta) -
 \label{eqn:dueling-deep-q}
 \end{equation}
 
-<!--
+
 ## Hardware Configuration
 
 We use two distinct hardware configurations in our experiment. For the Atari
-range of experiments, we use the servers of \cite{OhioSupercomputerCenter1987}.
-
-TODO: get specs of the servers
-
-The \cite{OhioSupercomputerCenter1987} provides no super user access, necessary
-to install the \ac{NES} emulator, FCEUX, used in the Mario experiment. We instead
-run this experiment locally on a workstation with a 4.2GHz Intel Core i5,
-nVidia GTX1070, and 32GB of 3200MHz RAM. Unlike the Atari emulator, which is
-written in Python, FCEUX is a standalone application that supports plugins
-written in Lua. To interface with our Python stack, the use of a client server
-pattern between game engine process and the agent process. Unfortunately, this
-overhead drastically impedes the agent's ability to interact with the
-environment. We note a slowdown of $\approx 8$x as compared to the Atari
-emulator based on agent frame rate. -->
+range of experiments, we use the servers of
+\cite{OhioSupercomputerCenter1987}. These machines feature 2.40 GHz 28 core
+Intel Xeon, nVidia P100, and 132GB of RAM. The
+\cite{OhioSupercomputerCenter1987} provides no super user access, necessary
+to install the \ac{NES} emulator, FCEUX, used in the Mario experiment. We
+instead run this experiment locally on a workstation with a 4.2GHz quad core
+Intel Core i5, nVidia GTX1070, and 32GB of RAM. Unlike the Atari emulator,
+which is written in Python, FCEUX is a standalone application that supports
+plug-ins written in Lua. A client-server pattern interfaces the \ac{NES}
+emulator with our Python stack. Unfortunately, this network overhead
+drastically impedes the agent's ability to interact with the environment. We
+note a slowdown of $\approx 8$x as compared to the Atari emulator based on
+agent frame rate.
