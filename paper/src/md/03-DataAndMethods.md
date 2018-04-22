@@ -1,8 +1,5 @@
 # Data & Methods
 
-<!-- TODO: \cite{adam} -->
-
-
 ## Reinforcement Learning Model
 
 The task of playing a video game like those on the Atari 2600 or the \ac{NES}
