@@ -187,8 +187,8 @@ $\epsilon$-greedy policy to encourage exploration. That is to say, with some
 probability $\epsilon$, an agent produces a random action instead of the
 greedy action from the \ac{DQN}. $\epsilon$ decays over time to allow the
 agent to take slow control of the environment.
-\cite{human-level-control-through-deep-rl} decay $\epsilon$ over $1e6$ states
-from $1.0$ to $0.1$ using a _linear_ schedule. For validation, they employ a
+\cite{human-level-control-through-deep-rl} decay $\epsilon$ over $E = 1e6$
+states from $1.0$ to $0.1$ using a _linear_ schedule. For validation, they employ a
 static $\epsilon = 0.05$. We use the same values, but decay $\epsilon$ using
 a _geometric_ schedule.
 
