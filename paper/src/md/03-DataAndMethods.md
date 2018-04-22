@@ -170,7 +170,7 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 <!-- TODO: reference why the replay rate -->
 <!-- TODO: extend? move somewhere else? -->
 
-The agent updates the network weights from replay memory every $R$ _states_.
+The agent updates the network weights from replay memory every $m$ _states_.
 In this way, we reduce over-fitting and early convergence to suboptimal
 policies.
 
