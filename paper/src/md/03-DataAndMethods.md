@@ -178,8 +178,6 @@ policies.
 
 #### $\epsilon$-greedy
 
-<!-- TODO: math value for the number of states to reduce. -->
-
 When predicting actions in training and validation, the agent uses an
 $\epsilon$-greedy policy to encourage exploration. That is to say, with some
 probability $\epsilon$, an agent produces a random action instead of the
@@ -193,12 +191,12 @@ a _geometric_ schedule.
 ### Double Deep-Q Learning
 
 \cite{human-level-control-through-deep-rl} show that updates to the same
-network that also defines target labels results in instable learning. A
-simple resolution to this problem, Double Deep-Q Learning, introduces an
-identical model $\theta_{target}$ for determining the ground truth labels
-shown in Eqn. \ref{eqn:double-deep-q-y}. Back-propagation continues to update
-$\theta$ which replaces $\theta_{target}$ every $T$ experiences. Our
-experiments apply a standard $T = 1e4$.
+\ac{DQN} that defines targets results in unstable learning. A simple
+resolution to this problem, Double Deep-Q Learning, introduces an identical
+model $\theta_{target}$ for determining the ground truth labels shown in
+Eqn. \ref{eqn:double-deep-q-y}. Back-propagation continues to update $\theta$
+which replaces $\theta_{target}$ every $T$ experiences. Our experiments apply
+a standard $T = 1e4$.
 
 \begin{equation}
 y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
@@ -207,17 +205,16 @@ y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
 
 ### Dueling Deep-Q Learning
 
-\cite{dueling-deep-q} presented an additional improvement to the Deep-Q
-architecture, the Dueling Deep-Q Network, which replaces the densely connected
-network with a new model that separates the data int two separate densely
-connected networks, one that estimates a scalar state value $V(s, \theta)$,
-and another that estimates action advantage values $A(s, a, \theta)$. It
-combines these independent streams into the $Q$ value $Q(s, a, \theta)$ using
-the computational layer described in Eqn. \ref{eqn:dueling-deep-q}. Fig.
-\ref{fig:dueling-dqn} provides a graphical representation of this new
-architecture. \cite{dueling-deep-q} showed that the Dueling Deep-Q Network
-performs better than the standard Deep-Q Architecture when the action space
-was large.
+\cite{dueling-deep-q} presented an additional improvement to the \ac{DQN},
+the Dueling Deep-Q Network, which replaces the densely connected network with
+a new model that separates the data into two distinct networks, one that
+estimates a scalar state value $V(s, \theta)$, and another that estimates
+action advantage values $A(s, a, \theta)$. It combines these independent
+streams into the $Q$ value $Q(s, a, \theta)$ using the computational layer
+described in Eqn. \ref{eqn:dueling-deep-q}. Fig. \ref{fig:dueling-dqn}
+provides a graphical representation of this architecture.
+\cite{dueling-deep-q} showed that the Dueling Deep-Q Network performs better
+than the standard Deep-Q Architecture when the action space was large.
 
 \begin{equation}
 Q(s, a, \theta) = V(s, \theta) +
@@ -229,7 +226,7 @@ A(s, a, \theta) -
 \end{equation}
 
 
-## Hardware Configuration
+<!-- ## Hardware Configuration
 
 We use two distinct hardware configurations in our experiment. For the Atari
 range of experiments, we use the servers of
@@ -244,4 +241,4 @@ plug-ins written in Lua. A client-server pattern interfaces the \ac{NES}
 emulator with our Python stack. Unfortunately, this network overhead
 drastically impedes the agent's ability to interact with the environment. We
 note a slowdown of $\approx 8$x as compared to the Atari emulator based on
-agent frame rate.
+agent frame rate. -->
