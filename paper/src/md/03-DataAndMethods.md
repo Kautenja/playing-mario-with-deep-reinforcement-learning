@@ -172,14 +172,13 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 \label{eqn:huber}
 \end{equation}
 
-#### Replay Rate
-
-<!-- TODO: reference why the replay rate -->
-<!-- TODO: extend? move somewhere else? -->
-
-The agent updates the network weights from replay memory every $m$ _states_.
-In this way, we reduce over-fitting and early convergence to suboptimal
-policies.
+The algorithm starts by performing $p = 5e4$ random steps to fill the replay
+memory with random data. The agent then experiences however many episodes it
+can in $T$ total frames. The agent replays a memory every $m = 4$ actions. We
+take the average score of $v = 100$ consecutive validation games before and
+after to show the change in distribution of collected rewards. And, we
+collect the reward and loss per episode to visualize convergence of the
+algorithm to a nearly optimal policy.
 
 #### $\epsilon$-greedy
 
@@ -200,8 +199,8 @@ a _geometric_ schedule.
 resolution to this problem, Double Deep-$Q$ Learning, introduces an identical
 model $\theta_{target}$ for determining the ground truth targets shown in
 Eqn. \ref{eqn:double-deep-q-y}. Back-propagation continues to update $\theta$
-which replaces $\theta_{target}$ every $T$ experiences. Our experiments apply
-a standard $T = 1e4$.
+which replaces $\theta_{target}$ every $t$ experiences. Our experiments apply
+a standard $t = 1e4$.
 
 \begin{equation}
 y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
