@@ -1,5 +1,8 @@
 # Data & Methods
 
+<!-- TODO: \cite{adam} -->
+
+
 ## Reinforcement Learning Model
 
 The task of playing a video game like those on the Atari 2600 or the \ac{NES}
@@ -8,9 +11,9 @@ agent experiences a game in pixel space $\mathcal{S}$ to produce an action
 from a discrete action space $\mathcal{A}$ corresponding to a combination of
 buttons on a controller. The environment responds to the action with a new
 state from $\mathcal{S}$ and a reward from reward space $\mathcal{R}$. Games
-define different reward spaces $\mathcal{R}$, but typically an agent receives
+define different reward spaces $\mathcal{R}$, but typically games grant
 positive rewards for scoring points, moving forward in a level, or killing an
-enemy; they receive negative rewards for losing points, backtracking in a
+enemy; they grant negative rewards for losing points, backtracking in a
 level, or dying.
 
 \begin{figure}[!ht]
@@ -26,27 +29,27 @@ indefinitely.}
 
 ## Game Environment
 
-We explore two distinct game environments in this study: the Atari 2600, and
+We explore two distinct game environments in this study: the Atari 2600 and
 the \ac{NES}. From the Atari 2600 we select five games: _Enduro_, _Breakout_,
 _Pong_, _Seaquest_, and _Space Invaders_. From the \ac{NES} we select one
-single game _Super Mario Bros_ due to hardware and time restrictions. We
-interface with both environments using Open.ai Gym to allow agents to
-easily generalize across the different environments with no alterations. We
-note that the emulator for running \ac{NES} games, FCEUX, is up to $8x$ slower
-than the Atari emulator due to a poorly designed client-server pattern that
-enables the Python stack to communicate with the Lua based emulator.
+game, \ac{SMB}, due to hardware and time restrictions. We interface with both
+environments using Open.ai Gym to allow agents to easily generalize across
+the different environments with no alterations. We note that the emulator for
+running \ac{NES} games, FCEUX, is up to $8x$ slower than the Atari emulator
+due to a poorly designed client-server pattern that enables he Python stack
+to communicate with the Lua based emulator.
 
 ## Preprocessing
 
 Following the work of \cite{human-level-control-through-deep-rl}, we apply a
 down-sampling function $\phi(s)$ to each frame produced by the emulator.
 $\phi(s)$ first crops the RGB image to the playable area of the screen. We
-parameterize $\phi(s)$ with pairs $x_{\phi} = (x_l, x_r)$ of the horizontal
-pixels to crop and $y_{\phi} = (y_t, y_b)$ of the vertical pixels to crop.
-After cropping, $\phi(s)$ down-samples the RGB image to a single black & white
-channel (Y) and resizes the image to $84 \times 84$ pixels using bilinear
-interpolation. $\phi(s)$ reduces dimensionality of states to better utilize
-hardware.
+parameterize $\phi(s)$ with pairs $x_{\phi} = (x_{left}, x_{right})$ of the
+horizontal pixels to crop and $y_{\phi} = (y_{top}, y_{bottom})$ of the
+vertical pixels to crop. After cropping, $\phi(s)$ down-samples the RGB image
+to a single black & white channel (Y) and resizes the image to $84 \times 84$
+pixels using bilinear interpolation. $\phi(s)$ reduces dimensionality of
+states to better utilize hardware.
 
 ## Frame Skipping
 
@@ -59,7 +62,7 @@ the last two frames as the next state to account for flickering sprites.
 Intermediary frames are dropped, the agent never sees them. Matching
 \cite{human-level-control-through-deep-rl}, we apply $k = 4$ to all Atari
 tasks. However, we get better performance on \ac{NES} tasks using $k = 1$ due
-to issues with FCEUX.
+to locking from the FCEUX client-server pattern.
 
 ## Frame Stacking
 
@@ -71,29 +74,26 @@ frames that are skipped with held actions are never seen by the agent. Fig.
 \ref{fig:frame-skip} illustrates roughly how this process works for $l = 3$
 and an arbitrary $k \geq 1$. This study uses a value $l = 4$ for all games.
 
-<!-- TODO: lower case s -->
-<!-- TODO: better diagram with tikz -->
 <!-- TODO: what about the max? -->
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/frame-skip}
 \caption{The process for skipping and stacking frames. An agent reacts every
-$k$ frames, holding an action during intermediary frames. The agent then keeps
-the last $l$ frames it reacted to as the current state. This figure implies
-an arbitrary $k$ value, but an $l$ value of $3$.}
+$k$ frames by holding an action during intermediary frames. The agent then
+keeps the last $l$ frames it reacted to as the current state $s_i$. This
+figure implies an arbitrary $k$ value, but an $l$ value of $3$.}
 \label{fig:frame-skip}
 \end{figure}
 
 ## Reward Clipping
 
-<!-- TODO: maybe move this section down where the loss is discussed? -->
-<!-- TODO: expand or rephrase more explicitly? -->
-
 \cite{human-level-control-through-deep-rl} found that clipping the rewards
-at each step into $\{-1, 0, 1\}$ allows agent hyperparameters to generalize
-across a broad range of reward spaces. We apply the same reward clipping in
-our Atari and Super Mario Bros experiments.
+at each step allows agent hyperparameters to generalize across a broad range
+of reward spaces. They so by forcing each unique reward space $\mathcal{R}$
+to the same reward space $\mathcal{R}' = \{-1, 0, 1\}$. This is as simple as
+replacing a reward $r = sgn(r)$. We apply the same reward clipping in our
+Atari and Super Mario Bros experiments.
 
 ## Experience Replay
 
