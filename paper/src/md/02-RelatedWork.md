@@ -40,10 +40,10 @@ each of: **Breakout** **Pong**, **Enduro**, **Space Invaders**, and
 demonstrated that a distributed genetic optimizer will converge on more
 optimal $\theta$ for a \ac{DQN} than the standard gradient-based approach on
 most Atari 2600 tasks. By decoupling the GPU dependency and distributing the
-search for $\theta$, they found state of the art agents in as few as $10$ minutes.
-Interestingly, they showed that random search outperformed the gradient-based
-approach in a few cases. They noted the ability of their agent to learn
-complex games like **Seaquest** that Deep-$Q$ methods struggle with.
+search for $\theta$, they found state of the art agents in as few as $10$
+minutes. Interestingly, they showed that random search outperformed the
+gradient-based approach in a few cases. They noted the ability of their agent
+to learn complex games like **Seaquest** that Deep-$Q$ methods struggle with.
 
 ## Engineering Support
 
@@ -66,11 +66,11 @@ compared to games in \ac{ALE}.
 
 ### Deep Learning Infrastructure
 
-\cite{keras} designed Keras, a high level interface to deep learning back-ends
-in Python. This framework enables the fast construction of computational
-graphs. And, it generalizes across popular back-ends including Theano,
-TensorFlow, and CNTK. Our study applies the TensorFlow back-end.
+\cite{keras} designed Keras, a high level interface to deep learning
+back-ends in Python. This framework enables the fast construction of
+computational graphs. And, it generalizes across popular back-ends including
+Theano, TensorFlow, and CNTK. Our study applies the TensorFlow back-end.
 \cite{OhioSupercomputerCenter1987} constructed an array of $160$ GPU nodes,
 each bearing an nVidia P100 GPU, 28 core Intel Xeon CPU, and 132GB of RAM.
-Our study runs experiments involving Atari 2600 on these machines, but not t
-hose using \ac{NES} due to complications with FCEUX.
+Our study runs experiments involving Atari 2600 on these machines, but not
+those using \ac{NES} due to complications with FCEUX.
