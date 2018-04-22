@@ -1,3 +1,5 @@
+\clearpage
+
 # Architectures
 
 \begin{figure}[!htp]

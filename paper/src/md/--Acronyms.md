@@ -1,5 +1,3 @@
-# Acronyms & Abbreviations
-
 \begin{acronym}
 
 \acro{NES}{Nintendo Entertainment System}
