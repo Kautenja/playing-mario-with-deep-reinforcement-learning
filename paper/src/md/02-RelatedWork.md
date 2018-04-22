@@ -1,6 +1,6 @@
 # Related Works
 
-### Deep-$Q$ Learning
+### Deep Reinforcement Learning
 
 \cite{play-atari-with-deep-rl} presented the first study of game playing with
 deep reinforcement learning on the Atari 2600 platform. They presented a
@@ -14,8 +14,6 @@ _Deep-Q Learning_ outperformed human competency on game like **Breakout**,
 **Pong**, and **Enduro**; but failed to do so on games like
 **Space Invaders**, and **Seaquest**.
 
-### Double Deep-$Q$ Learning
-
 \cite{human-level-control-through-deep-rl} published an updated version of
 the original work from \cite{play-atari-with-deep-rl} featuring an
 improvement to the \ac{DQN}. They introduce a second \ac{DQN} for
@@ -23,17 +21,20 @@ establishing target values in the $Q$-learning action replay phase. Separating
 this network and updating its weights from the trained network every so often
 allows the algorithm to better stabilize learning by preventing the
 overestimation of values for given states.  \cite{double-q-learning} study on
-this _Double Deep-Q Learning_ method and validate its efficacy. They show
+this _Double Deep-$Q$ Learning_ method and validate its efficacy. They show
 that this tweak allows the algorithm to outperform the original on each of:
 **Breakout** **Pong**, **Enduro**, **Space Invaders**, and **Seaquest**.
 
-### Dueling Deep-$Q$ Learning
-
-\cite{dueling-deep-q}
-
-<!-- TODO: dueling double? -->
-
-### Genetic Deep-$Q$ Learning
+\cite{dueling-deep-q} define a new \ac{DQN} model, the _\ac{DDQN}_. The
+novelty of this model lies in its inherent ability to estimate a scalar value
+for each state, as well as measure the advantage of a potential action. Using
+a simple computational layer, the network combine these estimates to produce
+the same $Q$ values as the original \ac{DQN}. As such, the \ac{DDQN} is a
+modular replacement requiring no actual change to the $Q$ learning algorithm.
+\cite{dueling-deep-q} show that the \ac{DDQN} outperforms the standard
+\ac{DQN} for games with a lot of actions to choose from. They show
+that this new model exceeds the performance of the vanilla \ac{DQN} on each
+of: **Breakout** **Pong**, **Enduro**, **Space Invaders**, and **Seaquest**.
 
 \cite{deep-neuroevolution-genetic-algorithms-are-a-competitive-alternative}
 show that a distributed genetic optimizer converges on more optimal $\theta$
@@ -41,7 +42,8 @@ for a \ac{DQN} than the standard gradient-based approach on most Atari 2600
 tasks. By decoupling the GPU dependency and distributing the search for
 $\theta$, they find state of the art agents in as few as $10$ minutes.
 Interestingly, they note that random search outperforms the gradient-based
-approach in a few cases.
+approach in a few cases. They note the ability of their agent to learn
+complex games like **Seaquest** that Deep-$Q$ methods struggle with.
 
 ## Engineering Support
 
