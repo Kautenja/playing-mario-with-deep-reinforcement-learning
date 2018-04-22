@@ -9,8 +9,8 @@
 | $N$              | $1e6$        | $5e5$      | Replay memory size                                   |
 | $n$              | $32$         | $32$       | Replay memory batch size                             |
 | $\alpha$         | $5e$-$2$     | $5e$-$2$   | Learning rate of Adam                                |
-| Adam $\beta_1$   | $0.9$        | $0.9$      | Weight of first moment of Adam                       |
-| Adam $\beta_2$   | $0.99$       | $0.99$     | Weight of the second moment of Adam                  |
+| $\beta_1$        | $0.9$        | $0.9$      | Weight of first moment of Adam                       |
+| $\beta_2$        | $0.99$       | $0.99$     | Weight of the second moment of Adam                  |
 | $\gamma$         | $0.99$       | $0.99$     | Factor for discounting future rewards                |
 | $m$              | $4$          | $4$        | The number of actions before a replay                |
 | $\epsilon_0$     | $1.0$        | $1.0$      | The starting value for exploration rate              |
