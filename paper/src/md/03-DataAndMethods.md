@@ -122,9 +122,9 @@ combat this weakness by confidently estimating the quality table using a
 \ac{DNN}. Eqn. \ref{eqn:q-alg} shows the original formulation of the
 Q-learning algorithm. The algorithm replaces the quality value for the
 current state-action pair $(s, a)$ with the sum of the current quality
-estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and estimated
-future reward $Q(s', a')$ from the next state $s'$ over all possible actions
-$a' \in \mathcal{A}$.
+estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and discounted
+estimated future reward $\gamma Q(s', a')$ from the next state $s'$ over all
+possible actions $a' \in \mathcal{A}$.
 
 \begin{equation}
 Q(s, a) \gets
