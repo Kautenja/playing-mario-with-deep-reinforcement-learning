@@ -49,8 +49,6 @@ hardware.
 
 ## Frame Skipping
 
-<!-- TODO: update k value if we use mario instead -->
-
 \cite{human-level-control-through-deep-rl} show that agents perform well
 despite experiencing a fraction of their environment. We apply a $k$ frame
 skip mechanism to allow the agent a linear speedup of $\leq k$. This
@@ -59,12 +57,13 @@ the total reward over the $k$ frames. We use the point-wise maximum between
 the last two frames as the next state to account for flickering sprites.
 Intermediary frames are dropped, the agent never sees them. Matching
 \cite{human-level-control-through-deep-rl}, we apply $k = 4$ to all Atari
-tasks. However, we get better performance on \ac{NES} tasks using $k = 1$.
+tasks. However, we get better performance on \ac{NES} tasks using $k = 1$ due
+to issues with FCEUX.
 
 ## Frame Stacking
 
 To provide the agent an understanding of directionality and velocity of
-sprites in games, \cite{human-level-control-through-deep-rl} stacks a history
+sprites in games, \cite{human-level-control-through-deep-rl} stack a history
 of $l$ frames as the current state. It is worth noting that we only keep a
 history of the frames that the agent reacts to in the stack; the $k - 1$
 frames that are skipped with held actions are never seen by the agent. Fig.
@@ -83,15 +82,15 @@ an arbitrary $k$ value, but an $l$ value of $3$.}
 
 ## Reward Clipping
 
+<!-- TODO: maybe move this section down where the loss is discussed? -->
+<!-- TODO: expand or rephrase more explicitly? -->
+
 \cite{human-level-control-through-deep-rl} found that clipping the rewards
-at each step into ${-1, 0, 1}$ enables the algorithm's hyperparameters to
-generalize across a broad range of reward spaces. We apply the same reward
-clipping in our Atari and Super Mario Bros experiments.
+at each step into $\{-1, 0, 1\}$ allows agent hyperparameters to generalize
+across a broad range of reward spaces. We apply the same reward clipping in
+our Atari and Super Mario Bros experiments.
 
 ## Experience Replay
-
-<!-- TODO: check FCEUX spelling and reference -->
-<!-- TODO: note that prioritized is better, ran out of time -->
 
 To build a dataset for training an agent's reward estimator, we use an
 experience replay queue. An agent in some state $s$ performs an action $a$ to
