@@ -227,7 +227,7 @@ $|\mathcal{A} = 14|$.
 Q(s, a, \theta) = V(s, \theta) +
 \bigg(
 A(s, a, \theta) -
-\frac{1}{\mathcal{A}} \sum_{a' \in |\mathcal{A}|} A(s, a', \theta)
+\frac{1}{|\mathcal{A}|} \sum_{a' \in \mathcal{A}} A(s, a', \theta)
 \bigg)
 \label{eqn:dueling-deep-q}
 \end{equation}
