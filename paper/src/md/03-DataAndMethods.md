@@ -1,13 +1,4 @@
-<!--
-    NP-something SMB
-http://erikdemaine.org/papers/Mario_FUN2016/paper.pdf
- -->
-
 # Data & Methods
-
-<!-- TODO: discuss games and tasks? -->
-<!-- TODO: notation table -->
-<!-- TODO: references -->
 
 ## Reinforcement Learning Model
 
