@@ -6,6 +6,7 @@
 \acro{DNN}{Deep Neural Network}
 \acro{CNN}{Convolutional Neural Network}
 \acro{DQN}{Deep-Q Network}
-\acro{FCEUX}{\cite{fceux}}
+\acro{ALE}{Arcade Learning Environment}
+\acro{SMB}{Super Mario Bros.}
 
 \end{acronym}
