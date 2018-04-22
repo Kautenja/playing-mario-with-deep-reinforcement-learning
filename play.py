@@ -36,7 +36,7 @@ if not os.path.exists(weights_file):
 
 # build the environment
 env = build_atari_environment(game, is_validation=True)
-env = Monitor(env, '{}/monitor'.format(exp_directory), force=True)
+env = Monitor(env, '{}/monitor_play'.format(exp_directory), force=True)
 # build the agent without any replay memory (not needed to play from model)
 agent = agents[agent_name](env, replay_memory_size=0)
 # load the weights
