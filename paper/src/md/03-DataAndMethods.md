@@ -100,8 +100,8 @@ Atari and Super Mario Bros experiments.
 To build a dataset for training an agent's reward estimator, we use an
 experience replay queue. An agent in some state $s \in \mathcal{S}$ performs
 an action $a \in \mathcal{A}$ to produce a new state $s' \in \mathcal{S}$, a
-reward $r \in {-1, 0, 1}$, and a flag denoting whether the episode (game) has
-ended $d \in {0, 1}$. The agent stores the experience as a tuple
+reward $r \in \{-1, 0, 1\}$, and a flag denoting whether the episode (game)
+has ended $d \in \{0, 1\}$. The agent stores the experience as a tuple
 $e = (s, a, r, d, s')$ in a FIFO queue $D = \{e_1, ..., e_N\}$ of at most $N$
 total experiences. To generate training data, the agent randomly draws a
 mini-batch $D'$ of $n$ experiences using a uniform distribution with
