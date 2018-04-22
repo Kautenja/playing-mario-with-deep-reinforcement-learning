@@ -35,3 +35,5 @@ activation. This network has $\approx 8e6$ weights (2x as many as the original
 architecture).}
 \label{fig:dueling-dqn}
 \end{figure}
+
+
