@@ -11,36 +11,38 @@ http://erikdemaine.org/papers/Mario_FUN2016/paper.pdf
 
 ## Reinforcement Learning Model
 
-The task of playing a video game like those on the Atari 2600 or the Nintendo
-Entertainment System (NES) to maximize score closely models a _Markov
-decision process (MDP)_ shown in Fig. \ref{fig:mdp}. In this case, an agent
-experiences a game in pixel space $\mathcal{S}$ to produce actions among a
-discrete action space $\mathcal{A}$ corresponding to combinations of buttons
-on a controller. Games define different reward spaces $\mathcal{R}$, but
-typically the agent receives positive rewards for scoring points or moving
-forward in a level; and negative rewards for losing points, backtracking in a
-level, or losing a life.
+The task of playing a video game like those on the Atari 2600 or the \ac{NES}
+closely models a _\ac{MDP}_ shown in Fig. \ref{fig:mdp}. In this case, an
+agent experiences a game in pixel space $\mathcal{S}$ to produce actions
+among a discrete action space $\mathcal{A}$ corresponding to combinations of
+buttons on a controller. The environment responds to the action with a new
+state and a reward from reward space $\mathcal{R}$. Games define different
+reward spaces $\mathcal{R}$, but typically the agent receives positive
+rewards for scoring points, moving forward in a level, or killing an enemy;
+it receives negative rewards for losing points, backtracking in a level, or
+dying.
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.6\textwidth]{img/mdp}
-\caption{The general form of a Markov decision process (MDP). An agent
-produces an action $a \in \mathcal{A}$ that actuates some environment. The
-environment produces a new state $s \in \mathcal{S}$, and a reward
-$r \in \mathcal{R}$ that the agent observes. The process repeats indefinitely.}
+\caption{The general form of a \ac{MDP}. An agent produces an action
+$a \in \mathcal{A}$ that actuates some environment. The environment produces
+a new state $s \in \mathcal{S}$, and a reward $r \in \mathcal{R}$ that the
+agent observes. The process repeats indefinitely.}
 \label{fig:mdp}
 \end{figure}
 
 ## Preprocessing
 
 Following the work of \cite{human-level-control-through-deep-rl}, we apply a
-down-sampling $\phi$ to each frame produced by the emulator. $\phi$ first
-crops the RGB image to the "playable" area of the screen. We parameterize
-$\phi$ with pairs $(x_l, x_r)$ of the horizontal pixels to crop and
-$(y_t, y_b)$ of the vertical pixels to crop from the RGB image. After
-cropping $\phi$ down-samples the RGB image to a single B&B channel and resizes
-the image to $84 \times 84$ using a bilinear interpolation. This down-sampling
-step helps reduce dimensionality of states to make computation easier.
+down-sampling function $\phi(s)$ to each frame produced by the emulator.
+$\phi(s)$ first crops the RGB image to the playable area of the screen. We
+parameterize $\phi(s)$ with pairs $x_{\phi} = (x_l, x_r)$ of the horizontal
+pixels to crop and $y_{\phi} = (y_t, y_b)$ of the vertical pixels to crop
+from the RGB image. After cropping, $\phi(s)$ down-samples the RGB image to a
+single black & white channel (Y) and resizes the image to $84 \times 84$
+using a bilinear interpolation. This down-sampling function helps reduce
+dimensionality of states to better utilize hardware.
 
 ## Frame Skipping
 
@@ -93,12 +95,12 @@ produce a new state $s'$, a reward $r$, and a flag denoting whether the
 episode (game) has ended $d$. The agent stores the experience as the tuple
 $e = (s, a, r, d, s')$ in a FIFO queue $D = {e_1, ..., e_N}$ of at most $N$
 total experiences. To generate training data, the agent randomly draws a
-mini-batch $d$ of $n$ experiences using a uniform distribution with
-replacement (i.e. $d = \{e_1, ..., e_n\} \sim U(D)$).
+mini-batch $D'$ of $n$ experiences using a uniform distribution with
+replacement (i.e. $D' = \{e_1, ..., e_n\} \sim U(D)$).
 \cite{human-level-control-through-deep-rl} apply $N = 1e6$ previous
-experiences with mini-batchs of size $n = 32$. We match these values in our
+experiences with mini-batches of size $n = 32$. We match these values in our
 Atari experiments, but use a size of $N = 5e5$ in the Mario experiment due to
-hardware restrictions imposed by FCEUX, the NES emulator.
+hardware restrictions imposed by FCEUX, the \ac{NES} emulator.
 
 ## Deep-Q Learning
 
@@ -106,9 +108,9 @@ Although traditional Q-learning excels in some classical reinforcement
 learning problems, the quality table suffers from the state complexity of
 NP-Hard tasks such as playing games using pixel space.
 \cite{human-level-control-through-deep-rl} presented the Deep-Q algorithm to
-combat this weakness by confidently estimating the quality table using a Deep
-Neural Network (DNN). Eqn. \ref{eqn:q-alg} shows the original formulation of
-the Q-learning algorithm. The algorithm replaces the quality value for the
+combat this weakness by confidently estimating the quality table using a
+\ac{DNN}. Eqn. \ref{eqn:q-alg} shows the original formulation of the
+Q-learning algorithm. The algorithm replaces the quality value for the
 current state action pair $(s, a)$ with the sum of the current quality
 estimate $Q(s, a)$ and the learning rate adjusted reward $r$ and estimated
 future reward $Q(s', a')$ from the next state $s'$ over all possible actions
@@ -233,7 +235,7 @@ range of experiments, we use the servers of \cite{OhioSupercomputerCenter1987}.
 TODO: get specs of the servers
 
 The \cite{OhioSupercomputerCenter1987} provides no super user access, necessary
-to install the NES emulator, FCEUX, used in the Mario experiment. We instead
+to install the \ac{NES} emulator, FCEUX, used in the Mario experiment. We instead
 run this experiment locally on a workstation with a 4.2GHz Intel Core i5,
 nVidia GTX1070, and 32GB of 3200MHz RAM. Unlike the Atari emulator, which is
 written in Python, FCEUX is a standalone application that supports plugins
