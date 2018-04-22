@@ -48,7 +48,13 @@ class NesEnv(gym.Env, utils.EzPickle):
         self.action_space = spaces.MultiDiscrete([[0, 1]] * NUM_ACTIONS)
         self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_height, self.screen_width, 3))
         self.launch_vars = {}
-        self.cmd_args = ['--xscale 1', '--yscale 1', '-f 0', '--sound 0', '--nogui']
+        self.cmd_args = [
+            '--xscale 1',
+            '--yscale 1',
+            '-f 0',
+            '--sound 0',
+            '--nogui',
+        ]
         self.lua_path = []
         self.subprocess = None
         self.no_render = True

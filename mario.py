@@ -41,7 +41,12 @@ env.configure(lock=Lock())
 env = Monitor(env, '{}/monitor'.format(exp_directory), force=True)
 print(env.observation_space.shape)
 
-agent = agents[agent_name](env, render_mode=render_mode)
+from src.base import AnnealingVariable
+agent = agents[agent_name](env, render_mode=render_mode,
+        exploration_rate=AnnealingVariable(0.1, 0.1, 1)
+    )
+agent.model.load_weights('weights.h5')
+agent.target_model.load_weights('weights.h5')
 agent
 
 
@@ -50,13 +55,13 @@ with open('{}/agent.py'.format(exp_directory), 'w') as agent_file:
     agent_file.write(repr(agent))
 
 
-initial = agent.play(games=5)
-initial = pd.Series(initial)
-initial.to_csv('{}/initial.csv'.format(exp_directory))
-print(initial.describe())
+# initial = agent.play(games=5)
+# initial = pd.Series(initial)
+# initial.to_csv('{}/initial.csv'.format(exp_directory))
+# print(initial.describe())
 
 
-agent.observe()
+# agent.observe()
 
 
 callback = BaseCallback()
