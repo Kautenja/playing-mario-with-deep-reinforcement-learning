@@ -13,14 +13,14 @@ http://erikdemaine.org/papers/Mario_FUN2016/paper.pdf
 
 The task of playing a video game like those on the Atari 2600 or the \ac{NES}
 closely models a _\ac{MDP}_ shown in Fig. \ref{fig:mdp}. In this case, an
-agent experiences a game in pixel space $\mathcal{S}$ to produce actions
-among a discrete action space $\mathcal{A}$ corresponding to combinations of
+agent experiences a game in pixel space $\mathcal{S}$ to produce an action
+from a discrete action space $\mathcal{A}$ corresponding to a combination of
 buttons on a controller. The environment responds to the action with a new
-state and a reward from reward space $\mathcal{R}$. Games define different
-reward spaces $\mathcal{R}$, but typically the agent receives positive
-rewards for scoring points, moving forward in a level, or killing an enemy;
-it receives negative rewards for losing points, backtracking in a level, or
-dying.
+state from $\mathcal{S}$ and a reward from reward space $\mathcal{R}$. Games
+define different reward spaces $\mathcal{R}$, but typically an agent receives
+positive rewards for scoring points, moving forward in a level, or killing an
+enemy; they receive negative rewards for losing points, backtracking in a
+level, or dying.
 
 \begin{figure}[!ht]
 \centering
