@@ -115,7 +115,7 @@ while total_score < 32000:
         env.change_level(level_you_want)
 ```
 
-#### Automatic Change
+#### Automatic
 
 if you don't call change_level() and the level is finished, the system will
 automatically select the unlocked level with the lowest level score (which is
@@ -162,6 +162,11 @@ element).
 Discrete action spaces are often easier to work with. `gym_super_mario_bros`
 provides a wrapper to convert the environment to discrete actions space:
 
+```
+from gym_super_mario_bros.wrappers import ToDiscreteActionSpaceEnv
+env = ToDiscreteActionSpaceEnv(env)
+```
+
 # Gameplay
 
 -   The game will automatically close if Mario dies or shortly after the
@@ -186,6 +191,7 @@ The following variables are available in the info dict returned with each step
 | `ignore`        | Added with a value of True if the game is stuck and is terminated early |
 
 -   A value of -1 indicates that the value is unknown
+
 
 ## Game is Stuck
 
