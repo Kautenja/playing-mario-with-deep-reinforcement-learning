@@ -17,7 +17,7 @@ class PenalizeDeathEnv(gym.Wrapper):
             None
 
         """
-        gym.Wrapper.__init__(self, env)
+        super().__init__(env)
         self.lives = 0
         self.penalty = penalty
 
