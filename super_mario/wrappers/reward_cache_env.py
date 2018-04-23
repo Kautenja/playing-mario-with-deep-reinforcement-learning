@@ -13,7 +13,7 @@ class RewardCacheEnv(gym.Wrapper):
         Returns:
             None
         """
-        gym.Wrapper.__init__(self, env)
+        super().__init__(env)
         self._rewards = []
 
     def step(self, action):

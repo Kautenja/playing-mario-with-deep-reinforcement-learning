@@ -1,15 +1,16 @@
+"""A wrapper to map the multi-discrete actions of SMB to discrete actions."""
 import gym
 
 
-class ToDiscreteWrapper(gym.Wrapper):
-    """Wrapper to convert MultiDiscrete action space to Discrete."""
+class ToDiscreteActionSpaceEnv(gym.Wrapper):
+    """An adapter from multi-discrete Super Mario inputs to discrete ones."""
 
-    def __init__(self, env):
+    def __init__(self, env) -> None:
         """
         Create a wrapper to map the action input from discrete inputs to
         the expected multi-discrete inputs.
         """
-        super(ToDiscreteWrapper, self).__init__(env)
+        super().__init__(env)
         self.discrete_to_multi = {
             0:  [0, 0, 0, 0, 0, 0],  # NOOP
             1:  [1, 0, 0, 0, 0, 0],  # Up
@@ -37,6 +38,4 @@ class ToDiscreteWrapper(gym.Wrapper):
         return self.env.reset(**kwargs)
 
 
-__all__ = [
-    ToDiscreteWrapper.__name__,
-]
+__all__ = [ToDiscreteActionSpaceEnv.__name__]

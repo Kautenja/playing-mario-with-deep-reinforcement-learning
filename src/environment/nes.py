@@ -8,7 +8,7 @@ from src.environment.wrappers import (
     NoopResetEnv,
 )
 from super_mario.wrappers import (
-    ToDiscreteWrapper,
+    ToDiscreteActionSpaceEnv,
     PenalizeDeathEnv,
     RewardCacheEnv
 )
@@ -39,7 +39,7 @@ def build_nes_environment(game_name: str,
     """
     # make the initial environment
     env = gym.make('{}-v0'.format(game_name))
-    env = ToDiscreteWrapper(env)
+    env = ToDiscreteActionSpaceEnv(env)
     r_cache = RewardCacheEnv(env)
     env = r_cache
     # apply the frame skip feature if enabled
