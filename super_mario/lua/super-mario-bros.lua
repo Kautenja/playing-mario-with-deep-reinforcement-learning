@@ -441,98 +441,6 @@ function get_screen()
     return;
 end;
 
--- get_tiles - Returns tiles data (and displays them on screen)
--- Only returns tiles that have changed since last update
--- Format: tiles_<frame_number>#<x(1 hex digits)><y (1 hex digits)><value (1 hex digits)>|...
--- Value: 0 - Empty space, 1 - Object / Other, 2 - Enemy, 3 - Mario
-function get_tiles()
-
-    -- -- Skipping if we do not need to draw tiles
-    -- if draw_tiles == 0 then
-    --     return;
-    -- end;
-
-    -- local enemies = get_enemies();
-    -- local left_x = get_left_x_position();
-    -- local y_viewport = get_y_viewport();
-    -- local framecount = emu.framecount();
-
-    -- -- Outside box (80 x 65 px)
-    -- -- Will contain a matrix of 16x13 sub-boxes of 5x5 pixels each
-    -- gui.box(
-    --     50 - 5 * 7 - 2,
-    --     70 - 5 * 7 - 2,
-    --     50 + 5 * 8 + 3,
-    --     70 + 5 * 5 + 3,
-    --     0,
-    --     "P30"
-    -- );       -- P30 = White (NES Palette 30 color)
-
-    -- -- Calculating tile types
-    -- for box_y = -4*16,8*16,16 do
-    --     local tile_string = "";
-    --     local data_count = 0;
-    --     for box_x = -7*16,8*16,16 do
-
-    --         -- 0 = Empty space
-    --         local tile_value = 0;
-    --         local color = 0;
-    --         local fill = 0;
-
-    --         -- +1 = Not-Empty space (e.g. hard surface, object)
-    --         local curr_tile_type = get_tile_type(box_x, box_y);
-    --         if (curr_tile_type == 1) and (curr_y_position + box_y < 0x1B0) then
-    --             tile_value = 1;
-    --             color = "P30"; -- White (NES Palette 30 color)
-    --         end;
-
-    --         -- +2 = Enemies
-    --         for i = 1,#enemies do
-    --             local dist_x = math.abs(enemies[i]["x"] - (curr_x_position + box_x - left_x + 108));
-    --             local dist_y = math.abs(enemies[i]["y"] - (90 + box_y));
-    --             if (dist_x <= 8) and (dist_y <= 8) then
-    --                 tile_value = 2;
-    --                 color = "P27"; -- Orange (NES Palette 27 color)
-    --                 fill = "P3F"; -- Black (NES Palette 3F color);
-    --             end;
-    --         end;
-
-    --         -- +3 = Mario
-    --         local dist_x = math.abs(curr_x_position - (curr_x_position + box_x - left_x + 108));
-    --         local dist_y = math.abs(curr_y_position - (80 + box_y));
-    --         if (y_viewport == 1) and (dist_x <= 8) and (dist_y <= 8) then
-    --             tile_value = 3;
-    --             color = "P05"; -- Red (NES Palette 05 color)
-    --             fill = color;
-    --         end;
-
-    --         -- Drawing tile
-    --         local tile_x = 50 + 5 * (box_x / 16);
-    --         local tile_y = 55 + 5 * (box_y / 16);
-
-    --         if (tile_value ~= 0) then
-    --             gui.box(tile_x - 2, tile_y - 2, tile_x + 2, tile_y + 2, fill, color);
-    --         end;
-
-    --         -- Storing value only on processed frames
-    --         -- Only sending values for processed frames if skip_tiles is 0
-    --         -- Skipped frames (where commands are not processed) have box drawn, but no values sent
-    --         if (framecount % skip_frames == 0) and (skip_tiles == 0) then
-    --             -- Only returning value if tile value has changed (or full refresh needed)
-    --             if (framecount % send_all_pixels == 0) or (tile_value ~= tiles[(box_x / 16) + 7][(box_y / 16) + 4]) or (force_refresh > 0) then
-    --                 tiles[(box_x / 16) + 7][(box_y / 16) + 4] = tile_value;
-    --                 --noinspection StringConcatenationInLoops
-    --                 tile_string = tile_string .. "|" .. string.format("%01x%01x%01x", (box_x / 16) + 7, (box_y / 16) + 4, tile_value);
-    --                 data_count = data_count + 1;
-    --             end;
-    --         end;
-    --     end;
-    --     if data_count > 0 then
-    --         write_to_pipe("tiles_" .. framecount .. "#" .. string.sub(tile_string, 2, -1));
-    --     end;
-    -- end;
-    return;
-end;
 
 -- check_if_started - Checks if the timer has started to decrease
 -- this is to avoid receiving commands while the level is loading, or the animation is still running
@@ -556,7 +464,6 @@ function check_if_started()
             force_refresh = 5;  -- Sending full screen for next 5 frames, then only diffs
             update_positions();
             show_curr_distance();
-            get_tiles();
             get_data();
             -- get_screen();    -- Was blocking execution
             ask_for_commands();
@@ -587,7 +494,6 @@ function check_if_finished()
             emu.frameadvance();
             update_positions();
             show_curr_distance();
-            get_tiles();
             get_data();
             get_screen();
             ask_for_commands();
@@ -824,7 +730,6 @@ function main_loop()
             emu.frameadvance();
             update_positions();
             show_curr_distance();
-            get_tiles();
             get_data();
             get_screen();
             ask_for_commands();
@@ -836,7 +741,6 @@ function main_loop()
         emu.frameadvance();
         update_positions();
         show_curr_distance();
-        get_tiles();
     end;
 
     -- Exiting if game is finished
