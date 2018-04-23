@@ -53,10 +53,10 @@ Table: Statistics from the Random and DDDQN agent respectively. The statistics
 describe Mario's terminal $x$ position among $v = 100$ validation games.
 \label{tab:smb-results}
 
-|         |  Min | Mean |  Max |
-|:--------|-----:|-----:|-----:|
-| DDDQN   |  268 |  780 | 1436 |
-| Random  |   77 |  372 |  656 |
+|         |     Min |    Mean |      Max |
+|:--------|--------:|--------:|---------:|
+| DDDQN   | **268** | **780** | **1436** |
+| Random  |      77 |     372 |      656 |
 
 We were unable to collect data to visualize the learning process for Super
 Mario Bros. on a per episode basis. However, we present the validation scores
