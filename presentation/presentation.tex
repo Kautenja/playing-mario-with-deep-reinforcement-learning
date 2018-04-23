@@ -44,7 +44,7 @@
         \item{Breakout, Enduro, Pong, Seaquest, Space Invaders}
         \item{Stella}
         \end{itemize}
-    \item{NES}
+    \item{Nintendo Entertainment System (NES)}
         \begin{itemize}
         \item{Super Mario Bros.}
         \item{FCEUX}
@@ -81,8 +81,10 @@ $\Downarrow$ \\
 \begin{minipage}{0.6\textwidth}
 \begin{itemize}
     \item{Defined by the ROM for each game}
+    \item{Stacks of $4$ frames of Y-channel game-play images}
+    \item{Targets are future reward estimates over actions in a $\mathcal{A}$}
     \item{Experience Replay of $1000000$ experiences}
-    \item{Generated using "bootstrapping"}
+    \item{Each experience contains a state, action, reward, next state, and terminal flag}
     \item{Networks train on random mini-batches of $32$ experiences every $4$ decisions}
 \end{itemize}
 \end{minipage}
@@ -214,7 +216,7 @@ jumps into them.}
     \end{tabular}
     \begin{tablenotes}
         \small
-        \item $^*$ DDDQN trains for $1e7$ frames.
+        \item $^*$ DDDQN trains for $1e6$ frames.
     \end{tablenotes}
     \end{threeparttable}
     \end{table}
@@ -238,7 +240,6 @@ jumps into them.}
 \begin{itemize}
     \item{DDDQN outperforms DQN in a fraction of the time in some cases}
     \item{DDDQN can play Mario with rudimentary confidence after $\approx 1e6$ experiences}
-    \item{DDDQN generalizes across domains with no tweaking}
     \item{Engineering problems can have an immense impact on Deep-Learning work-flows}
     \item{Reward schemes get challenging to design in more complex environments}
 \end{itemize}
