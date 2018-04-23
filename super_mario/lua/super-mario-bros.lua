@@ -41,9 +41,8 @@ end;
 is_started = 0;             -- Indicates that the timer has started to decrease (i.e. commands can now be processed)
 is_finished = 0;            -- Indicates a life has been lost, world has changed, or finish line crossed
 last_time_left = 0;         -- Indicates the last time left (to check if timer has started to decrease)
-skip_frames = 1;            -- Process a frame every k frames
-start_delay = 175; --100;          -- Number of frames to wait before pressing "start" to start level
-send_all_pixels = 10000; -- 702;      -- Return full screen (all pixels) every 700 frames
+start_delay = 100;          -- Number of frames to wait before pressing "start" to start level (was 175)
+send_all_pixels = 10000;    -- Return full screen (all pixels) every 10000 frames (was 702)
 force_refresh = 0;          -- Forces to return full screen (all pixels and data) for this number of frames
 changing_level = 0;         -- Indicates level change in progress
 curr_x_position = 0;        -- Current x position
@@ -114,7 +113,6 @@ addr_enemy_x = 0x87;
 addr_enemy_y = 0xcf;
 addr_injury_timer = 0x079e;
 addr_swimming_flag = 0x0704;
-addr_tiles = 0x500;
 
 -- Emulator Speed
 emu.speedmode("maximum");
@@ -636,7 +634,7 @@ function main_loop()
         emu.frameadvance();
 
     -- Processed frame, getting commands (sync mode), sending back screen
-    elseif framecount % skip_frames == 0 then
+    else
         read_commands();
         if commands_rcvd == 1 then
             commands_rcvd = 0
@@ -647,11 +645,6 @@ function main_loop()
             ask_for_commands();
         end;
 
-    -- Skipped frame, using same command as last frame, not returning screen
-    else
-        joypad.set(1, commands);
-        emu.frameadvance();
-        update_positions();
     end;
 
     -- Exiting if game is finished

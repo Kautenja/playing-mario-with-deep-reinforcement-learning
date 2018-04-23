@@ -5,24 +5,27 @@ import signal
 import subprocess
 import tempfile
 from distutils import spawn
+"""An environment for interacting with NES games through FCEUX."""
 from threading import Thread, Lock
 from time import sleep
-
 import numpy as np
-
 import gym
 from gym import utils, spaces
 from gym.utils import seeding
+
 
 SEARCH_PATH = os.pathsep.join([os.environ['PATH'], '/usr/games', '/usr/local/games'])
 FCEUX_PATH = spawn.find_executable('fceux', SEARCH_PATH)
 if FCEUX_PATH is None:
     raise gym.error.DependencyNotInstalled("fceux is required. Try installing with apt-get install fceux.")
 
+
 logger = logging.getLogger(__name__)
+
 
 # Constants
 NUM_ACTIONS = 6
+
 
 # Singleton pattern
 class NesLock:

@@ -18,29 +18,30 @@ SMB_LEVELS = [
     (8, 1, 1, 6114), (8, 2, 2, 3554), (8, 3, 3, 3554), (8, 4, 4, 4989)]
 
 
-for draw_tiles in range(2):
-    tile_suffix = '-Tiles' if draw_tiles == 1 else ''
+register(
+    id='meta-SuperMarioBros-v0',
+    entry_point='super_mario:MetaSuperMarioBrosEnv',
+    max_episode_steps=9999999,
+    reward_threshold=32000,
+    kwargs={
+        'average_over': 3,
+        'passing_grade': 600,
+        'min_tries_for_avg': 3
+    },
+    nondeterministic=True,
+)
 
+for (world_number, level_number, area_number, max_distance) in SMB_LEVELS:
+    level = (world_number - 1) * 4 + (level_number - 1)
     register(
-        id='meta-SuperMarioBros{}-v0'.format(tile_suffix),
-        entry_point='super_mario:MetaSuperMarioBrosEnv',
-        max_episode_steps=9999999,
-        reward_threshold=32000,
-        kwargs={ 'draw_tiles': draw_tiles, 'average_over': 3, 'passing_grade': 600, 'min_tries_for_avg': 3 },
+        id='SuperMarioBros-{}-{}-v0'.format(world_number, level_number),
+        entry_point='super_mario:SuperMarioBrosEnv',
+        max_episode_steps=10000,
+        reward_threshold=(max_distance - 40),
+        kwargs={ 'level': level },
+        # Seems to be non-deterministic about 5% of the time
         nondeterministic=True,
     )
-
-    for (world_number, level_number, area_number, max_distance) in SMB_LEVELS:
-        level = (world_number - 1) * 4 + (level_number - 1)
-        register(
-            id='SuperMarioBros-{}-{}{}-v0'.format(world_number, level_number, tile_suffix),
-            entry_point='super_mario:SuperMarioBrosEnv',
-            max_episode_steps=10000,
-            reward_threshold=(max_distance - 40),
-            kwargs={ 'draw_tiles': draw_tiles, 'level': level },
-            # Seems to be non-deterministic about 5% of the time
-            nondeterministic=True,
-        )
 
 
 # Scoreboard registration
@@ -59,22 +60,10 @@ add_task(
 )
 
 
-add_task(
-    id='meta-SuperMarioBros-Tiles-v0',
-    group='super-mario',
-    summary='Compilation of all 32 levels of Super Mario Bros. on Nintendo platform - Tiles version.',
-)
-
-
 for world in range(8):
     for level in range(4):
         add_task(
             id='SuperMarioBros-{}-{}-v0'.format(world + 1, level + 1),
             group='super-mario',
             summary='Level: {}-{} of Super Mario Bros. on Nintendo platform - Screen version.'.format(world + 1, level + 1),
-        )
-        add_task(
-            id='SuperMarioBros-{}-{}-Tiles-v0'.format(world + 1, level + 1),
-            group='super-mario',
-            summary='Level: {}-{} of Super Mario Bros. on Nintendo platform - Tiles version.'.format(world + 1, level + 1),
         )
