@@ -80,4 +80,4 @@ def build_dueling_deep_q_model(
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['build_dueling_deep_q_model']
+__all__ = [build_dueling_deep_q_model.__name__]
