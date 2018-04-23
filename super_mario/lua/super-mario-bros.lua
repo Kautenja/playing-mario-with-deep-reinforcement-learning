@@ -52,7 +52,6 @@ last_processed_frame = 0;   -- Indicates last frame that was sent to pipe, to wa
 commands = {};              -- List of current commands (inputs)
 screen = {};                -- List of current screen pixels
 data = {};                  -- List of current player stats
-tiles = {};                 -- List of tiles
 pipe_in = nil;              -- Input named pipe
 pipe_out = nil;             -- Output named pipe
 running_thread = 0;         -- To avoid 2 threads running at the same time
@@ -138,12 +137,6 @@ function reset_vars()
     local commands_var = { "up", "left", "down", "right", "A", "B", "start", "select" };
     for i=1,#commands_var do
         commands[commands_var[i]] = false;
-    end;
-    for x=0,15 do
-        tiles[x] = {};
-        for y=0,12 do
-            tiles[x][y] = -1;
-        end;
     end;
     is_started = 0;
     is_finished = 0;
@@ -274,67 +267,6 @@ function get_player_status()
     return memory.readbyte(addr_player_status);
 end;
 
--- get_tile_type - Returns the tile type
--- 0 = empty space, 1 = non-empty space
-function get_tile_type(box_x, box_y)
-    local left_x = get_left_x_position();
-    local x = curr_x_position - left_x + box_x + 112;
-    local y = box_y + 96;
-    local page = math.floor(x / 256) % 2;
-
-    local sub_x = math.floor((x % 256) / 16);
-    local sub_y = math.floor((y - 32) / 16);
-    local curr_tile_addr = addr_tiles + page * 13 * 16 + sub_y * 16 + sub_x;
-
-    if (sub_y >= 13) or (sub_y < 0) then
-      return 0;
-    end;
-
-    -- 0 = empty space, 1 is not-empty (e.g. hard surface or object)
-    if memory.readbyte(curr_tile_addr) ~= 0 then
-      return 1;
-    else
-      return 0;
-    end;
-end;
-
--- get_enemies - Returns enemy location
-function get_enemies()
-    local enemies = {};
-    for slot=0,4 do
-      local enemy = memory.readbyte(0xF + slot);
-      if enemy ~= 0 then
-        local ex = memory.readbyte(addr_enemy_page + slot) * 0x100 + memory.readbyte(addr_enemy_x + slot);
-        local ey = memory.readbyte(addr_enemy_y + slot);
-        enemies[#enemies+1] = {["x"]=ex,["y"]=ey};
-      end
-    end
-    return enemies;
-end;
-
--- get_distance_perc - Returns the percentage of the world currently completed (as a string with % sign)
-function get_distance_perc(current_distance, max_distance)
-    -- For some maps, underground tunnels use a page location after the finish line
-    -- Not returning a percentage for those cases, or if max_distance is 0
-    if (current_distance > (max_distance + 40)) or (max_distance <= 0) then
-        return "--%";
-    end;
-    -- There are usually 80 pixels between the flagpole and the castle.
-    -- The target (reward_threshold) is 40 pixels before the castle
-    -- The finish line (where the game will automatically close) is 15 pixels before the castle
-    local current_perc = round(current_distance / (max_distance - 40) * 100, 0);
-    current_perc = math.min(current_perc, 100);
-    current_perc = math.max(current_perc, 0);
-    return current_perc .. "%";
-end;
-
--- show_curr_distance - Displays the current distance on the map with percentage
-function show_curr_distance()
-    local distance = "Distance " .. curr_x_position;
-    distance = distance .. " (" .. get_distance_perc(curr_x_position, max_distance) .. ")";
-    return emu.message(distance);
-end;
-
 -- get_data - Returns the current player stats data (reward, distance, life, scores, coins, timer, player_status, is_finished)
 -- Only returning values that have changed since last update
 -- Format: data_<frame_number>#name_1:value_1|name_2:value_2|name_3:value_3
@@ -446,7 +378,6 @@ function check_if_started()
             write_to_pipe("ready_" .. emu.framecount());
             force_refresh = 5;  -- Sending full screen for next 5 frames, then only diffs
             update_positions();
-            show_curr_distance();
             get_data();
             -- get_screen();    -- Was blocking execution
             ask_for_commands();
@@ -476,7 +407,6 @@ function check_if_finished()
             commands_rcvd = 0
             emu.frameadvance();
             update_positions();
-            show_curr_distance();
             get_data();
             get_screen();
             ask_for_commands();
@@ -712,7 +642,6 @@ function main_loop()
             commands_rcvd = 0
             emu.frameadvance();
             update_positions();
-            show_curr_distance();
             get_data();
             get_screen();
             ask_for_commands();
@@ -723,7 +652,6 @@ function main_loop()
         joypad.set(1, commands);
         emu.frameadvance();
         update_positions();
-        show_curr_distance();
     end;
 
     -- Exiting if game is finished
