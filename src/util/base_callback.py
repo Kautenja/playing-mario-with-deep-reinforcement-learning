@@ -23,6 +23,14 @@ class BaseCallback(object):
         self.scores = []
         self.losses = []
 
+    def __repr__(self) -> str:
+        """Return an executable string representation of this object."""
+        return '{}(weights_file_name={}, update_every={})'.format(
+            self.__class__.__name__,
+            repr(self.weights_file_name),
+            self.update_every,
+        )
+
     def __call__(self, agent, score: float, loss: float) -> None:
         """
         Update the callback with the new score (from a finished episode).
