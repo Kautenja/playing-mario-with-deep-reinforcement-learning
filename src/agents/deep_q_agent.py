@@ -277,7 +277,6 @@ class DeepQAgent(Agent):
             # pass the score to the callback at the end of the episode
             if callable(callback):
                 callback(score, loss)
-                self.model.save_weights('./weights.h5')
             # update the progress bar
             progress.set_postfix(score=score, loss=loss)
             progress.update(frames)
