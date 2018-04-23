@@ -55,8 +55,13 @@ class NesEnv(gym.Env, utils.EzPickle):
         self.rom_path = ''
         self.screen_height = 224
         self.screen_width = 256
-        self.action_space = spaces.MultiDiscrete([[0, 1]] * NUM_ACTIONS)
-        self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_height, self.screen_width, 3))
+        self.action_space = spaces.MultiDiscrete([2] * NUM_ACTIONS)
+        self.observation_space = spaces.Box(
+            low=0,
+            high=255,
+            shape=(self.screen_height, self.screen_width, 3),
+            dtype=np.uint8
+        )
         self.launch_vars = {}
         self.cmd_args = [
             '--xscale 1',

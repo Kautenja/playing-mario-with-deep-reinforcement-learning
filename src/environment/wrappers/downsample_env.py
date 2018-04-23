@@ -59,10 +59,11 @@ class DownsampleEnv(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(image_size[1], image_size[0], 1)
+            shape=(image_size[1], image_size[0], 1),
+            dtype=np.uint8
         )
 
-    def _observation(self, frame):
+    def observation(self, frame):
         # crop the image to the playable space
         frame = frame[self.y[0]:-self.y[1], self.x[0]:-self.x[1]]
         # convert the frame from RGB to gray scale
