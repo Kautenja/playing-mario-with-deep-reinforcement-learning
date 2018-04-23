@@ -89,7 +89,7 @@ figure implies an arbitrary $k$ value, but an $l$ value of $3$.}
 at each step allows agent hyperparameters to generalize across a broad range
 of reward spaces. They so by forcing each unique reward space $\mathcal{R}$
 to the same reward space $\mathcal{R}' = \{-1, 0, 1\}$. This is as simple as
-replacing a reward $r = sgn(r)$. We apply the same reward clipping in our
+replacing a reward $r \gets sgn(r)$. We apply the same reward clipping in our
 Atari and Super Mario Bros experiments.
 
 ## Experience Replay

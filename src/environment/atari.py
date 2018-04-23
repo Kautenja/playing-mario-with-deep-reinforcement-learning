@@ -8,6 +8,7 @@ from src.environment.wrappers import (
     MaxFrameskipEnv,
     NoopResetEnv,
     PenalizeDeathEnv,
+    RewardCacheEnv,
 )
 
 
@@ -40,6 +41,8 @@ def build_atari_environment(game_name: str,
     # make the initial environment
     if is_validation:
         env = gym.make('{}NoFrameskip-v10'.format(game_name))
+        r_cache = RewardCacheEnv(env)
+        env = r_cache
     else:
         env = gym.make('{}NoFrameskip-v4'.format(game_name))
     # apply the no op max feature if enabled
@@ -62,6 +65,9 @@ def build_atari_environment(game_name: str,
     # apply the back history of frames if the feature is enabled
     if agent_history_length is not None:
         env = FrameStackEnv(env, agent_history_length)
+
+    if is_validation:
+        return env, r_cache
 
     return env
 

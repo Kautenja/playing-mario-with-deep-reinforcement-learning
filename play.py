@@ -4,6 +4,7 @@
 """
 import os
 import sys
+import pandas as pd
 from gym.wrappers import Monitor
 from src.agents import DeepQAgent, A3CAgent
 from src.environment.atari import build_atari_environment
@@ -35,12 +36,18 @@ if not os.path.exists(weights_file):
 
 
 # build the environment
-env = build_atari_environment(game, is_validation=True)
-env = Monitor(env, '{}/monitor_play'.format(exp_directory), force=True)
+env, r_cache = build_atari_environment(game, is_validation=True)
+# env = Monitor(env, '{}/monitor_play'.format(exp_directory), force=True)
 # build the agent without any replay memory (not needed to play from model)
 agent = agents[agent_name](env, replay_memory_size=0)
 # load the weights
 agent.model.load_weights(weights_file)
 # play some games
-scores = agent.play()
-print(scores)
+agent.play()
+# collect the game scores
+scores = pd.Series(r_cache._rewards)
+scores.to_csv('{}/final_validation.csv'.format(exp_directory))
+# print some stats
+print('min ', scores.min())
+print('mean ', scores.mean())
+print('max ', scores.max())
