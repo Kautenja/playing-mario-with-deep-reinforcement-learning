@@ -13,17 +13,17 @@ class RewardCacheEnv(gym.Wrapper):
         Returns:
             None
         """
-        gym.Wrapper.__init__(self, env)
+        super().__init__(env)
         self._rewards = []
 
-    def _step(self, action):
+    def step(self, action):
         state, reward, done, info = self.env.step(action)
         if done:
             print(info['distance'])
             self._rewards.append(info['distance'])
         return state, reward, done, info
 
-    def _reset(self, **kwargs):
+    def reset(self, **kwargs):
         return self.env.reset(**kwargs)
 
 
