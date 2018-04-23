@@ -1,6 +1,6 @@
 """Usage:
 
-    python validate_random.py <game name> <results directory>
+    python play_random.py <game name> <results directory>
 """
 import os
 import sys
