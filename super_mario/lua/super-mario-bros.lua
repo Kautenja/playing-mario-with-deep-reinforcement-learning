@@ -6,7 +6,6 @@
 
 -- ** Parameters **
 -- target = "111";          -- World Number - Level Number - Area Number
--- mode = "algo";           -- algo, human
 -- draw_tiles = "1";
 -- meta = "0"               -- meta indicates multiple mission
 -- pipe_name = "abc";
@@ -21,7 +20,6 @@
 -- ===========================
 -- These parameters are expected to be generated and set in the temp file
 -- Default values
-mode = mode or "algo";
 draw_tiles = tonumber(draw_tiles) or 0;
 meta = tonumber(meta) or 0;
 pipe_name = pipe_name or "";
@@ -45,13 +43,13 @@ end;
 is_started = 0;             -- Indicates that the timer has started to decrease (i.e. commands can now be processed)
 is_finished = 0;            -- Indicates a life has been lost, world has changed, or finish line crossed
 last_time_left = 0;         -- Indicates the last time left (to check if timer has started to decrease)
-skip_frames = 2;            -- Process a frame every 2 frames (usually 60 fps, by not returning 50% of the frames, we get ~30fps)
+skip_frames = 1;            -- Process a frame every 2 frames (usually 60 fps, by not returning 50% of the frames, we get ~30fps)
 skip_screen = 0;            -- Does not send screen data to pipe (e.g. human mode)
 skip_data = 0;              -- Does not send data to pipe (e.g. human mode)
 skip_tiles = 0;             -- Does not send tiles to pipe (e.g. human mode)
 skip_commands = 0;          -- Do not read commands from pipe (e.g. human mode)
-start_delay = 100;          -- Number of frames to wait before pressing "start" to start level
-send_all_pixels = 702;      -- Return full screen (all pixels) every 700 frames
+start_delay = 175; --100;          -- Number of frames to wait before pressing "start" to start level
+send_all_pixels = 10000; -- 702;      -- Return full screen (all pixels) every 700 frames
 force_refresh = 0;          -- Forces to return full screen (all pixels and data) for this number of frames
 changing_level = 0;         -- Indicates level change in progress
 curr_x_position = 0;        -- Current x position
@@ -71,13 +69,13 @@ distances = {};
 distances["111"] = 3266;    -- 1-1
 distances["123"] = 3266;    -- 1-2
 distances["134"] = 2514;    -- 1-3
-distances["145"] = 2430;    -- 1-4    
+distances["145"] = 2430;    -- 1-4
 distances["211"] = 3298;    -- 2-1
 distances["223"] = 3266;    -- 2-2
 distances["234"] = 3682;    -- 2-3
-distances["245"] = 2430;    -- 2-4    
+distances["245"] = 2430;    -- 2-4
 distances["311"] = 3298;    -- 3-1
-distances["322"] = 3442;    -- 3-2    
+distances["322"] = 3442;    -- 3-2
 distances["333"] = 2498;    -- 3-3
 distances["344"] = 2430;    -- 3-4
 distances["411"] = 3698;    -- 4-1
@@ -100,26 +98,6 @@ distances["811"] = 6114;    -- 8-1
 distances["822"] = 3554;    -- 8-2
 distances["833"] = 3554;    -- 8-3
 distances["844"] = 4989;    -- 8-4
-
--- Setting mode
--- Human: Game is played manually by a human (no algo)
--- Algo (Default): Game is played by algo at high speed
-if mode == "human" then
-    emu.speedmode("normal");
-    skip_frames = 1;
-    skip_screen = 1;
-    skip_data = 1;
-    skip_tiles = 1;
-    skip_commands = 1;
-    start_delay = 125;
-
-else
-    -- algo
-    emu.speedmode("maximum");
-    skip_frames = 2;
-    start_delay = 175;
-    send_all_pixels = 1500;
-end;
 
 -- ===========================
 --         Memory Address
@@ -144,6 +122,9 @@ addr_enemy_y = 0xcf;
 addr_injury_timer = 0x079e;
 addr_swimming_flag = 0x0704;
 addr_tiles = 0x500;
+
+-- Emulator Speed
+emu.speedmode("maximum");
 
 -- ===========================
 --         Functions
@@ -306,15 +287,15 @@ function get_tile_type(box_x, box_y)
     local x = curr_x_position - left_x + box_x + 112;
     local y = box_y + 96;
     local page = math.floor(x / 256) % 2;
-    
+
     local sub_x = math.floor((x % 256) / 16);
     local sub_y = math.floor((y - 32) / 16);
     local curr_tile_addr = addr_tiles + page * 13 * 16 + sub_y * 16 + sub_x;
-    
+
     if (sub_y >= 13) or (sub_y < 0) then
       return 0;
     end;
-    
+
     -- 0 = empty space, 1 is not-empty (e.g. hard surface or object)
     if memory.readbyte(curr_tile_addr) ~= 0 then
       return 1;
@@ -378,7 +359,7 @@ function get_data()
     local curr_coins = get_coins();
     local curr_time = get_time();
     local curr_player_status = get_player_status();
-    
+
     -- Checking what values have changed
     if (framecount % send_all_pixels == 0) or (curr_x_position ~= data["distance"]) or (force_refresh > 0) then
         data["distance"] = curr_x_position;
@@ -415,7 +396,7 @@ function get_data()
         data_string = data_string .. "|is_finished:" .. is_finished;
         data_count = data_count + 1;
     end;
-    
+
     -- Removing leading "|" if data has changed, otherwise not returning anything
     if data_count > 0 then
         if is_finished == 1 then
@@ -465,91 +446,91 @@ end;
 -- Format: tiles_<frame_number>#<x(1 hex digits)><y (1 hex digits)><value (1 hex digits)>|...
 -- Value: 0 - Empty space, 1 - Object / Other, 2 - Enemy, 3 - Mario
 function get_tiles()
-    
-    -- Skipping if we do not need to draw tiles
-    if draw_tiles == 0 then
-        return;
-    end;
-    
-    local enemies = get_enemies();
-    local left_x = get_left_x_position();
-    local y_viewport = get_y_viewport();
-    local framecount = emu.framecount();
-    
-    -- Outside box (80 x 65 px)
-    -- Will contain a matrix of 16x13 sub-boxes of 5x5 pixels each
-    gui.box(
-        50 - 5 * 7 - 2,
-        70 - 5 * 7 - 2,
-        50 + 5 * 8 + 3,
-        70 + 5 * 5 + 3,
-        0,
-        "P30"
-    );       -- P30 = White (NES Palette 30 color)
-  
-    -- Calculating tile types
-    for box_y = -4*16,8*16,16 do
-        local tile_string = "";
-        local data_count = 0;
-        for box_x = -7*16,8*16,16 do
-      
-            -- 0 = Empty space
-            local tile_value = 0;
-            local color = 0;
-            local fill = 0;
-      
-            -- +1 = Not-Empty space (e.g. hard surface, object)
-            local curr_tile_type = get_tile_type(box_x, box_y);
-            if (curr_tile_type == 1) and (curr_y_position + box_y < 0x1B0) then
-                tile_value = 1;
-                color = "P30"; -- White (NES Palette 30 color)
-            end;
-      
-            -- +2 = Enemies
-            for i = 1,#enemies do
-                local dist_x = math.abs(enemies[i]["x"] - (curr_x_position + box_x - left_x + 108));
-                local dist_y = math.abs(enemies[i]["y"] - (90 + box_y));
-                if (dist_x <= 8) and (dist_y <= 8) then
-                    tile_value = 2;
-                    color = "P27"; -- Orange (NES Palette 27 color)
-                    fill = "P3F"; -- Black (NES Palette 3F color);
-                end;
-            end;
-            
-            -- +3 = Mario
-            local dist_x = math.abs(curr_x_position - (curr_x_position + box_x - left_x + 108));
-            local dist_y = math.abs(curr_y_position - (80 + box_y));
-            if (y_viewport == 1) and (dist_x <= 8) and (dist_y <= 8) then
-                tile_value = 3;
-                color = "P05"; -- Red (NES Palette 05 color)
-                fill = color;
-            end;
-            
-            -- Drawing tile
-            local tile_x = 50 + 5 * (box_x / 16);
-            local tile_y = 55 + 5 * (box_y / 16);
-            
-            if (tile_value ~= 0) then
-                gui.box(tile_x - 2, tile_y - 2, tile_x + 2, tile_y + 2, fill, color);
-            end;
-            
-            -- Storing value only on processed frames
-            -- Only sending values for processed frames if skip_tiles is 0
-            -- Skipped frames (where commands are not processed) have box drawn, but no values sent
-            if (framecount % skip_frames == 0) and (skip_tiles == 0) then
-                -- Only returning value if tile value has changed (or full refresh needed)
-                if (framecount % send_all_pixels == 0) or (tile_value ~= tiles[(box_x / 16) + 7][(box_y / 16) + 4]) or (force_refresh > 0) then
-                    tiles[(box_x / 16) + 7][(box_y / 16) + 4] = tile_value;
-                    --noinspection StringConcatenationInLoops
-                    tile_string = tile_string .. "|" .. string.format("%01x%01x%01x", (box_x / 16) + 7, (box_y / 16) + 4, tile_value);
-                    data_count = data_count + 1;
-                end;
-            end;
-        end;
-        if data_count > 0 then
-            write_to_pipe("tiles_" .. framecount .. "#" .. string.sub(tile_string, 2, -1));
-        end;
-    end;
+
+    -- -- Skipping if we do not need to draw tiles
+    -- if draw_tiles == 0 then
+    --     return;
+    -- end;
+
+    -- local enemies = get_enemies();
+    -- local left_x = get_left_x_position();
+    -- local y_viewport = get_y_viewport();
+    -- local framecount = emu.framecount();
+
+    -- -- Outside box (80 x 65 px)
+    -- -- Will contain a matrix of 16x13 sub-boxes of 5x5 pixels each
+    -- gui.box(
+    --     50 - 5 * 7 - 2,
+    --     70 - 5 * 7 - 2,
+    --     50 + 5 * 8 + 3,
+    --     70 + 5 * 5 + 3,
+    --     0,
+    --     "P30"
+    -- );       -- P30 = White (NES Palette 30 color)
+
+    -- -- Calculating tile types
+    -- for box_y = -4*16,8*16,16 do
+    --     local tile_string = "";
+    --     local data_count = 0;
+    --     for box_x = -7*16,8*16,16 do
+
+    --         -- 0 = Empty space
+    --         local tile_value = 0;
+    --         local color = 0;
+    --         local fill = 0;
+
+    --         -- +1 = Not-Empty space (e.g. hard surface, object)
+    --         local curr_tile_type = get_tile_type(box_x, box_y);
+    --         if (curr_tile_type == 1) and (curr_y_position + box_y < 0x1B0) then
+    --             tile_value = 1;
+    --             color = "P30"; -- White (NES Palette 30 color)
+    --         end;
+
+    --         -- +2 = Enemies
+    --         for i = 1,#enemies do
+    --             local dist_x = math.abs(enemies[i]["x"] - (curr_x_position + box_x - left_x + 108));
+    --             local dist_y = math.abs(enemies[i]["y"] - (90 + box_y));
+    --             if (dist_x <= 8) and (dist_y <= 8) then
+    --                 tile_value = 2;
+    --                 color = "P27"; -- Orange (NES Palette 27 color)
+    --                 fill = "P3F"; -- Black (NES Palette 3F color);
+    --             end;
+    --         end;
+
+    --         -- +3 = Mario
+    --         local dist_x = math.abs(curr_x_position - (curr_x_position + box_x - left_x + 108));
+    --         local dist_y = math.abs(curr_y_position - (80 + box_y));
+    --         if (y_viewport == 1) and (dist_x <= 8) and (dist_y <= 8) then
+    --             tile_value = 3;
+    --             color = "P05"; -- Red (NES Palette 05 color)
+    --             fill = color;
+    --         end;
+
+    --         -- Drawing tile
+    --         local tile_x = 50 + 5 * (box_x / 16);
+    --         local tile_y = 55 + 5 * (box_y / 16);
+
+    --         if (tile_value ~= 0) then
+    --             gui.box(tile_x - 2, tile_y - 2, tile_x + 2, tile_y + 2, fill, color);
+    --         end;
+
+    --         -- Storing value only on processed frames
+    --         -- Only sending values for processed frames if skip_tiles is 0
+    --         -- Skipped frames (where commands are not processed) have box drawn, but no values sent
+    --         if (framecount % skip_frames == 0) and (skip_tiles == 0) then
+    --             -- Only returning value if tile value has changed (or full refresh needed)
+    --             if (framecount % send_all_pixels == 0) or (tile_value ~= tiles[(box_x / 16) + 7][(box_y / 16) + 4]) or (force_refresh > 0) then
+    --                 tiles[(box_x / 16) + 7][(box_y / 16) + 4] = tile_value;
+    --                 --noinspection StringConcatenationInLoops
+    --                 tile_string = tile_string .. "|" .. string.format("%01x%01x%01x", (box_x / 16) + 7, (box_y / 16) + 4, tile_value);
+    --                 data_count = data_count + 1;
+    --             end;
+    --         end;
+    --     end;
+    --     if data_count > 0 then
+    --         write_to_pipe("tiles_" .. framecount .. "#" .. string.sub(tile_string, 2, -1));
+    --     end;
+    -- end;
     return;
 end;
 
@@ -628,7 +609,7 @@ function read_commands()
     if not pipe_in then
         return;
     end;
-    
+
     -- Waiting for proper line
     local is_received = 0;
     local line = "";
@@ -715,7 +696,7 @@ end;
 -- pipes (mkfifo) are created by python script
 function open_pipes()
     local _;
-    if pipe_name ~= "" and mode ~= "human" then
+    if pipe_name ~= "" then
         pipe_out, _, _ = io.open(pipe_prefix .. "-in." .. pipe_name, "w");
         pipe_in, _, _ = io.open(pipe_prefix .. "-out." .. pipe_name, "r");
     end;
@@ -788,14 +769,14 @@ emu.registerexit(exit_hook);
 --     end;
 -- end;
 -- memory.registerwrite(addr_life, hook_set_life);
--- 
+--
 -- function hook_set_invincibility()
 --     if memory.readbyte(addr_injury_timer) ~= 0x08 then
 --         memory.writebyte(addr_injury_timer, 0x08);
 --     end;
 -- end;
 -- memory.registerwrite(addr_injury_timer, hook_set_invincibility);
--- 
+--
 -- function hook_set_swimmer()
 --     if memory.readbyte(addr_swimming_flag) ~= 0x01 then
 --         memory.writebyte(addr_swimming_flag, 0x01);
@@ -834,13 +815,6 @@ function main_loop()
     -- Game not yet started, just skipping frame
     elseif 0 == is_started then
         emu.frameadvance();
-
-    -- Human mode
-    elseif 'human' == mode then
-        emu.frameadvance();
-        update_positions();
-        show_curr_distance();
-        get_tiles();
 
     -- Processed frame, getting commands (sync mode), sending back screen
     elseif framecount % skip_frames == 0 then
