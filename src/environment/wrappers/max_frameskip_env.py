@@ -46,12 +46,6 @@ class MaxFrameskipEnv(gym.Wrapper):
 
         return max_frame, total_reward, done, info
 
-    def reset(self):
-        return self.env.reset()
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
-
 
 # explicitly define the outward facing API of this module
 __all__ = [MaxFrameskipEnv.__name__]

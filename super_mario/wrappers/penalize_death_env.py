@@ -1,4 +1,4 @@
-"""A gym wrapper for penalizing deaths."""
+"""A gym wrapper for penalizing deaths in SuperMarioBros."""
 import gym
 
 
@@ -17,16 +17,14 @@ class PenalizeDeathEnv(gym.Wrapper):
             None
 
         """
-        gym.Wrapper.__init__(self, env)
+        super().__init__(env)
         self.lives = 0
         self.penalty = penalty
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        lives = self.env.unwrapped.ale.lives()
-        # check if its less than the last step, i.e. a death occurred. and
-        # set the reward to the penalty if so
-        # TODO: should `lives > 0` be constrained?
+        lives = info['life']
+        # check if its less than the last step, i.e. a death occurred.
         reward = self.penalty if lives < self.lives else reward
         self.lives = lives
 
@@ -35,7 +33,7 @@ class PenalizeDeathEnv(gym.Wrapper):
     def reset(self):
         obs = self.env.reset()
         # reset the lives counter
-        self.lives = self.env.unwrapped.ale.lives()
+        self.lives = 0
         return obs
 
 
