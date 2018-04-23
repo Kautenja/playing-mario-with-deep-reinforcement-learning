@@ -17,12 +17,12 @@ _Deep-Q Learning_ outperformed human competency on game like **Breakout**,
 \cite{human-level-control-through-deep-rl} published an updated version of
 the original work from \cite{play-atari-with-deep-rl} featuring an
 improvement to the \ac{DQN}. They introduce a second \ac{DQN} for
-establishing target values in the $Q$-learning action replay phase. In doing
-so, the agent follows a more stable learning pattern, overestimating the
-value of fewer states. \cite{double-q-learning} studied this
-_Double Deep-$Q$ Learning_ method to validate its efficacy. They showed that
-the tweak allowed the algorithm to outperform the original on each of:
-**Breakout** **Pong**, **Enduro**, **Space Invaders**, and **Seaquest**.
+establishing target values in the $Q$-learning replay phase. In doing so, the
+agent follows a more stable learning pattern, overestimating the value of
+fewer states. \cite{double-q-learning} studied this _Double Deep-$Q$ Learning_
+method to validate its efficacy. They showed that the tweak allowed the
+algorithm to outperform the original on each of: **Breakout** **Pong**,
+**Enduro**, **Space Invaders**, and **Seaquest**.
 
 \cite{dueling-deep-q} defined a new \ac{DQN} model, the _\ac{DDQN}_. The
 novelty of this model lies in its inherent ability to estimate a scalar value
@@ -37,13 +37,14 @@ each of: **Breakout** **Pong**, **Enduro**, **Space Invaders**, and
 **Seaquest**.
 
 \cite{deep-neuroevolution-genetic-algorithms-are-a-competitive-alternative}
-demonstrated that a distributed genetic optimizer will converge on more
+demonstrated that a distributed genetic optimizer will converge to more
 optimal $\theta$ for a \ac{DQN} than the standard gradient-based approach on
 most Atari 2600 tasks. By decoupling the GPU dependency and distributing the
-search for $\theta$, they found state of the art agents in as few as $10$
-minutes. Interestingly, they showed that random search outperformed the
-gradient-based approach in a few cases. They noted the ability of their agent
-to learn complex games like **Seaquest** that Deep-$Q$ methods struggle with.
+search for $\theta$ across many nodes, they found state of the art agents in
+as few as $10$ minutes. Interestingly, they showed that random search
+outperformed the gradient-based approach in a few cases. They noted the
+ability of their agent to learn complex games like **Seaquest** that Deep-$Q$
+methods struggle with.
 
 ## Engineering Support
 
@@ -57,7 +58,7 @@ simple, but powerful API for designing reinforcement agents in Python entitled
 _Open.ai Gym_. \cite{openai-baselines} used Open.ai Gym as a framework to
 recreate baselines of reinforcement learning papers. They provided extensions
 to the default environments in Open.ai Gym to model environments used in
-research papers. \cite{ppaquette} extended Open.ai Gym with an emulator for
+academic research. \cite{ppaquette} extended Open.ai Gym with an emulator for
 playing \ac{NES} games. Namely, this framework provides an interface to the
 classic \ac{NES} game, \ac{SMB}. It interacts with an instance of the
 \ac{NES} emulator, \cite{fceux}, via a client-server pattern. It is worth
@@ -68,7 +69,7 @@ compared to games in \ac{ALE}.
 
 \cite{keras} designed Keras, a high level interface to deep learning
 back-ends in Python. This framework enables the fast construction of
-computational graphs. And, it generalizes across popular back-ends including
+computational graphs. It generalizes across popular back-ends including
 Theano, TensorFlow, and CNTK. Our study applies the TensorFlow back-end.
 \cite{OhioSupercomputerCenter1987} constructed an array of $160$ GPU nodes,
 each bearing an nVidia P100 GPU, 28 core Intel Xeon CPU, and 132GB of RAM.

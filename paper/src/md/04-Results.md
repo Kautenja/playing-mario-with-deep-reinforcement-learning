@@ -5,8 +5,8 @@ Deep-$Q$ Network. We use the hyperparameters in Table
 \ref{tab:hyperparameters}. Because of issues with the \ac{NES} emulator
 crashing during training, we were unable to keep track of the number of
 training frames $T$ and performance metrics such as the loss and reward of
-each training episode. We can however, validate an untrained and trained
-agent to confirm learning.
+each training episode. We can, however, validate both an untrained agent
+and a fully trained one to confirm learning.
 
 ## Atari
 
@@ -20,8 +20,8 @@ higher rewards than the initial state (randomness).
 
 Table: Validation results of Double \ac{DDQN} before and after training to
 play games for $1e7$ frames on Atari benchmarks. It is worth noting that these
-values represent _clipped_ rewards, and as such do not compare well to the
-previous works of others. \label{tab:atari-results}
+values represent _clipped_ rewards and do not compare well to the
+contemporary Deep-RL literature. \label{tab:atari-results}
 
 |         |   Breakout |   Enduro |     Pong |   Seaquest |   SpaceInvaders |
 |:--------|-----------:|---------:|---------:|-----------:|----------------:|
@@ -34,9 +34,9 @@ Fig. \ref{fig:train-Pong} describes the per-episode loss and reward
 (cumulative) seen by the agent. The loss increases as the agent begins to
 explore and locate the optimal policy. Once the policy is found, the loss
 converges over $\approx 500$ episodes resulting in an agent with master
-competency. Although this learning curve suggest that Double \ac{DDQN}
+competency. Although this learning curve suggests that Double \ac{DDQN}
 produces a clean learning signal, games with complicated reward schemes or
-noisy inputs result in a far noisier output signal.
+noisy inputs result in a more erratic output signal.
 
 \begin{figure}[!ht]
 \centering
@@ -58,6 +58,6 @@ more training time or potentially a network with larger capacity to better
 fit the space. We note the complexity of the reward scheme in Super Mario
 Bros. as a potential future research direction. Without a strong and
 effective reward signal, the agent cannot competently learn the correct task.
-We simply reward agents for moving right and penalize them for moving left or
-dying. Future work can explore rewarding the agent for killing enemies or
+We simply reward the agent for moving right and penalize it for moving left
+or dying. Future work can explore rewarding the agent for killing enemies or
 collecting coins and penalizing the agent for losing time on the clock.
