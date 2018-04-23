@@ -40,9 +40,10 @@ def build_nes_environment(game_name: str,
     """
     # make the initial environment
     env = gym.make('{}-v0'.format(game_name))
+    # convert the action space to a discrete action space
     env = ToDiscreteActionSpaceEnv(env)
-    r_cache = RewardCacheEnv(env)
-    env = r_cache
+    # add a reward cache for scoring episodes
+    env = RewardCacheEnv(env)
     # apply the frame skip feature if enabled
     if skip_frames is not None:
         env = MaxFrameskipEnv(env, skip=skip_frames)
@@ -59,7 +60,7 @@ def build_nes_environment(game_name: str,
     if agent_history_length is not None:
         env = FrameStackEnv(env, agent_history_length)
 
-    return env, r_cache
+    return env
 
 
 # explicitly specify the outward facing API of this module
