@@ -21,6 +21,7 @@ now = datetime.today().strftime('%Y-%m-%d_%H-%M')
 output_dir = '{}/{}/{}'.format(output_dir, game_name, now)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+print('writing results to {}'.format(repr(output_dir)))
 
 
 # load these after command line arg checking bc tensorflow is slow to load
