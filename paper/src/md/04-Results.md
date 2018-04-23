@@ -10,18 +10,17 @@ and a fully trained one to confirm learning.
 
 ## Atari
 
-Our agent performs modestly on the Atari benchmark. Training for $1e7$ frames
-on the \cite{OhioSupercomputerCenter1987} consumed $\approx 15$ hours per
-game and produced the results in Table \ref{tab:atari-results}. We mistakenly
-recorded the _clipped_ reward value instead of the _in-game score_, resulting
-in poor comparisons to the other Deep-RL literature. However, the results
-confirm that the algorithm converges to a nearly optimal policy achieving
-higher rewards than the initial state (randomness).
+Our agent performs modestly on the Atari benchmark. Training for $T = 1e7$
+frames on the \cite{OhioSupercomputerCenter1987} consumed $\approx 15$ hours
+per game and produced the results in Table \ref{tab:atari-results}. In only
+$\frac{1}{5}$ as many training frames, the Double \ac{DDQN} outperforms
+vanilla \ac{DQN} on **Pong**, **Enduro**, and **Seaquest**. However, it fails
+to compete on the **Breakout** and **SpaceInvaders** tasks.
 
-Table: Validation results of Double \ac{DDQN} before and after training to
-play games for $1e7$ frames on Atari benchmarks. It is worth noting that these
-values represent _clipped_ rewards and do not compare well to the
-contemporary Deep-RL literature. \label{tab:atari-results}
+Table: Mean score of Double \ac{DDQN} agent on $v = 100$ episodes before and
+after training for $T = 1e7$ frames on Atari benchmarks. It is worth noting
+that these values represent in-game scores, not rewards seen by the agent.
+\label{tab:atari-results}
 
 |         |   Breakout |   Enduro |     Pong |   Seaquest |   Space Invaders |
 |:--------|-----------:|---------:|---------:|-----------:|-----------------:|
