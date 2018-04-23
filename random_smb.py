@@ -19,5 +19,6 @@ for game in tqdm(range(100)):
         env.render()
     scores.append(score)
 
+
 scores = pd.Series(r_cache._rewards)
 scores.to_csv('results/SMB_random.csv')
