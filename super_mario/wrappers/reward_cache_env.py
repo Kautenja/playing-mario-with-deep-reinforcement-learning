@@ -19,7 +19,6 @@ class RewardCacheEnv(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
         if done:
-            print(info['distance'])
             self._rewards.append(info['distance'])
         return state, reward, done, info
 
