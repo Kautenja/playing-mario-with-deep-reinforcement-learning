@@ -1,7 +1,7 @@
 \documentclass{beamer}
 \usepackage{
     graphicx, float, caption,
-    amsmath,
+    amsmath, longtable, booktabs,
     textpos, blindtext, scrextend,
     apacite
 }
@@ -129,7 +129,51 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 
 
 \begin{frame}{Results}
-TODO
+\begin{minipage}[t]{\textwidth}
+    \begin{minipage}{0.3\textwidth}
+    \begin{figure}
+    \includegraphics[height=0.35\textheight]{img/Breakout}
+    \caption*{Breakout}
+    \end{figure}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.3\textwidth}
+    \begin{figure}
+    \includegraphics[height=0.35\textheight]{img/Pong}
+    \caption*{Pong}
+    \end{figure}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.3\textwidth}
+    \begin{figure}
+    \includegraphics[height=0.35\textheight]{img/Seaquest}
+    \caption*{Seaquest}
+    \end{figure}
+    \end{minipage}
+\end{minipage}
+
+\begin{minipage}[t]{\textwidth}
+\framesubtitle{Atari}
+\begin{center}
+ \begin{tabular}{||c c c c c c||}
+ \hline
+ & Breakout & Enduro & Pong & Seaquest & Space Invaders \\ [0.5ex]
+ \hline\hline
+ DDDQN & 363 & \textbf{330} & \textbf{19.7} & \textbf{8015} & 999 \\
+ \hline
+ DQN & \textbf{401} & 301 & 18.9 & 5286 & \textbf{1976} \\
+ \hline
+ Random & 1 & 0 & -21 & 103 & 138 \\
+ \hline
+\end{tabular}
+\end{center}
+\end{minipage}
+\end{frame}
+
+
+
+\begin{frame}{Results}
+\framesubtitle{Super Mario Bros}
 \end{frame}
 
 \begin{frame}{Demo}

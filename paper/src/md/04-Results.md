@@ -17,16 +17,16 @@ $\frac{1}{5}$ as many training frames, the Double \ac{DDQN} outperforms
 vanilla \ac{DQN} on **Pong**, **Enduro**, and **Seaquest**. However, it fails
 to compete on the **Breakout** and **SpaceInvaders** tasks.
 
-Table: Mean score of Double \ac{DDQN} agent on $v = 100$ episodes before and
-after training for $T = 1e7$ frames on Atari benchmarks. It is worth noting
-that these values represent in-game scores, not rewards seen by the agent.
+Table: Mean score of \ac{DQN}, Double \ac{DDQN}, random agents on $v = 100$
+episodes after training. It is worth noting that these values represent
+in-game scores, not rewards seen by the agent.
 \label{tab:atari-results}
 
 |          |   Breakout |   Enduro |     Pong |   Seaquest |   Space Invaders |
 |:---------|-----------:|---------:|---------:|-----------:|-----------------:|
-| Random   |          1 |    0     | -21      |        103 |              138 |
 | DDDQN    |        363 |  **330** | **19.7** |   **8015** |              999 |
-| \ac{DQN} |    **401** |      301 |     18.9 |       5286 |         **1976** |
+| DQN      |    **401** |      301 |     18.9 |       5286 |         **1976** |
+| Random   |          1 |    0     | -21      |        103 |              138 |
 
 ### Pong
 
