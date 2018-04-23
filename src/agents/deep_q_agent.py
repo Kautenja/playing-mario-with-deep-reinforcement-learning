@@ -2,7 +2,6 @@
 import numpy as np
 from typing import Callable
 from tqdm import tqdm
-from pygame.time import Clock
 from keras.optimizers import Adam
 from src.models import build_deep_q_model
 from src.models import build_dueling_deep_q_model
@@ -276,33 +275,25 @@ class DeepQAgent(Agent):
 
             # pass the score to the callback at the end of the episode
             if callable(callback):
-                callback(score, loss)
+                callback(self, score, loss)
             # update the progress bar
             progress.set_postfix(score=score, loss=loss)
             progress.update(frames)
 
         progress.close()
 
-    def play(self,
-        games: int=100,
-        exploration_rate: float=0.05,
-        fps: int=None
-    ) -> np.ndarray:
+    def play(self, games: int=100, exploration_rate: float=0.05) -> np.ndarray:
         """
         Run the agent without training for a number of games.
 
         Args:
             games: the number of games to play
             exploration_rate: the epsilon for epsilon greedy exploration
-            fps: the frame-rate to limit game play to
-                - if None, the frame-rate will not be limited (i.e infinite)
 
         Returns:
             an array of scores, one for each game
 
         """
-        # initialize a clock to keep the frame-rate bounded
-        clock = Clock()
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
@@ -320,9 +311,6 @@ class DeepQAgent(Agent):
                 score += reward
                 # set the state to the new state
                 state = next_state
-                # bound the frame rate if there is an fps provided
-                if fps is not None:
-                    clock.tick(fps)
             # push the score onto the history
             scores[game] = score
 
@@ -330,4 +318,4 @@ class DeepQAgent(Agent):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['DeepQAgent']
+__all__ = [DeepQAgent.__name__]
