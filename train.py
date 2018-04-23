@@ -7,14 +7,14 @@ import sys
 import datetime
 import pandas as pd
 from src.util import BaseCallback
-from src.agents import DeepQAgent, A3CAgent
+from src.agents import RandomAgent, DeepQAgent
 from src.environment.atari import build_atari_environment
 
 
 # a mapping of string names to agents
 agents = {
+    RandomAgent.__name__: RandomAgent,
     DeepQAgent.__name__: DeepQAgent,
-    A3CAgent.__name__: A3CAgent,
 }
 
 
