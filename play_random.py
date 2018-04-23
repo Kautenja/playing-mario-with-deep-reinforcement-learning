@@ -24,6 +24,7 @@ if not os.path.exists(output_dir):
 
 
 # load these after command line arg checking bc tensorflow is slow to load
+# and generates some warning output
 from src.environment.atari import build_atari_environment
 from src.environment.nes import build_nes_environment
 from src.agents import RandomAgent
@@ -31,10 +32,10 @@ from src.agents import RandomAgent
 
 # check if we need to load the NES environment
 if 'SuperMarioBros' in game_name:
-    env, r_cache = build_nes_environment(game_name)
+    env = build_nes_environment(game_name)
 # default to the Atari environment
 else:
-    env, r_cache = build_atari_environment(game_name, is_validation=True)
+    env = build_atari_environment(game_name, is_validation=True)
 # wrap the environment with a monitor
 env = Monitor(env, '{}/monitor'.format(output_dir), force=True)
 
@@ -45,5 +46,5 @@ agent.play(games=3)
 
 
 # save the scores from the validation games in the output directory
-scores = pd.Series(r_cache._rewards)
+scores = pd.Series(env.unwrapped.episode_rewards)
 scores.to_csv('{}/final_scores.csv'.format(output_dir))
