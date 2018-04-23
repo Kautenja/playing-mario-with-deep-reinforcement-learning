@@ -22,10 +22,11 @@ after training for $T = 1e7$ frames on Atari benchmarks. It is worth noting
 that these values represent in-game scores, not rewards seen by the agent.
 \label{tab:atari-results}
 
-|         |   Breakout |   Enduro |     Pong |   Seaquest |   Space Invaders |
-|:--------|-----------:|---------:|---------:|-----------:|-----------------:|
-| Random  |     1.0202 |    0     | -21      |     103.03 |          138.838 |
-| Trained |   363.808  |  330.667 |  19.7475 |    8015.96 |          999.848 |
+|          |   Breakout |   Enduro |     Pong |   Seaquest |   Space Invaders |
+|:---------|-----------:|---------:|---------:|-----------:|-----------------:|
+| Random   |          1 |    0     | -21      |        103 |              138 |
+| DDDQN    |        363 |  **330** | **19.7** |   **8015** |              999 |
+| \ac{DQN} |    **401** |      301 |     18.9 |       5286 |         **1976** |
 
 ### Pong
 
