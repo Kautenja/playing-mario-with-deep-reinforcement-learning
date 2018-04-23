@@ -18,7 +18,8 @@ def build_nes_environment(game_name: str,
     image_size: tuple=(84, 84),
     death_penalty: int=-1,
     clip_rewards: bool=True,
-    agent_history_length: int=4
+    skip_frames: int=None,
+    agent_history_length: int=4,
 ):
     """
     Build and return a configured NES environment.
@@ -43,8 +44,8 @@ def build_nes_environment(game_name: str,
     r_cache = RewardCacheEnv(env)
     env = r_cache
     # apply the frame skip feature if enabled
-    # if skip_frames is not None:
-    #     env = MaxFrameskipEnv(env, skip=skip_frames)
+    if skip_frames is not None:
+        env = MaxFrameskipEnv(env, skip=skip_frames)
     # apply a down-sampler for the given game
     downsampler = DownsampleEnv.metadata[game_name.split('-')[0]]
     env = DownsampleEnv(env, image_size, **downsampler)
