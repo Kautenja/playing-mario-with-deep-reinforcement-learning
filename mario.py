@@ -43,7 +43,7 @@ print(env.observation_space.shape)
 
 from src.base import AnnealingVariable
 agent = agents[agent_name](env, render_mode=render_mode,
-        exploration_rate=AnnealingVariable(0.1, 0.1, 1)
+        exploration_rate=AnnealingVariable(0.10001, 0.1, 1)
     )
 agent.model.load_weights('weights.h5')
 agent.target_model.load_weights('weights.h5')
