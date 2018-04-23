@@ -5,7 +5,7 @@ from gym.wrappers import Monitor
 from src.environment.nes import build_nes_environment
 
 
-env = build_nes_environment('SuperMarioBros-1-1')
+env, r_cache = build_nes_environment('SuperMarioBros-1-1')
 env.configure(lock=Lock())
 
 
@@ -21,5 +21,5 @@ for game in tqdm(range(100)):
         env.render()
     scores.append(score)
 
-scores = pd.Series(scores)
+scores = pd.Series(r_cache._rewards)
 scores.to_csv('results/SMB_random.csv')

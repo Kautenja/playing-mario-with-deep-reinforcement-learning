@@ -36,7 +36,7 @@ if not os.path.exists(plot_dir):
     os.makedirs(plot_dir)
 
 
-env = build_nes_environment(game_name)
+env, r_cache = build_nes_environment(game_name)
 env.configure(lock=Lock())
 env = Monitor(env, '{}/monitor'.format(exp_directory), force=True)
 print(env.observation_space.shape)
@@ -64,21 +64,21 @@ with open('{}/agent.py'.format(exp_directory), 'w') as agent_file:
 # agent.observe()
 
 
-callback = BaseCallback()
-agent.train(callback=callback, frames_to_play=2500000)
+# callback = BaseCallback()
+# agent.train(callback=callback, frames_to_play=2500000)
 
 
-# save the training results
-scores = pd.Series(callback.scores)
-scores.to_csv('{}/scores.csv'.format(exp_directory))
-losses = pd.Series(callback.losses)
-losses.to_csv('{}/losses.csv'.format(exp_directory))
+# # save the training results
+# scores = pd.Series(callback.scores)
+# scores.to_csv('{}/scores.csv'.format(exp_directory))
+# losses = pd.Series(callback.losses)
+# losses.to_csv('{}/losses.csv'.format(exp_directory))
 
 
-final = agent.play(games=5)
-final = pd.Series(final)
+agent.play(games=100)
+final = pd.Series(r_cache._rewards)
 final.to_csv('{}/final.csv'.format(exp_directory))
 print(final.describe())
 
 
-agent.model.save_weights('{}/weights.h5'.format(exp_directory), overwrite=True)
+# agent.model.save_weights('{}/weights.h5'.format(exp_directory), overwrite=True)
