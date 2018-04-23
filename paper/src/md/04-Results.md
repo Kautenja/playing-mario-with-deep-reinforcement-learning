@@ -62,13 +62,12 @@ We were unable to collect data to visualize the learning process for Super
 Mario Bros. on a per episode basis. However, we present the validation scores
 of the agent compared to randomness in Table. \ref{tab:smb-results}. Although
 the DDDQN outperforms the random agent, it still performs relatively poorly,
-making it to the end of the level 0 times. Because Super Mario Bros is
-arguably more complex than all of the Atari 2600 games, it's fair to assume
-that it should need more training time or potentially a network with larger
-capacity to better fit the space. We note the complexity of the reward scheme
-in Super Mario Bros. as a potential future research direction. Without a
-strong and effective reward signal, the agent cannot competently learn the
-correct task. We simply reward the agent for moving right and penalize it for
-moving left or dying. Future work can explore rewarding the agent for killing
-enemies or collecting coins and penalizing the agent for losing time on the
-clock.
+completing the level 0 times. Because Super Mario Bros is arguably more
+complex than all of the Atari 2600 games, it's fair to assume that it should
+need more training time or potentially a network with larger capacity to
+better fit the space. We note the complexity of the reward scheme in Super
+Mario Bros. as a potential future research direction. Without a strong and
+effective reward signal, the agent cannot competently learn the correct task.
+We simply reward the agent for moving right and penalize it for moving left
+or dying. Future work can explore rewarding the agent for killing enemies or
+collecting coins and penalizing the agent for losing time on the clock.
