@@ -41,10 +41,7 @@ end;
 is_started = 0;             -- Indicates that the timer has started to decrease (i.e. commands can now be processed)
 is_finished = 0;            -- Indicates a life has been lost, world has changed, or finish line crossed
 last_time_left = 0;         -- Indicates the last time left (to check if timer has started to decrease)
-skip_frames = 1;            -- Process a frame every 2 frames (usually 60 fps, by not returning 50% of the frames, we get ~30fps)
-skip_data = 0;              -- Does not send data to pipe (e.g. human mode)
-skip_tiles = 0;             -- Does not send tiles to pipe (e.g. human mode)
-skip_commands = 0;          -- Do not read commands from pipe (e.g. human mode)
+skip_frames = 1;            -- Process a frame every k frames
 start_delay = 175; --100;          -- Number of frames to wait before pressing "start" to start level
 send_all_pixels = 10000; -- 702;      -- Return full screen (all pixels) every 700 frames
 force_refresh = 0;          -- Forces to return full screen (all pixels and data) for this number of frames
@@ -342,11 +339,6 @@ end;
 -- Only returning values that have changed since last update
 -- Format: data_<frame_number>#name_1:value_1|name_2:value_2|name_3:value_3
 function get_data()
-
-    -- Skipping data is skip_data is set
-    if skip_data == 1 then
-        return;
-    end;
 
     local framecount = emu.framecount();
     local data_count = 0;
