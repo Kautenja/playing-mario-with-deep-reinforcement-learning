@@ -14,12 +14,12 @@ class RewardCacheEnv(gym.Wrapper):
             None
         """
         super().__init__(env)
-        self._rewards = []
+        self.env.unwrapped.episode_rewards = []
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)
         if done:
-            self._rewards.append(info['distance'])
+            self.env.unwrapped.episode_rewards.append(info['distance'])
         return state, reward, done, info
 
     def reset(self, **kwargs):
