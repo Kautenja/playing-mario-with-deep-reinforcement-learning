@@ -49,8 +49,8 @@ around episode 2000.}
 
 ## Super Mario Bros.
 
-Table: Statistics from the Random and DDDQN agent respectively. The statistics
-describe Mario's terminal $x$ position among $v = 100$ validation games.
+Table: Statistics from the Random and DDDQN agent. The metrics describe
+Mario's terminal $x$ position among $v = 100$ validation games.
 \label{tab:smb-results}
 
 |         |     Min |    Mean |      Max |
