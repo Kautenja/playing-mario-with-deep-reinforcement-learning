@@ -48,6 +48,13 @@ around episode 2000.}
 
 ## Super Mario Bros.
 
+Table:
+
+|         |  Min | Mean |  Max |
+|:--------|-----:|-----:|-----:|
+| Random  |    ? |    ? |    ? |
+| Trained |   45 |   64 |  272 |
+
 We were unable to collect data to visualize the learning process for Super
 Mario Bros. on a per episode basis. However, we note that a random agent
 produces mean validation score $TODO$, while a trained agent produces a
