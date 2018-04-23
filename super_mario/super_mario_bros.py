@@ -10,10 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 # (world_number, level_number, area_number, max_distance)
-WORLD_NUMBER = 0
-LEVEL_NUMBER = 1
-AREA_NUMBER = 2
-MAX_DISTANCE = 3
 SMB_LEVELS = [
     (1, 1, 1, 3266), (1, 2, 2, 3266), (1, 3, 4, 2514), (1, 4, 5, 2430),
     (2, 1, 1, 3298), (2, 2, 2, 3266), (2, 3, 4, 3682), (2, 4, 5, 2430),
@@ -26,7 +22,31 @@ SMB_LEVELS = [
 ]
 
 
+def encode_level(level: int) -> str:
+    """
+    Encode a level integer into the FCEUX opcode.
+
+    Args:
+        level: the level as a integer to decode
+
+    Returns:
+        a string of 3 integers:
+        - world_number
+        - level_number
+        - area_number
+
+    """
+    world_number = int(level / 4) + 1
+    level_number = (level % 4) + 1
+    area_number = level_number
+    # Worlds 1, 2, 4, 7 have a transition as area number 2 (so 2-2 is area 3 and 3, 2-3 is area 4, 2-4 is area 5)
+    if world_number in [1, 2, 4, 7] and level_number >= 2:
+        area_number += 1
+    return '%d%d%d' % (world_number, level_number, area_number)
+
+
 def is_int16(s: str) -> bool:
+    """Return true if the input string is a 16-bit integer, false otherwise."""
     try:
         int(s, 16)
         return True
@@ -56,7 +76,7 @@ class SuperMarioBrosEnv(NesEnv):
         package_directory = os.path.dirname(os.path.abspath(__file__))
         self.level = level
         self.lua_path.append(os.path.join(package_directory, 'lua/super-mario-bros.lua'))
-        self.launch_vars['target'] = self._get_level_code(self.level)
+        self.launch_vars['target'] = encode_level(self.level)
         self.launch_vars['meta'] = '0'
         # check if a custom ROM path is employed
         if rom_path is not None:
@@ -68,15 +88,6 @@ class SuperMarioBrosEnv(NesEnv):
             if not os.path.isfile(rom_path):
                 raise ValueError('default ROM ({}) missing.'.format(rom_path))
         self.rom_path = rom_path
-
-    def _get_level_code(self, level):
-        world_number = int(level / 4) + 1
-        level_number = (level % 4) + 1
-        area_number = level_number
-        # Worlds 1, 2, 4, 7 have a transition as area number 2 (so 2-2 is area 3 and 3, 2-3 is area 4, 2-4 is area 5)
-        if world_number in [1, 2, 4, 7] and level_number >= 2:
-            area_number += 1
-        return '%d%d%d' % (world_number, level_number, area_number)
 
     def _process_data_message(self, frame_number, data):
         # Format: data_<frame>#name_1:value_1|name_2:value_2|...
@@ -235,7 +246,7 @@ class MetaSuperMarioBrosEnv(MetaNesEnv, SuperMarioBrosEnv):
     def _get_standard_reward(self, episode_reward):
         # Returns a standardized reward for an episode (i.e. between 0 and 1,000)
         min_score = 0
-        target_score = float(SMB_LEVELS[self.level][MAX_DISTANCE]) - 40
+        target_score = float(SMB_LEVELS[self.level][-1]) - 40
         max_score = min_score + (target_score - min_score) / 0.99  # Target is 99th percentile (Scale 0-1000)
         std_reward = round(1000 * (episode_reward - min_score) / (max_score - min_score), 4)
         std_reward = min(1000, std_reward)  # Cannot be more than 1,000

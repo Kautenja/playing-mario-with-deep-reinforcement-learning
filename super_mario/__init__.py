@@ -1,25 +1,13 @@
+"""A package providing an Open.ai Gym interface to Super Mario Bros."""
 from gym.envs.registration import register
 from gym.scoreboard.registration import add_task, add_group
 from .nes_env import NesEnv, MetaNesEnv
-from .super_mario_bros import SuperMarioBrosEnv, MetaSuperMarioBrosEnv
+from .super_mario_bros import SuperMarioBrosEnv, MetaSuperMarioBrosEnv, SMB_LEVELS
 
 
-# Env registration
-# ==========================
-# (world_number, level_number, area_number, max_distance)
-SMB_LEVELS = [
-    (1, 1, 1, 3266), (1, 2, 3, 3266), (1, 3, 4, 2514), (1, 4, 5, 2430),
-    (2, 1, 1, 3298), (2, 2, 3, 3266), (2, 3, 4, 3682), (2, 4, 5, 2430),
-    (3, 1, 1, 3298), (3, 2, 2, 3442), (3, 3, 3, 2498), (3, 4, 4, 2430),
-    (4, 1, 1, 3698), (4, 2, 3, 3266), (4, 3, 4, 2434), (4, 4, 5, 2942),
-    (5, 1, 1, 3282), (5, 2, 2, 3298), (5, 3, 3, 2514), (5, 4, 4, 2429),
-    (6, 1, 1, 3106), (6, 2, 2, 3554), (6, 3, 3, 2754), (6, 4, 4, 2429),
-    (7, 1, 1, 2962), (7, 2, 3, 3266), (7, 3, 4, 3682), (7, 4, 5, 3453),
-    (8, 1, 1, 6114), (8, 2, 2, 3554), (8, 3, 3, 3554), (8, 4, 4, 4989)]
-
-
+# register the full scale, 32 level environment
 register(
-    id='meta-SuperMarioBros-v0',
+    id='SuperMarioBros-v0',
     entry_point='super_mario:MetaSuperMarioBrosEnv',
     max_episode_steps=9999999,
     reward_threshold=32000,
@@ -31,6 +19,8 @@ register(
     nondeterministic=True,
 )
 
+
+# iterate over the levels and register each one
 for (world_number, level_number, area_number, max_distance) in SMB_LEVELS:
     level = (world_number - 1) * 4 + (level_number - 1)
     register(
@@ -44,8 +34,7 @@ for (world_number, level_number, area_number, max_distance) in SMB_LEVELS:
     )
 
 
-# Scoreboard registration
-# ==========================
+# add the group for the scoreboard
 add_group(
     id= 'super-mario',
     name= 'SuperMario',
@@ -53,17 +42,19 @@ add_group(
 )
 
 
+# add the scoreboard task for the full scale, 32 level environment
 add_task(
-    id='meta-SuperMarioBros-v0',
+    id='SuperMarioBros-v0',
     group='super-mario',
-    summary='Compilation of all 32 levels of Super Mario Bros. on Nintendo platform - Screen version.',
+    summary='Compilation of all 32 levels of Super Mario Bros. on Nintendo platform.',
 )
 
 
+# iterate over the levels and add the scoreboard task for each one
 for world in range(8):
     for level in range(4):
         add_task(
             id='SuperMarioBros-{}-{}-v0'.format(world + 1, level + 1),
             group='super-mario',
-            summary='Level: {}-{} of Super Mario Bros. on Nintendo platform - Screen version.'.format(world + 1, level + 1),
+            summary='Level: {}-{} of Super Mario Bros. on Nintendo platform.'.format(world + 1, level + 1),
         )
