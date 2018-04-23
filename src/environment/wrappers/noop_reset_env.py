@@ -19,9 +19,9 @@ class NoopResetEnv(gym.Wrapper):
     def step(self, ac):
         return self.env.step(ac)
 
-    def reset(self, **kwargs):
+    def reset(self):
         """ Do no-op action for a number of steps in [1, noop_max]."""
-        self.env.reset(**kwargs)
+        self.env.reset()
         if self.override_num_noops is not None:
             noops = self.override_num_noops
         else:
@@ -31,7 +31,7 @@ class NoopResetEnv(gym.Wrapper):
         for _ in range(noops):
             obs, _, done, _ = self.env.step(self.noop_action)
             if done:
-                obs = self.env.reset(**kwargs)
+                obs = self.env.reset()
         return obs
 
 

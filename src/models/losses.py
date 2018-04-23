@@ -32,4 +32,4 @@ def huber_loss(y, y_pred, delta: float=1.0):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['huber_loss']
+__all__ = [huber_loss.__name__]

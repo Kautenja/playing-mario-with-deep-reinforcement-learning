@@ -33,6 +33,10 @@ class DownsampleEnv(gym.ObservationWrapper):
             'y': (7, 23),
             'x': (8, 1)
         },
+        'SuperMarioBros': {
+            'y': (0, 1),
+            'x': (0, 1)
+        }
     }
 
     def __init__(self, env, image_size: tuple, y: int, x: int):

@@ -32,8 +32,8 @@ class PenalizeDeathEnv(gym.Wrapper):
 
         return obs, reward, done, info
 
-    def reset(self, **kwargs):
-        obs = self.env.reset(**kwargs)
+    def reset(self):
+        obs = self.env.reset()
         # reset the lives counter
         self.lives = self.env.unwrapped.ale.lives()
         return obs
