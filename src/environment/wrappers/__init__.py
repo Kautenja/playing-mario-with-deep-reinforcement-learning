@@ -15,6 +15,7 @@ from .frame_stack_env import FrameStackEnv
 from .max_frameskip_env import MaxFrameskipEnv
 from .noop_reset_env import NoopResetEnv
 from .penalize_death_env import PenalizeDeathEnv
+from .reward_cache_env import RewardCacheEnv
 
 
 # explicitly specify the outward facing API of this package
@@ -26,4 +27,5 @@ __all__ = [
     MaxFrameskipEnv.__name__,
     NoopResetEnv.__name__,
     PenalizeDeathEnv.__name__,
+    RewardCacheEnv.__name__,
 ]

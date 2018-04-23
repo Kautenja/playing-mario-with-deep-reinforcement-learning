@@ -23,10 +23,10 @@ play games for $1e7$ frames on Atari benchmarks. It is worth noting that these
 values represent _clipped_ rewards and do not compare well to the
 contemporary Deep-RL literature. \label{tab:atari-results}
 
-|         |   Breakout |   Enduro |     Pong |   Seaquest |   SpaceInvaders |
-|:--------|-----------:|---------:|---------:|-----------:|----------------:|
-| Final   |   85.4343  |  1184.06 |  19.6364 | 263.818    |         52.9899 |
-| Initial |   -3.43434 |     0    | -21      |   0.585859 |          6.9899 |
+|         |   Breakout |   Enduro |     Pong |   Seaquest |   Space Invaders |
+|:--------|-----------:|---------:|---------:|-----------:|-----------------:|
+| Random  |     1.0202 |    0     | -21      |     103.03 |          138.838 |
+| Trained |   363.808  |  330.667 |  19.7475 |    8015.96 |          999.848 |
 
 ### Pong
 
