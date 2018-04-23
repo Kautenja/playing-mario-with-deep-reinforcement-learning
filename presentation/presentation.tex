@@ -42,10 +42,12 @@
     \item{Atari 2600}
         \begin{itemize}
         \item{Breakout, Enduro, Pong, Seaquest, Space Invaders}
+        \item{Stella}
         \end{itemize}
     \item{NES}
         \begin{itemize}
         \item{Super Mario Bros.}
+        \item{FCEUX}
         \end{itemize}
 \end{itemize}
 \end{minipage}
@@ -69,6 +71,13 @@ $\Downarrow$ \\
 \begin{frame}{Dataset}
 \begin{minipage}{\textwidth}
 %
+\begin{minipage}{0.35\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/brain}
+\end{minipage}
+%
+\hfill
+%
 \begin{minipage}{0.6\textwidth}
 \begin{itemize}
     \item{Defined by the ROM for each game}
@@ -76,13 +85,6 @@ $\Downarrow$ \\
     \item{Generated using "bootstrapping"}
     \item{Networks train on random mini-batches of $32$ experiences every $4$ decisions}
 \end{itemize}
-\end{minipage}
-%
-\hfill
-%
-\begin{minipage}{0.35\textwidth}
-\centering
-\includegraphics[width=\textwidth]{img/brain}
 \end{minipage}
 %
 \end{minipage}
@@ -157,6 +159,7 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 
 \begin{minipage}[t]{\textwidth}
     \begin{table}
+    \caption{Mean cumulative reward over $100$ validation episodes.}
     \begin{threeparttable}
         \begin{tabular}{||c c c c c c||}
         \hline
@@ -171,7 +174,7 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
         \end{tabular}
     \begin{tablenotes}
         \small
-        \item The DDQN trains for $1e7$ frames while the DQN trains for $5e7$ frames.
+        \item $^*$ The DDDQN trains for $1e7$ frames while DQN trains for $5e7$ frames.
     \end{tablenotes}
     \end{threeparttable}
     \end{table}
@@ -183,6 +186,41 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 
 \begin{frame}{Results}
 \framesubtitle{Super Mario Bros}
+\begin{minipage}{\textwidth}
+%
+\begin{minipage}{0.4\textwidth}
+\begin{figure}
+\includegraphics[width=\textwidth]{img/smb_clip}
+\caption*{The agent struggles to detect holes in the ground and frequently
+jumps into them.}
+\end{figure}
+\end{minipage}
+%
+\hfill
+%
+\begin{minipage}{0.5\textwidth}
+    \begin{table}
+    \centering
+    \caption{Mean cumulative reward over $100$ validation episodes.}
+    \begin{threeparttable}
+    \begin{tabular}{||c c c c||}
+    \hline
+    & Min & Mean & Max \\ [0.5ex]
+    \hline\hline
+    DDDQN & 45 & 64 & 272 \\
+    \hline
+    Random & ? & ? & ? \\
+    \hline
+    \end{tabular}
+    \begin{tablenotes}
+        \small
+        \item $^*$ DDDQN trains for $1e7$ frames.
+    \end{tablenotes}
+    \end{threeparttable}
+    \end{table}
+\end{minipage}
+%
+\end{minipage}
 \end{frame}
 
 \begin{frame}{Demo}
