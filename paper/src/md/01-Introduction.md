@@ -15,6 +15,5 @@ evolving the agent opposed to the standard gradient-based approach. We
 planned to implement cutting edge techniques like Deep-$Q$ networks, A3C, and
 Deep-SARSA as a baseline. With no original experience with reinforcement
 learning, we spent a great deal of time understanding, debugging, and
-training our first baseline (and its variants), Deep-$Q$. Having
-underestimated the hardware requirements of genetic optimization on this
-task, we simply ran out of time.
+implementing Deep-$Q$ as a baseline. Having underestimated the hardware
+requirements of genetic optimization on this task, we simply ran out of time.
