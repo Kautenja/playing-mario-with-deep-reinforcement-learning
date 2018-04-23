@@ -105,12 +105,6 @@ class NesEnv(gym.Env, utils.EzPickle):
         self.curr_seed = 0
         self._seed()
 
-    def _configure(self, rom_path=None, lock=None):
-        if rom_path is not None:
-            self.rom_path = rom_path
-        if lock is not None:
-            self.lock = lock
-
     def _create_pipes(self):
         # Creates named pipe for inter-process communication
         self.pipe_name = seeding.hash_seed(None) % 2 ** 32
@@ -285,7 +279,7 @@ class NesEnv(gym.Env, utils.EzPickle):
         # Overridable - Returns the other variables
         return self.info
 
-    def _step(self, action):
+    def step(self, action):
         if 0 == self.is_initialized:
             return self._get_state(), 0, self._get_is_finished(), {}
 
@@ -361,7 +355,7 @@ class NesEnv(gym.Env, utils.EzPickle):
         info = self._get_info()
         return state, reward, is_finished, info
 
-    def _reset(self):
+    def reset(self):
         if 1 == self.is_initialized:
             self.close()
         self.last_frame = 0
@@ -377,7 +371,7 @@ class NesEnv(gym.Env, utils.EzPickle):
         self.screen = np.zeros(shape=(self.screen_height, self.screen_width, 3), dtype=np.uint8)
         return self._get_state()
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         if close:
             if self.viewer is not None:
                 self.viewer.close()
@@ -397,7 +391,7 @@ class NesEnv(gym.Env, utils.EzPickle):
                 self.viewer = rendering.SimpleImageViewer()
             self.viewer.imshow(img)
 
-    def _close(self):
+    def close(self):
         # Terminating thread
         self.is_exiting = 1
         self._write_to_pipe('exit')
@@ -658,7 +652,7 @@ class MetaNesEnv(NesEnv):
                 averages[i] = round(level_average, 4)
         return averages
 
-    def _reset(self):
+    def reset(self):
         # Reset is called on first step() after level is finished
         # or when change_level() is called. Returning if neither have been called to
         # avoid resetting the level twice
@@ -677,7 +671,7 @@ class MetaNesEnv(NesEnv):
         self.screen = np.zeros(shape=(self.screen_height, self.screen_width, 3), dtype=np.uint8)
         return self._get_state()
 
-    def _step(self, action):
+    def step(self, action):
         # Changing level
         if self.find_new_level:
             self.change_level()
