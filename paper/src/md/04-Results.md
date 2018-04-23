@@ -53,7 +53,7 @@ Table:
 
 |         |  Min | Mean |  Max |
 |:--------|-----:|-----:|-----:|
-| Random  |    ? |    ? |    ? |
+| Random  |   17 |  153 |  336 |
 | Trained |   45 |   64 |  272 |
 
 We were unable to collect data to visualize the learning process for Super
