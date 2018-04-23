@@ -21,7 +21,7 @@ class PenalizeDeathEnv(gym.Wrapper):
         self.lives = 0
         self.penalty = penalty
 
-    def _step(self, action):
+    def step(self, action):
         obs, reward, done, info = self.env.step(action)
         lives = info['life']
         # check if its less than the last step, i.e. a death occurred.
@@ -30,7 +30,7 @@ class PenalizeDeathEnv(gym.Wrapper):
 
         return obs, reward, done, info
 
-    def _reset(self):
+    def reset(self):
         obs = self.env.reset()
         # reset the lives counter
         self.lives = 0

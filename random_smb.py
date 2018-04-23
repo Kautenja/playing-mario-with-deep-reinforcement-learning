@@ -1,4 +1,3 @@
-from multiprocessing import Lock
 from tqdm import tqdm
 import pandas as pd
 from gym.wrappers import Monitor
@@ -6,7 +5,6 @@ from src.environment.nes import build_nes_environment
 
 
 env, r_cache = build_nes_environment('SuperMarioBros-1-1')
-env.configure(lock=Lock())
 
 
 scores = []

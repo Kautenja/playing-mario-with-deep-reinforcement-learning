@@ -1,6 +1,5 @@
 """A package providing an Open.ai Gym interface to Super Mario Bros."""
 from gym.envs.registration import register
-from gym.scoreboard.registration import add_task, add_group
 from .nes_env import NesEnv, MetaNesEnv
 from .super_mario_bros import SuperMarioBrosEnv, MetaSuperMarioBrosEnv, SMB_LEVELS
 
@@ -32,29 +31,3 @@ for (world_number, level_number, area_number, max_distance) in SMB_LEVELS:
         # Seems to be non-deterministic about 5% of the time
         nondeterministic=True,
     )
-
-
-# add the group for the scoreboard
-add_group(
-    id= 'super-mario',
-    name= 'SuperMario',
-    description= '32 levels of the original Super Mario Bros game.'
-)
-
-
-# add the scoreboard task for the full scale, 32 level environment
-add_task(
-    id='SuperMarioBros-v0',
-    group='super-mario',
-    summary='Compilation of all 32 levels of Super Mario Bros. on Nintendo platform.',
-)
-
-
-# iterate over the levels and add the scoreboard task for each one
-for world in range(8):
-    for level in range(4):
-        add_task(
-            id='SuperMarioBros-{}-{}-v0'.format(world + 1, level + 1),
-            group='super-mario',
-            summary='Level: {}-{} of Super Mario Bros. on Nintendo platform.'.format(world + 1, level + 1),
-        )

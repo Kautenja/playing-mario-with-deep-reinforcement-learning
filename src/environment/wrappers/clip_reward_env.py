@@ -10,7 +10,7 @@ class ClipRewardEnv(gym.RewardWrapper):
         """Initialize a new reward clipping environment."""
         gym.RewardWrapper.__init__(self, env)
 
-    def _reward(self, reward):
+    def reward(self, reward):
         """Bin reward to {-1, 0, +1} using its sign."""
         return np.sign(reward)
 

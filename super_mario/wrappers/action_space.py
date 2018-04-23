@@ -1,16 +1,16 @@
 import gym
-from gym.spaces.multi_discrete import (
-    BoxToMultiDiscrete,
-    DiscreteToMultiDiscrete
-)
 
 
 class ToDiscreteWrapper(gym.Wrapper):
     """Wrapper to convert MultiDiscrete action space to Discrete."""
 
     def __init__(self, env):
+        """
+        Create a wrapper to map the action input from discrete inputs to
+        the expected multi-discrete inputs.
+        """
         super(ToDiscreteWrapper, self).__init__(env)
-        self.action_space = DiscreteToMultiDiscrete(self.action_space, {
+        self.discrete_to_multi = {
             0:  [0, 0, 0, 0, 0, 0],  # NOOP
             1:  [1, 0, 0, 0, 0, 0],  # Up
             2:  [0, 0, 1, 0, 0, 0],  # Down
@@ -25,24 +25,18 @@ class ToDiscreteWrapper(gym.Wrapper):
             11: [0, 0, 0, 0, 1, 0],  # A
             12: [0, 0, 0, 0, 0, 1],  # B
             13: [0, 0, 0, 0, 1, 1],  # A + B
-        })
+        }
+        # assign a new action space to this wrapper for sampling from
+        self.action_space = gym.spaces.Discrete(len(self.discrete_to_multi))
 
-    def _step(self, action):
-        return self.env.step(self.action_space(action))
+    def step(self, action):
+        # unwrap the action using the map
+        return self.env.step(self.discrete_to_multi[action])
 
-
-class ToBoxWrapper(gym.Wrapper):
-    """Wrapper to convert MultiDiscrete action space to Box."""
-
-    def __init__(self, env):
-        super(ToBoxWrapper, self).__init__(env)
-        self.action_space = BoxToMultiDiscrete(self.action_space)
-
-    def _step(self, action):
-        return self.env.step(self.action_space(action))
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
 
 
 __all__ = [
     ToDiscreteWrapper.__name__,
-    ToBoxWrapper.__name__
 ]
