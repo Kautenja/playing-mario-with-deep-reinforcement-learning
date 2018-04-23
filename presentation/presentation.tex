@@ -31,6 +31,8 @@
 % title slide
 \frame{\titlepage}
 
+
+
 \begin{frame}{Problem}
 \begin{minipage}{\textwidth}
 %
@@ -61,13 +63,70 @@ $\Downarrow$ \\
 \end{minipage}
 \end{frame}
 
+
+
 \begin{frame}{Dataset}
-TODO
+\begin{minipage}{\textwidth}
+%
+\begin{minipage}{0.6\textwidth}
+\begin{itemize}
+    \item{Defined by the ROM for each game}
+    \item{Experience Replay of $1000000$ experiences}
+    \item{Generated using "bootstrapping"}
+    \item{Networks train on random mini-batches of $32$ experiences every $4$ decisions}
+\end{itemize}
+\end{minipage}
+%
+\hfill
+%
+\begin{minipage}{0.35\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/brain}
+\end{minipage}
+%
+\end{minipage}
 \end{frame}
 
+
+
 \begin{frame}{Methods}
-TODO
+\framesubtitle{Double Deep-Q Learning}
+
+\begin{equation}
+y = r + (1 - d) \gamma \max_{a' \in \mathcal{A}} Q(s', a', \theta_{target})
+\end{equation}
+
+\begin{equation}
+\hat{y} = Q(s, a, \theta)
+\end{equation}
+
+\begin{equation}
+L(\theta) =
+\mathbb{E}_{(s, a, r, d, s') \sim U(D)} \bigg[ L_{\delta}(y, \hat{y}) \bigg]
+\label{eqn:deep-q-alg}
+\end{equation}
+
+\begin{equation}
+L_{\delta}(y, \hat{y}) = \begin{cases}
+      \frac{1}{2} (y - \hat{y})^2                & |y - \hat{y}| \leq \delta \\
+      \delta |y - \hat{y}| - \frac{1}{2}\delta^2 & \textbf{otherwise} \\
+\end{cases}
+\label{eqn:huber}
+\end{equation}
+
 \end{frame}
+
+
+
+\begin{frame}{Methods}
+\framesubtitle{Dueling Deep-Q Network}
+\begin{figure}
+\includegraphics[width=0.9\textwidth]{img/dueling-deep-q}
+\caption*{Deep-Q Network (top) and Dueling Deep-Q Network (Bottom)}
+\end{figure}
+\end{frame}
+
+
 
 \begin{frame}{Results}
 TODO
