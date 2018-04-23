@@ -1,3 +1,4 @@
+"""An environment for interacting with NES games through FCEUX."""
 import logging
 import os
 import multiprocessing
@@ -5,7 +6,6 @@ import signal
 import subprocess
 import tempfile
 from distutils import spawn
-"""An environment for interacting with NES games through FCEUX."""
 from threading import Thread, Lock
 from time import sleep
 import numpy as np
@@ -41,9 +41,16 @@ class NesLock:
 
 
 class NesEnv(gym.Env, utils.EzPickle):
-    metadata = {'render.modes': ['human', 'rgb_array'], 'video.frames_per_second': 30}
+    """An Open.ai gym environment for emulating NES games."""
+
+    # metadata about the environment
+    metadata = {
+        'render.modes': ['human', 'rgb_array'],
+        'video.frames_per_second': 60
+    }
 
     def __init__(self):
+        """Setup the NES environment."""
         utils.EzPickle.__init__(self)
         self.rom_path = ''
         self.screen_height = 224
