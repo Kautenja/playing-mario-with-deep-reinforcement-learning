@@ -5,6 +5,7 @@
     textpos, blindtext, scrextend,
     apacite
 }
+\usepackage[flushleft]{threeparttable}
 \usepackage[font=small, labelfont=bf]{subcaption}
 
 %% MARK: Beamer Setup
@@ -129,6 +130,8 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 
 
 \begin{frame}{Results}
+\framesubtitle{Atari}
+
 \begin{minipage}[t]{\textwidth}
     \begin{minipage}{0.3\textwidth}
     \begin{figure}
@@ -153,21 +156,27 @@ L_{\delta}(y, \hat{y}) = \begin{cases}
 \end{minipage}
 
 \begin{minipage}[t]{\textwidth}
-\framesubtitle{Atari}
-\begin{center}
- \begin{tabular}{||c c c c c c||}
- \hline
- & Breakout & Enduro & Pong & Seaquest & Space Invaders \\ [0.5ex]
- \hline\hline
- DDDQN & 363 & \textbf{330} & \textbf{19.7} & \textbf{8015} & 999 \\
- \hline
- DQN & \textbf{401} & 301 & 18.9 & 5286 & \textbf{1976} \\
- \hline
- Random & 1 & 0 & -21 & 103 & 138 \\
- \hline
-\end{tabular}
-\end{center}
+    \begin{table}
+    \begin{threeparttable}
+        \begin{tabular}{||c c c c c c||}
+        \hline
+        & Breakout & Enduro & Pong & Seaquest & Space Invaders \\ [0.5ex]
+        \hline\hline
+        DDDQN & 363 & \textbf{330} & \textbf{19.7} & \textbf{8015} & 999 \\
+        \hline
+        DQN & \textbf{401} & 301 & 18.9 & 5286 & \textbf{1976} \\
+        \hline
+        Random & 1 & 0 & -21 & 103 & 138 \\
+        \hline
+        \end{tabular}
+    \begin{tablenotes}
+        \small
+        \item The DDQN trains for $1e7$ frames while the DQN trains for $5e7$ frames.
+    \end{tablenotes}
+    \end{threeparttable}
+    \end{table}
 \end{minipage}
+
 \end{frame}
 
 
