@@ -6,7 +6,6 @@
 
 -- ** Parameters **
 -- target = "111";          -- World Number - Level Number - Area Number
--- draw_tiles = "1";
 -- meta = "0"               -- meta indicates multiple mission
 -- pipe_name = "abc";
 -- pipe_prefix = "/tmp/smb-fifo";
@@ -20,7 +19,6 @@
 -- ===========================
 -- These parameters are expected to be generated and set in the temp file
 -- Default values
-draw_tiles = tonumber(draw_tiles) or 0;
 meta = tonumber(meta) or 0;
 pipe_name = pipe_name or "";
 pipe_prefix = pipe_prefix or "";
@@ -44,7 +42,6 @@ is_started = 0;             -- Indicates that the timer has started to decrease 
 is_finished = 0;            -- Indicates a life has been lost, world has changed, or finish line crossed
 last_time_left = 0;         -- Indicates the last time left (to check if timer has started to decrease)
 skip_frames = 1;            -- Process a frame every 2 frames (usually 60 fps, by not returning 50% of the frames, we get ~30fps)
-skip_screen = 0;            -- Does not send screen data to pipe (e.g. human mode)
 skip_data = 0;              -- Does not send data to pipe (e.g. human mode)
 skip_tiles = 0;             -- Does not send tiles to pipe (e.g. human mode)
 skip_commands = 0;          -- Do not read commands from pipe (e.g. human mode)
@@ -413,12 +410,6 @@ end;
 -- Format: screen_<frame_number>#<x(2 hex digits)><y (2 hex digits)><palette (2 hex digits)>|...
 -- Palette is a number from 0 to 127 that represents an RGB color (conversion table in python file)
 function get_screen()
-
-    -- Skipping screen is skip_screen is set or draw_tiles if set
-    if (skip_screen == 1) or (draw_tiles == 1) then
-        return;
-    end;
-
     local r, g, b, p;
     local framecount = emu.framecount();
     -- NES only has y values in the range 8 to 231, so we need to offset y values by 8
