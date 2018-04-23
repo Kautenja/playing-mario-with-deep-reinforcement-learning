@@ -30,9 +30,9 @@ state value $V(s, \theta)$ (top) and action advantage $A(s, a, \theta)$
 (bottom) respectively. The streams combine using a computational layer,
 described in Eqn. \ref{eqn:dueling-deep-q}, to produce output values
 $Q(s, a, \theta)$. Much like the original Deep-Q architecture, each layer is
-separated by a ReLu activations; the output layer features a linear
-activation. This network has $\approx 8e6$ weights (2x as many as the original
-architecture).}
+separated by a ReLu activation; the output layer features a linear
+activation. This network has $\approx 8e6$ weights, 2x as many as the original
+architecture.}
 \label{fig:dueling-dqn}
 \end{figure}
 
