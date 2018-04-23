@@ -42,9 +42,13 @@ env = Monitor(env, '{}/monitor'.format(output_dir), force=True)
 
 # initialize a random agent on the environment and play a validation batch
 agent = RandomAgent(env)
-agent.play(games=3)
+agent.play()
 
 
 # save the scores from the validation games in the output directory
 scores = pd.Series(env.unwrapped.episode_rewards)
 scores.to_csv('{}/final_scores.csv'.format(output_dir))
+# print some stats
+print('min ', scores.min())
+print('mean ', scores.mean())
+print('max ', scores.max())
