@@ -51,7 +51,7 @@ class BaseCallback(object):
         self.losses.append(loss)
         # save the weights
         if self._episodes % self.update_every == 0:
-            agent.model.save_wights(self.weights_file_name)
+            agent.model.save_weights(self.weights_file_name)
 
 
 # explicitly define the outward facing API of this module
