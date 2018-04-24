@@ -70,6 +70,7 @@ class NesEnv(gym.Env, utils.EzPickle):
             '-f 0',
             '--sound 0',
             '--nogui',
+            '--opengl 0',
         ]
         self.lua_path = []
         self.subprocess = None
