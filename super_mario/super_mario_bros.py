@@ -1,7 +1,6 @@
 """A subclass of NesEnvironment for the Super Mario Bros ROM."""
 import logging
 import os
-import numpy as np
 from gym import spaces
 from .nes_env import NesEnv, MetaNesEnv
 
