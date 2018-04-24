@@ -69,8 +69,11 @@ class NesEnv(gym.Env, utils.EzPickle):
             '--yscale 1',
             '-f 0',
             '--sound 0',
-            '--nogui',
+            '--nogui 1',
+            '--noframe 0',
             '--opengl 0',
+            '--openglip 0',
+            '--frameskip 4',
         ]
         self.lua_path = []
         self.subprocess = None

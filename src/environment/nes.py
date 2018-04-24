@@ -4,7 +4,6 @@ from src.environment.wrappers import (
     ClipRewardEnv,
     DownsampleEnv,
     FrameStackEnv,
-    MaxFrameskipEnv,
     NoopResetEnv,
 )
 from super_mario.wrappers import (
@@ -18,7 +17,6 @@ def build_nes_environment(game_name: str,
     image_size: tuple=(84, 84),
     death_penalty: int=-1,
     clip_rewards: bool=True,
-    skip_frames: int=None,
     agent_history_length: int=4,
 ):
     """
@@ -44,9 +42,6 @@ def build_nes_environment(game_name: str,
     env = ToDiscreteActionSpaceEnv(env)
     # add a reward cache for scoring episodes
     env = RewardCacheEnv(env)
-    # apply the frame skip feature if enabled
-    if skip_frames is not None:
-        env = MaxFrameskipEnv(env, skip=skip_frames)
     # apply a down-sampler for the given game
     downsampler = DownsampleEnv.metadata[game_name.split('-')[0]]
     env = DownsampleEnv(env, image_size, **downsampler)
