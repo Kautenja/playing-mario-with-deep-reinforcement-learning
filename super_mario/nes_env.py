@@ -15,17 +15,17 @@ from gym.utils import seeding
 from .rgb_palette import get_rgb_from_palette
 
 
-SEARCH_PATH = os.pathsep.join([os.environ['PATH'], '/usr/games', '/usr/local/games'])
-FCEUX_PATH = spawn.find_executable('fceux', SEARCH_PATH)
-if FCEUX_PATH is None:
-    raise gym.error.DependencyNotInstalled("fceux is required. Try installing with apt-get install fceux.")
-
-
 logger = logging.getLogger(__name__)
 
 
-# Constants
-NUM_ACTIONS = 6
+def find_fceux_path() -> None:
+    """Raise an error if FCEUX cant be found"""
+    path = os.pathsep.join([os.environ['PATH'], '/usr/games', '/usr/local/games'])
+    path = spawn.find_executable('fceux', path)
+    if path is None:
+        msg = "fceux is required. Try installing with apt-get install fceux."
+        raise gym.error.DependencyNotInstalled(msg)
+    return path
 
 
 # Singleton pattern
@@ -44,6 +44,9 @@ class NesLock:
 class NesEnv(gym.Env, utils.EzPickle):
     """An Open.ai gym environment for emulating NES games."""
 
+    # the number of actions available in this environment
+    NUM_ACTIONS = 6
+
     # metadata about the environment
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -52,11 +55,12 @@ class NesEnv(gym.Env, utils.EzPickle):
 
     def __init__(self):
         """Setup the NES environment."""
+        self.fceux_path = find_fceux_path()
         utils.EzPickle.__init__(self)
         self.rom_path = ''
         self.screen_height = 224
         self.screen_width = 256
-        self.action_space = spaces.MultiDiscrete([2] * NUM_ACTIONS)
+        self.action_space = spaces.MultiDiscrete([2] * self.NUM_ACTIONS)
         self.observation_space = spaces.Box(
             low=0,
             high=255,
@@ -227,7 +231,7 @@ class NesEnv(gym.Env, utils.EzPickle):
         self._reset_info_vars()
 
         # Loading fceux
-        args = [FCEUX_PATH]
+        args = [self.fceux_path]
         args.extend(self.cmd_args[:])
         args.extend(['--loadlua', temp_lua_path])
         args.append(self.rom_path)
@@ -284,13 +288,8 @@ class NesEnv(gym.Env, utils.EzPickle):
     def step(self, action):
         if 0 == self.is_initialized:
             return self._get_state(), 0, self._get_is_finished(), {}
-
-        if NUM_ACTIONS != len(action):
-            logger.warn('NES action list must contain %d items. Padding missing items with 0' % NUM_ACTIONS)
-            old_action = action
-            action = [0] * NUM_ACTIONS
-            for i in range(len(old_action)):
-                action[i] = old_action[i]
+        # action set must match the expected size
+        assert self.NUM_ACTIONS == len(action)
 
         # Blocking until game sends ready
         loop_counter = 0
