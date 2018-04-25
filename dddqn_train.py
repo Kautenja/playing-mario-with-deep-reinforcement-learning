@@ -53,7 +53,7 @@ with open('{}/agent.py'.format(output_dir), 'w') as agent_file:
 
 
 # observe frames to fill the replay memory
-agent.observe(1000)
+agent.observe()
 
 
 # train the agent
