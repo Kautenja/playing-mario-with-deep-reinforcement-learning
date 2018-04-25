@@ -1,6 +1,6 @@
 """Usage:
 
-    python dddqn_train.py <agent name> <game name> <results directory>
+    python dddqn_train.py <game name> <results directory>
 """
 import os
 import sys
