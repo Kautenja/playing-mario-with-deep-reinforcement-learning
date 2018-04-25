@@ -3,20 +3,17 @@
 Using Double Dueling Deep-_Q_ Networks to play Atari 2600 games and Super
 Mario Bros from the Nintendo Entertainment System (NES).
 
-## Atari 2600 (_Breakout_, _Pong_, _Seaquest_)
+## Atari 2600 
 
-<p float="left" align="center">
-<img src="img/Breakout.png" width="250"/>
-<img src="img/Pong.png" width="250"/>
-<img src="img/Seaquest.png" width="250"/>
-</p>
+| Breakout              | Pong              | Seaquest              |
+|:---------------------:|:-----------------:|:---------------------:|
+| ![](img/Breakout.png) | ![](img/Pong.png) | ![](img/Seaquest.png) |
 
 ## Super Mario Bros.
 
-<p float="left" align="center">
-<img src="img/SuperMarioBros1.png" width="300"/>
-<img src="img/SuperMarioBros2.png" width="300"/>
-</p>
+|                              |                              | 
+|:----------------------------:|:----------------------------:|
+| ![](img/SuperMarioBros1.png) | ![](img/SuperMarioBros2.png) | 
 
 
 
