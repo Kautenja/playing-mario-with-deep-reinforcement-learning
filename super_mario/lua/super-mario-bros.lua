@@ -465,23 +465,6 @@ function parse_commands(line)
         commands["select"] = false;
         joypad.set(1, commands);
 
-    -- Noop at beginning of level (to simulate seed)
-    elseif ("noop" == command) and (tonumber(frame_number) == last_processed_frame) then
-        local noop_count = tonumber(data);
-        commands["up"] = false;
-        commands["left"] = false;
-        commands["down"] = false;
-        commands["right"] = false;
-        commands["A"] = false;
-        commands["B"] = false;
-        commands["start"] = false;
-        commands["select"] = false;
-        joypad.set(1, commands);
-        if noop_count > 0 then
-            for i=1,noop_count,1 do
-                emu.frameadvance();
-            end;
-        end;
 
     -- Changing level
     elseif ("changelevel" == command) and (tonumber(data) >= 0) and (tonumber(data) <= 31) then
