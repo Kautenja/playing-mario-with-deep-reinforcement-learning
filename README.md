@@ -68,7 +68,8 @@ make test
 
 ## Random Games
 
-To play random games, use the random script.
+To play games with an agent that makes random decisions, use the random play
+script.
 
 ```shell
 python3 random_play.py <game name> <results directory>
