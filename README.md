@@ -1,70 +1,17 @@
 # Playing Atari 2600 & Super Mario Bros. with Deep Reinforcement Learning
 
+<p float="left" align="center">
+<img src="img/Breakout.png" width="250"/>
+<img src="img/Seaquest.png" width="250"/>
+<img src="img/SuperMarioBros.png" width="250"/>
+</p>
 
+Using Double Dueling Deep-_Q_ Networks to play Atari 2600 games and Super
+Mario Bros from the Nintendo Entertainment System (NES).
 
-## Literature Review
+## Usage
 
-Papers reviewed by this work (and their citations) are in
-[literature-review](literature-review). The corresponding
-[README](literature-review/README.md) describes he structure.
-
-### Usage
-
-To update the `references.bib` for either the proposal or the paper:
-
-```shell
-make update_proposal_references
-```
-
-```shell
-make update_paper_references
-```
-
-
-
-
-## Project Proposal
-
-The Markdown / LaTeX files comprising the proposal are in
-[proposal](proposal). The corresponding [README](proposal/README.md)
-outlines the structure.
-
-### Usage
-
-To compile the proposal into the [build](build) directory.
-
-```shell
-make proposal
-```
-
-
-
-
-## Paper
-
-The Markdown / LaTeX files comprising the paper are in
-[paper](paper). The corresponding [README](paper/README.md)
-outlines the structure.
-
-### Usage
-
-To compile the paper into the [build](build) directory.
-
-```shell
-make paper
-```
-
-
-
-
-## Source Code
-
-Source code for the project lives in [src](src). The corresponding
-[README](src/README.md) outlines the structure.
-
-### Usage
-
-#### `virtualenv`
+### `virtualenv`
 
 Use `virtualenv` to contain the environment to a single
 local installation of python3:
@@ -84,7 +31,7 @@ When you've concluded the session:
 deactivate
 ```
 
-#### Dependencies
+### Dependencies
 
 [requirements.txt](requirements.txt) lists the Python dependencies for the
 project with frozen versions. To install dependencies:
