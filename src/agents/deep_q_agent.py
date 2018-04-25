@@ -32,7 +32,7 @@ class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
     def __init__(self, env, render_mode: str='rgb_array',
-        replay_memory_size: int=750000,
+        replay_memory_size: int=1000000,
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer=Adam(lr=2e-5),
@@ -221,7 +221,7 @@ class DeepQAgent(Agent):
             return np.argmax(actions)
 
     def train(self,
-        frames_to_play: int=10000000,
+        frames_to_play: int=25000000,
         batch_size: int=32,
         callback: Callable=None,
     ) -> None:
