@@ -1,13 +1,11 @@
 """Methods for setting up an NES environment."""
-import gym
 from src.environment.wrappers import (
     ClipRewardEnv,
     DownsampleEnv,
     FrameStackEnv,
-    NoopResetEnv,
     RewardCacheEnv
 )
-import nesgym_super_mario_bros
+import gym_super_mario_bros
 
 
 def build_nes_environment(game_name: str,
@@ -29,7 +27,7 @@ def build_nes_environment(game_name: str,
 
     """
     # make the initial environment
-    env = gym.make('nesgym/{}-v0'.format(game_name))
+    env = gym_super_mario_bros.make('{}-v0'.format(game_name))
     # add a reward cache for scoring episodes
     env = RewardCacheEnv(env)
     # apply a down-sampler for the given game
