@@ -58,3 +58,5 @@ scores.to_csv('{}/final_scores.csv'.format(output_dir))
 print('min ', scores.min())
 print('mean ', scores.mean())
 print('max ', scores.max())
+
+env.close()
