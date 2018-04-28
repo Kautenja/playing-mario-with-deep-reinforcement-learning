@@ -1,12 +1,11 @@
 """Usage:
 
-    python dddqn_train.py <agent name> <game name> <results directory>
+    python dddqn_train.py <game name> <results directory>
 """
 import os
 import sys
 import datetime
 import pandas as pd
-from gym.wrappers import Monitor
 
 
 # load variables from the command line
