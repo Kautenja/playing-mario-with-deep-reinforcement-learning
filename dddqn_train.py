@@ -1,12 +1,11 @@
 """Usage:
 
-    python dddqn_train.py <agent name> <game name> <results directory>
+    python dddqn_train.py <game name> <results directory>
 """
 import os
 import sys
 import datetime
 import pandas as pd
-from gym.wrappers import Monitor
 
 
 # load variables from the command line
@@ -42,7 +41,7 @@ if 'SuperMarioBros' in game_name:
 else:
     env = build_atari_environment(game_name)
 # wrap the environment with a monitor
-env = Monitor(env, '{}/monitor_train'.format(output_dir), force=True)
+# env = Monitor(env, '{}/monitor_train'.format(output_dir), force=True)
 
 
 # build the agent
@@ -53,7 +52,7 @@ with open('{}/agent.py'.format(output_dir), 'w') as agent_file:
 
 
 # observe frames to fill the replay memory
-agent.observe(1000)
+agent.observe()
 
 
 # train the agent
