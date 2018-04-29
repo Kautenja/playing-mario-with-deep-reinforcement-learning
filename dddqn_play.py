@@ -26,7 +26,7 @@ if not os.path.exists(weights_file):
 
 
 # load these after command line arg checking bc tensorflow is slow to load
-# and generates some warning output
+# and generates some warning output deprecations and such that clog std out
 from src.environment.atari import build_atari_environment
 from src.environment.nes import build_nes_environment
 from src.agents import DeepQAgent
