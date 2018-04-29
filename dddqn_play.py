@@ -5,7 +5,6 @@
 import os
 import sys
 import pandas as pd
-from gym.wrappers import Monitor
 
 
 # load variables from the command line
@@ -35,12 +34,13 @@ from src.agents import DeepQAgent
 
 # check if we need to load the NES environment
 if 'SuperMarioBros' in game_name:
-    env = build_nes_environment(game_name)
+    monitor_dir = '{}/monitor_play'.format(output_dir)
+    env = build_nes_environment(game_name, monitor_dir=monitor_dir)
 # default to the Atari environment
 else:
     env = build_atari_environment(game_name, is_validation=True)
-# wrap the environment with a monitor
-env = Monitor(env, '{}/monitor_play'.format(output_dir), force=True)
+    from gym.wrappers import Monitor
+    env = Monitor(env, '{}/monitor_play'.format(output_dir), force=True)
 
 
 # build the agent without any replay memory since we're just playing, load
