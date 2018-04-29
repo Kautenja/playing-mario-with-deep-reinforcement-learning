@@ -18,7 +18,7 @@ except IndexError:
     sys.exit(-1)
 # setup the output directory with a timestamped directory
 now = datetime.today().strftime('%Y-%m-%d_%H-%M')
-output_dir = '{}/{}/{}'.format(output_dir, game_name, now)
+output_dir = '{}/{}/Random/{}'.format(output_dir, game_name, now)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 print('writing results to {}'.format(repr(output_dir)))
@@ -53,3 +53,5 @@ scores.to_csv('{}/final_scores.csv'.format(output_dir))
 print('min ', scores.min())
 print('mean ', scores.mean())
 print('max ', scores.max())
+
+env.close()

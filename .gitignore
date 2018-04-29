@@ -1,5 +1,6 @@
 # Ignores specific to this project
 build/
+dummy/
 
 # Ignores specific to different operating system files
 
