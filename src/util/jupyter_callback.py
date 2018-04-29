@@ -30,15 +30,14 @@ class JupyterCallback(object):
         # set the figsize of this callback
         self.figsize = width, height_per_plot * len(self.metrics)
 
-    def __call__(self, score: float, loss: float) -> None:
+    def __call__(self, agent, score: float, loss: float) -> None:
         """
         Update the callback with the new score (from a finished episode).
 
         Args:
+            agent: the agent producing the score and loss
             score: the score at the end of any episode to log
             loss: the loss from training the network
-            discount_factor: the discount factor of the Q algorithm
-            exploration_rate: the exploration rate of the Q algorithm
 
         Returns:
             None

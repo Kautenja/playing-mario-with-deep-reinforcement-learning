@@ -1,28 +1,23 @@
 """An implementation of Deep Q-Learning."""
 import numpy as np
 from tqdm import tqdm
-from pygame.time import Clock
 from .agent import Agent
 
 
 class RandomAgent(Agent):
     """An agent that behaves randomly."""
 
-    def play(self, games: int=100, fps: int=None) -> np.ndarray:
+    def play(self, games: int=100) -> np.ndarray:
         """
         Run the agent.
 
         Args:
             games: the number of games to play
-            fps: the frame-rate to limit game play to
-                - if None, the frame-rate will not be limited (i.e infinite)
 
         Returns:
             an array of scores
 
         """
-        # initialize a clock to keep the frame-rate
-        clock = Clock()
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
@@ -38,9 +33,6 @@ class RandomAgent(Agent):
                 # hold the action for the number of frames
                 _, reward, done = self._next_state(action)
                 score += reward
-                # bound the frame rate if there is an fps provided
-                if fps is not None:
-                    clock.tick(fps)
             # push the score onto the history
             scores[game] = score
 
@@ -48,4 +40,4 @@ class RandomAgent(Agent):
 
 
 # explicitly define the outward facing API of this module
-__all__ = ['RandomAgent']
+__all__ = [RandomAgent.__name__]

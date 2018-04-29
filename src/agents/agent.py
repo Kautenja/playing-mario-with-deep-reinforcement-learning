@@ -1,13 +1,13 @@
-"""An abstract base class for deep reinforcement agents."""
+"""An abstract base class for reinforcement agents."""
 import numpy as np
 
 
 class Agent(object):
-    """An abstract base class for building deep reinforcement agents."""
+    """An abstract base class for building reinforcement agents."""
 
     def __init__(self, env, render_mode: str='rgb_array') -> None:
         """
-        Create a new abstract deep reinforcement agent.
+        Create a new abstract reinforcement agent.
 
         Args:
             env: the environment for the agent to experience
