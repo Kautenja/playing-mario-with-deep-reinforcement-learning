@@ -6,12 +6,14 @@ from src.environment.wrappers import (
     RewardCacheEnv
 )
 import gym_super_mario_bros
+from gym_super_mario_bros.wrappers import Monitor
 
 
 def build_nes_environment(game_name: str,
     image_size: tuple=(84, 84),
     clip_rewards: bool=True,
     agent_history_length: int=4,
+    monitor_dir: str=None
 ):
     """
     Build and return a configured NES environment.
@@ -21,6 +23,7 @@ def build_nes_environment(game_name: str,
         image_size: the size to down-sample images to
         clip_rewards: whether to clip rewards in {-1, 0, +1}
         agent_history_length: the size of the frame buffer for the agent
+        monitor_dir: the directory to save monitor info to if any
 
     Returns:
         a gym environment configured for this experiment
@@ -30,6 +33,9 @@ def build_nes_environment(game_name: str,
     env = gym_super_mario_bros.make('{}-v0'.format(game_name))
     # add a reward cache for scoring episodes
     env = RewardCacheEnv(env)
+    # add a monitor if the directory is provided
+    if monitor_dir is not None:
+        env = Monitor(env, monitor_dir)
     # apply a down-sampler for the given game
     downsampler = DownsampleEnv.metadata[game_name.split('-')[0]]
     env = DownsampleEnv(env, image_size, **downsampler)
