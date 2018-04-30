@@ -3,19 +3,10 @@
 Using Double Dueling Deep-_Q_ Networks to play Atari 2600 games and Super
 Mario Bros from the Nintendo Entertainment System (NES).
 
-## Atari 2600 
+[![Playing Super Mario Bros with Deep Reinforcement Learning][thumb]][video]
 
-| Breakout              | Pong              | Seaquest              |
-|:---------------------:|:-----------------:|:---------------------:|
-| ![](img/Breakout.png) | ![](img/Pong.png) | ![](img/Seaquest.png) |
-
-## Super Mario Bros.
-
-|                              |                              | 
-|:----------------------------:|:----------------------------:|
-| ![](img/SuperMarioBros1.png) | ![](img/SuperMarioBros2.png) | 
-
-
+[thumb]: https://img.youtube.com/vi/GCUVFAwUpj0/0.jpg
+[video]: https://www.youtube.com/watch?v=GCUVFAwUpj0
 
 # Installation
 
