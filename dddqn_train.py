@@ -26,8 +26,8 @@ print('writing results to {}'.format(repr(output_dir)))
 weights_file = '{}/weights.h5'.format(output_dir)
 
 
-# load these after command line arg checking bc tensorflow is slow to load
-# and generates some warning output
+# load these module after command line argument checking because TensorFlow
+# is slow to load and generates some warning outputs
 from src.environment.atari import build_atari_environment
 from src.environment.nes import build_nes_environment
 from src.agents import DeepQAgent
@@ -46,7 +46,7 @@ else:
 
 # build the agent
 agent = DeepQAgent(env)
-# write some info about the agent's hyperparameters to disk
+# write some info about the agent's hyper-parameters to disk
 with open('{}/agent.py'.format(output_dir), 'w') as agent_file:
     agent_file.write(repr(agent))
 
@@ -58,7 +58,7 @@ agent.observe()
 # train the agent
 try:
     callback = BaseCallback(weights_file)
-    agent.train(callback=callback)
+    agent.train(frames_to_play=1e6, callback=callback)
 except KeyboardInterrupt:
     print('canceled training')
 
