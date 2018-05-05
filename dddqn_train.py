@@ -6,6 +6,7 @@ import os
 import sys
 import datetime
 import pandas as pd
+from matplotlib import pyplot as plt
 
 
 # load variables from the command line
@@ -44,7 +45,6 @@ else:
 # env = Monitor(env, '{}/monitor_train'.format(output_dir), force=True)
 
 
-# build the agent
 agent = DeepQAgent(env)
 # write some info about the agent's hyper-parameters to disk
 with open('{}/agent.py'.format(output_dir), 'w') as agent_file:
@@ -58,18 +58,22 @@ agent.observe()
 # train the agent
 try:
     callback = BaseCallback(weights_file)
-    agent.train(frames_to_play=1e6, callback=callback)
+    agent.train(frames_to_play=5e6, callback=callback)
 except KeyboardInterrupt:
     print('canceled training')
 
-
-# save the training results
-scores = pd.Series(callback.scores)
-scores.to_csv('{}/scores.csv'.format(output_dir))
-losses = pd.Series(callback.losses)
-losses.to_csv('{}/losses.csv'.format(output_dir))
 # save the weights to disk
 agent.model.save_weights(weights_file, overwrite=True)
+
+# save the training results
+rewards = pd.Series(callback.scores)
+losses = pd.Series(callback.losses)
+rewards_losses = pd.concat([rewards, losses], axis=1)
+rewards_losses.columns = ['Reward', 'Loss']
+rewards_losses.index.name = 'Episode'
+rewards_losses.to_csv('{}/rewards_losses.csv'.format(output_dir))
+rewards_losses.plot(figsize=(12, 5), subplots=True)
+plt.savefig('{}/rewards_losses.pdf'.format(output_dir))
 
 
 # close the environment to perform necessary cleanup
