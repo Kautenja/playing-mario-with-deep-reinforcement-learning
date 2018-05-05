@@ -30,7 +30,7 @@ def build_nes_environment(game_name: str,
 
     """
     # make the initial environment
-    env = gym_super_mario_bros.make('{}-v0'.format(game_name))
+    env = gym_super_mario_bros.make('{}-v1'.format(game_name))
     # add a reward cache for scoring episodes
     env = RewardCacheEnv(env)
     # add a monitor if the directory is provided
