@@ -30,15 +30,14 @@ def build_nes_environment(game_name: str,
 
     """
     # make the initial environment
-    env = gym_super_mario_bros.make('{}-v0'.format(game_name))
+    env = gym_super_mario_bros.make('{}-v1'.format(game_name))
     # add a reward cache for scoring episodes
     env = RewardCacheEnv(env)
     # add a monitor if the directory is provided
     if monitor_dir is not None:
         env = Monitor(env, monitor_dir)
     # apply a down-sampler for the given game
-    downsampler = DownsampleEnv.metadata[game_name.split('-')[0]]
-    env = DownsampleEnv(env, image_size, **downsampler)
+    env = DownsampleEnv(env, image_size)
     # clip the rewards in {-1, 0, +1} if the feature is enabled
     if clip_rewards:
         env = ClipRewardEnv(env)

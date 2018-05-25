@@ -55,7 +55,7 @@ def build_atari_environment(game_name: str,
     if 'FIRE' in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
     # apply a down-sampler for the given game
-    env = DownsampleEnv(env, image_size, **DownsampleEnv.metadata[game_name])
+    env = DownsampleEnv(env, image_size)
     # apply the death penalty feature if enabled
     if death_penalty is not None:
         env = PenalizeDeathEnv(env, penalty=death_penalty)
