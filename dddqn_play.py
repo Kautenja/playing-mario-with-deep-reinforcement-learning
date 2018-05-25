@@ -5,6 +5,7 @@
 import os
 import sys
 import pandas as pd
+import gym_tetris
 
 
 # load variables from the command line
@@ -32,8 +33,12 @@ from src.environment.nes import build_nes_environment
 from src.agents import DeepQAgent
 
 
+# check if this is the Tetris environment
+if 'Tetris-v0' == game_name:
+    env = gym_tetris.make('Tetris-v0')
+    env = gym_tetris.wrap(env)
 # check if we need to load the NES environment
-if 'SuperMarioBros' in game_name:
+elif 'SuperMarioBros' in game_name:
     monitor_dir = '{}/monitor_play'.format(output_dir)
     env = build_nes_environment(game_name, monitor_dir=monitor_dir)
 # default to the Atari environment
