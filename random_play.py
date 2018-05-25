@@ -31,6 +31,8 @@ from src.environment.atari import build_atari_environment
 from src.environment.nes import build_nes_environment
 from src.agents import RandomAgent
 
+
+# check if this is the Tetris environment
 if 'Tetris-v0' == game_name:
     env = gym_tetris.make('Tetris-v0')
     env = gym_tetris.wrap(env)
