@@ -38,7 +38,7 @@ from src.util import BaseCallback
 # check if this is the Tetris environment
 if 'Tetris-v0' == game_name:
     env = gym_tetris.make('Tetris-v0')
-    env = gym_tetris.wrap(env)
+    env = gym_tetris.wrap(env, clip_rewards=False)
 # check if we need to load the NES environment
 elif 'SuperMarioBros' in game_name:
     env = build_nes_environment(game_name)
@@ -50,7 +50,7 @@ else:
 
 
 # build the agent
-agent = DeepQAgent(env)
+agent = DeepQAgent(env, replay_memory_size=int(7.5e5))
 # write some info about the agent's hyperparameters to disk
 with open('{}/agent.py'.format(output_dir), 'w') as agent_file:
     agent_file.write(repr(agent))
@@ -63,7 +63,7 @@ agent.observe()
 # train the agent
 try:
     callback = BaseCallback(weights_file)
-    agent.train(callback=callback)
+    agent.train(frames_to_play=int(2.5e6), callback=callback)
 except KeyboardInterrupt:
     print('canceled training')
 
