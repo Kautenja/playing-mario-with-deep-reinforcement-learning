@@ -36,7 +36,7 @@ from src.agents import DeepQAgent
 # check if this is the Tetris environment
 if 'Tetris-v0' == game_name:
     env = gym_tetris.make('Tetris-v0')
-    env = gym_tetris.wrap(env)
+    env = gym_tetris.wrap(env, clip_rewards=False)
 # check if we need to load the NES environment
 elif 'SuperMarioBros' in game_name:
     monitor_dir = '{}/monitor_play'.format(output_dir)
