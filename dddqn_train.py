@@ -36,8 +36,8 @@ from src.util import BaseCallback
 
 
 # check if this is the Tetris environment
-if 'Tetris-v0' == game_name:
-    env = gym_tetris.make('Tetris-v0')
+if 'Tetris' in game_name:
+    env = gym_tetris.make(game_name)
     env = gym_tetris.wrap(env, clip_rewards=False)
 # check if we need to load the NES environment
 elif 'SuperMarioBros' in game_name:
