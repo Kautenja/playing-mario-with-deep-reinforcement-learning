@@ -6,6 +6,7 @@ import os
 import sys
 import pandas as pd
 import gym_tetris
+import gym_super_mario_bros
 
 
 # load variables from the command line
@@ -29,18 +30,17 @@ if not os.path.exists(weights_file):
 # load these after command line arg checking bc tensorflow is slow to load
 # and generates some warning output deprecations and such that clog std out
 from src.environment.atari import build_atari_environment
-from src.environment.nes import build_nes_environment
 from src.agents import DeepQAgent
 
 
 # check if this is the Tetris environment
-if 'Tetris-v0' == game_name:
-    env = gym_tetris.make('Tetris-v0')
+if 'Tetris' in game_name:
+    env = gym_tetris.make(game_name)
     env = gym_tetris.wrap(env, clip_rewards=False)
 # check if we need to load the NES environment
 elif 'SuperMarioBros' in game_name:
-    monitor_dir = '{}/monitor_play'.format(output_dir)
-    env = build_nes_environment(game_name, monitor_dir=monitor_dir)
+    env = gym_super_mario_bros.make(game_name)
+    env = gym_super_mario_bros.wrap(env, clip_rewards=False)
 # default to the Atari environment
 else:
     env = build_atari_environment(game_name, is_validation=True)
