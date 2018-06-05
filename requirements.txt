@@ -1,5 +1,5 @@
 gym==0.10.5
-gym-super-mario-bros==0.6.0
+gym-super-mario-bros==0.11.5
 gym-tetris==0.3.7
 atari_py==0.1.1
 opencv-python==3.4.0.12
