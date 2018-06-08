@@ -7,8 +7,8 @@ and Tetris.
 
 ## `virtualenv`
 
-Use `virtualenv` to contain the environment to a single
-local installation of python3:
+Use `virtualenv` to contain the Python environment to a single local
+installation of python3:
 
 #### Setup
 
