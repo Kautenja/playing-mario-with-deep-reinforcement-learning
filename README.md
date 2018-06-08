@@ -42,7 +42,12 @@ python3; python2 is not supported.
 # Usage
 
 The following instructions assume you have a shell running at the top level
-directory of the project.
+directory of the project. For comprehensive documentation on command line
+options, run the following:
+
+```shell
+python . -h
+```
 
 ## Test Cases
 
@@ -93,7 +98,7 @@ python . -m train -e Pong-v0
 To run a trained Deep-Q agent on validation games:
 
 ```shell
-python . -o <results directory>
+python . -m play -o <results directory>
 ```
 
 -   `<results directory>` is a directory containing a `weights.h5` file from a
@@ -104,5 +109,5 @@ python . -o <results directory>
 For instance, to play a Deep-Q agent on Pong:
 
 ```shell
-python . -m train -e results/Pong-v0/DeepQAgent/2018-06-07_09-24
+python . -m play -e results/Pong-v0/DeepQAgent/2018-06-07_09-24
 ```
