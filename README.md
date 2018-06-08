@@ -1,4 +1,4 @@
-# Playing Super Mario Bros. & Tetris Deep Reinforcement Learning
+# Playing Super Mario Bros. & Tetris With Deep Reinforcement Learning
 
 Using (Double/Dueling) Deep-Q Networks to play Atari 2600, Super Mario Bros.,
 and Tetris.
