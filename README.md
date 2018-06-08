@@ -1,12 +1,7 @@
-# Playing Atari 2600 & Super Mario Bros. with Deep Reinforcement Learning
+# Playing Super Mario Bros. & Tetris Deep Reinforcement Learning
 
-Using Double Dueling Deep-_Q_ Networks to play Atari 2600 games and Super
-Mario Bros from the Nintendo Entertainment System (NES).
-
-[![Playing Super Mario Bros with Deep Reinforcement Learning][thumb]][video]
-
-[thumb]: https://img.youtube.com/vi/GCUVFAwUpj0/0.jpg
-[video]: https://www.youtube.com/watch?v=GCUVFAwUpj0
+Using (Double/Dueling) Deep-Q Networks to play Atari 2600, Super Mario Bros.,
+and Tetris.
 
 # Installation
 
