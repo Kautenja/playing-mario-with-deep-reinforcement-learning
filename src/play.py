@@ -10,7 +10,7 @@ import gym_super_mario_bros
 
 def play(
     results_dir: str,
-    is_monitor: bool = False
+    is_monitor: bool=False
 ) -> None:
     """
     Play an environment with a certain agent.
@@ -48,6 +48,9 @@ def play(
         env = gym_super_mario_bros.wrap(env, clip_rewards=False)
     else:
         env = build_atari_environment(env_id, is_validation=True)
+
+    # wrap the environment with a monitor if enabled
+    if is_monitor:
         env = Monitor(env, '{}/monitor_play'.format(results_dir), force=True)
 
     # build the agent without any replay memory since we're just playing, load
@@ -77,7 +80,7 @@ def play(
 def play_random(
     env_id: str,
     output_dir: str,
-    is_monitor: bool = False
+    is_monitor: bool=False
 ) -> None:
     """
     Run a uniformly random agent in the given environment.
@@ -115,7 +118,7 @@ def play_random(
 
     # wrap the environment with a monitor if enabled
     if is_monitor:
-        env = Monitor(env, '{}/monitor_train'.format(output_dir), force=True)
+        env = Monitor(env, '{}/monitor_random'.format(output_dir), force=True)
 
     # initialize a random agent on the environment and play a validation batch
     agent = RandomAgent(env)
