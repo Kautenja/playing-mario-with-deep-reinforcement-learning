@@ -46,44 +46,68 @@ python3; python2 is not supported.
 
 # Usage
 
-#### Test Cases
+The following instructions assume you have a shell running at the top level
+directory of the project.
+
+## Test Cases
 
 To execute the `unittest` suite for the project run:
 
 ```shell
-make test
+python -m unittest discover .
 ```
 
-## Random Games
+## Random Agent
 
-To play games with an agent that makes random decisions, use the random play
-script.
+To play games with an agent that makes random decisions:
 
 ```shell
-python3 random_play.py <game name> <results directory>
+python . -m random -e <environment ID>
 ```
 
--   `<game name>` is the game to play such as `Breakout` or `SuperMarioBros`
--   `<results directory>` is the directory to store output results in
+-   `<environment ID>` is the ID of the environment to play randomly.
 
-## Train DDDQN
+### Example
 
-To train the DDDQN on a game, use the training script.
+For instance, to play a random agent on Pong:
 
 ```shell
-python3 dddqn_train.py <game name> <results directory>
+python . -m random -e Pong-v0
 ```
 
--   `<game name>` is the game to play such as `Breakout` or `SuperMarioBros`
--   `<results directory>` is the directory to store output results in
+## Training A Deep-Q Agent
 
-## Play With Trained DDDQN
-
-To run a trained DDDQN on validation games, use the play script.
+To train a Deep-Q agent to play a game:
 
 ```shell
-python3 dddqn_play.py <results directory>
+python . -m train -e <environment ID>
 ```
 
--   `<results directory>` is the directory containing a `weights.h5` file
-    with stored weights from the dueling network model
+-   `<environment ID>` is the ID of the environment to train on.
+
+### Example
+
+For instance, to train a Deep-Q agent on Pong:
+
+```shell
+python . -m train -e Pong-v0
+```
+
+## Playing With A Trained Agent
+
+To run a trained Deep-Q agent on validation games:
+
+```shell
+python . -o <results directory>
+```
+
+-   `<results directory>` is a directory containing a `weights.h5` file from a
+    training session
+
+### Example
+
+For instance, to play a Deep-Q agent on Pong:
+
+```shell
+python . -m train -e results/Pong-v0/DeepQAgent/2018-06-07_09-24
+```
