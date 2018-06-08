@@ -5,6 +5,7 @@
 import os
 import sys
 import pandas as pd
+from matplotlib import pyplot as plt
 import gym_tetris
 import gym_super_mario_bros
 
@@ -56,12 +57,19 @@ agent.target_model.load_weights(weights_file)
 agent.play()
 
 
-# collect the game scores
-scores = pd.Series(env.unwrapped.episode_rewards)
+# collect the game scores, actual scores from the reward cache wrapper, not
+# mutated, clipped, or whatever rewards that the agent sees
+scores = pd.concat([pd.Series(env.unwrapped.episode_rewards)], axis=1)
+scores.columns = ['Score']
+scores.index.name = 'Episode'
+print(scores.describe())
+# write the scores and a histogram visualization to disk
 scores.to_csv('{}/final_scores.csv'.format(output_dir))
-# print some stats
-print('min ', scores.min())
-print('mean ', scores.mean())
-print('max ', scores.max())
+ax = scores['Score'].hist()
+ax.set_title('Histogram of Scores')
+ax.set_ylabel('Number of Episodes')
+ax.set_xlabel('Score')
+plt.savefig('{}/final_scores.pdf'.format(output_dir))
+
 
 env.close()
