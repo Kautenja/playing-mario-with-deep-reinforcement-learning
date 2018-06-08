@@ -11,7 +11,7 @@ import gym_super_mario_bros
 def train(
     env_id: str,
     output_dir: str,
-    is_monitor: bool = False
+    is_monitor: bool=False
 ) -> None:
     """
     Train an agent to actuate a certain environment.
