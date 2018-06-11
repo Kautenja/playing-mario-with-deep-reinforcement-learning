@@ -1,5 +1,5 @@
 """Methods for playing environments with agents."""
-import os
+import os, sys
 from datetime import datetime
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -58,7 +58,12 @@ def play(
     agent = DeepQAgent(env, replay_memory_size=0)
     agent.model.load_weights(weights_file)
     agent.target_model.load_weights(weights_file)
-    agent.play()
+
+    try:
+        agent.play()
+    except KeyboardInterrupt:
+        env.close()
+        sys.exit(0)
 
     # collect the game scores, actual scores from the reward cache wrapper,
     # not mutated, clipped, or whatever rewards that the agent sees
