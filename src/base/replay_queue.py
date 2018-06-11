@@ -1,5 +1,4 @@
 """A queue for storing previous experiences to sample from."""
-from collections import deque
 import numpy as np
 
 
