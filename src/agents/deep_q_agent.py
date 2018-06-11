@@ -91,7 +91,7 @@ class DeepQAgent(Agent):
         self.dueling_network = dueling_network
         # build an output mask that lets all action values pass through
         mask_shape = (1, env.action_space.n)
-        self.predict_mask = np.ones(mask_shape)
+        self.mask = np.ones(mask_shape)
         if dueling_network:
             build_model = build_dueling_deep_q_model
         else:
@@ -155,16 +155,11 @@ class DeepQAgent(Agent):
             # terminal states have a Q value of zero by definition
             Q_t = 0.0
         else:
-            # create a null mask to let all values pass through the output
-            Q_t_mask = np.ones((1, self.env.action_space.n))
             # predict Q values for the next state and take the max value.
-            Q_t = self.target_model.predict([s2[None, :, :, :], Q_t_mask])
+            Q_t = self.target_model.predict([s2[None, :, :, :], self.mask])
 
-        # use an identity of size action space, and index a row from it using
-        # the action to produce a one-hot vector representing the mask
-        Q_mask = np.eye(self.env.action_space.n)[a][np.newaxis, :]
         # calculate the predicted Q value from the current state and action
-        Q = self.model.predict([s[None, :, :, :], Q_mask])
+        Q = self.model.predict([s[None, :, :, :], self.mask])
         # calculate the TD error based on the reward, discounted future
         # reward, and the predicted future reward
         td_error = abs(r + self.discount_factor * np.max(Q_t) - np.max(Q))
@@ -299,7 +294,7 @@ class DeepQAgent(Agent):
             # reshape the frames to pass through the loss network
             frames = frames[np.newaxis, :, :, :]
             # predict the values of each action
-            actions = self.model.predict([frames, self.predict_mask])
+            actions = self.model.predict([frames, self.mask])
             # return the action with the highest estimated future reward
             return np.argmax(actions)
 
