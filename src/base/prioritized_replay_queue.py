@@ -31,6 +31,11 @@ class PrioritizedReplayQueue(object):
         """Return an executable string representation of priority queue."""
         return '{}(size={})'.format(self.__class__.__name__, self.size)
 
+    @property
+    def top(self)-> int:
+        """Return the index of the top element in the queue."""
+        return len(self.heap)
+
     def push(self,
         s: np.ndarray,
         a: int,
