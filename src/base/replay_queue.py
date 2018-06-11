@@ -32,19 +32,23 @@ class ReplayQueue(object):
         """Return the size of the queue."""
         return len(self.queue)
 
-    def push(self, *args) -> None:
+    def push(self, s, a, r, d, s2) -> None:
         """
         Push a new experience onto the queue.
 
         Args:
-            *args: the experience s, a, r, d, s2
+            s: the current state
+            a: the action to get from current state `s` to next state `s2`
+            r: the reward resulting from taking action `a` in state `s`
+            d: the flag denoting whether the episode ended after action `a`
+            s2: the next state from taking action `a` in state `s`
 
         Returns:
             None
 
         """
         # push the variables onto the queue
-        self.queue[self.index] = args
+        self.queue[self.index] = s, a, r, d, s2
         # increment the index
         self.index = (self.index + 1) % self.size
         # increment the top pointer
