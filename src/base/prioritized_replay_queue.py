@@ -1,4 +1,5 @@
 """A priority queue for storing previous experiences to sample from."""
+import itertools
 from heapq import heappush, heappushpop
 import numpy as np
 
@@ -26,6 +27,12 @@ class PrioritizedReplayQueue(object):
         self.size = size
         # initialize the priority queue as a heap
         self.heap = []
+        # create a counter for resolving issues of equal priority. multi-
+        # dimensional numpy arrays can't be directly compared, thus rendering
+        # a value error if we try to compare them. Thus adding a unique count
+        # as the secondary comparison (after priority) prevents the comparison
+        # of numpy arrays altogether
+        self.counter = itertools.count()
 
     def __repr__(self) -> str:
         """Return an executable string representation of priority queue."""
@@ -59,12 +66,14 @@ class PrioritizedReplayQueue(object):
             None
 
         """
+        # get the unique count for this item
+        count = next(self.counter)
         # if the heap has arrived at capacity, use push pop to add new items
         if len(self.heap) == self.size:
-            heappushpop(self.heap, (priority, (s, a, r, d, s2)))
+            heappushpop(self.heap, (priority, count, (s, a, r, d, s2)))
         # otherwise heap push the item onto the queue
         else:
-            heappush(self.heap, (priority, (s, a, r, d, s2)))
+            heappush(self.heap, (priority, count, (s, a, r, d, s2)))
 
     def sample(self, size: int=32) -> bool:
         """
@@ -78,8 +87,9 @@ class PrioritizedReplayQueue(object):
 
         """
         # extract a sample from the heap (priorities are in increasing order)
-        # i.e. the lowest priority value is the first item in the sample
-        sample_batch = [x[1] for x in self.heap[-size:]]
+        # i.e. the lowest priority value is the first item in the sample.
+        # ignore the first two values in each heap item (priority & count)
+        sample_batch = [experience for (_, _, experience) in self.heap[-size:]]
         # initialize lists for each component of the batch
         s = [None] * len(sample_batch)
         a = [None] * len(sample_batch)
