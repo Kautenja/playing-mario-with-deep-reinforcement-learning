@@ -1,13 +1,16 @@
 """An implementation of Deep Q-Learning."""
+import gym
 import numpy as np
 from typing import Callable
 from tqdm import tqdm
+from keras.optimizers import Optimizer
 from keras.optimizers import Adam
 from src.models import build_deep_q_model
 from src.models import build_dueling_deep_q_model
 from src.models.losses import huber_loss
 from src.base import AnnealingVariable
 from src.base import ReplayQueue
+from src.base import PrioritizedReplayQueue
 from .agent import Agent
 
 
@@ -31,13 +34,15 @@ _REPR_TEMPLATE = """
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env, render_mode: str='rgb_array',
+    def __init__(self, env: gym.Env,
+        render_mode: str='rgb_array',
         replay_memory_size: int=1000000,
+        prioritized_experience_replay: bool=False,
         discount_factor: float=0.99,
         update_frequency: int=4,
-        optimizer=Adam(lr=2e-5),
-        exploration_rate=AnnealingVariable(1.0, 0.1, 1000000),
-        loss=huber_loss,
+        optimizer: Optimizer=Adam(lr=2e-5),
+        exploration_rate: AnnealingVariable=AnnealingVariable(1., .1, 1000000),
+        loss: Callable=huber_loss,
         target_update_freq: int=10000,
         dueling_network: bool=True
     ) -> None:
@@ -66,9 +71,16 @@ class DeepQAgent(Agent):
             None
 
         """
+        # setup the Gym environment variables
         self.env = env
         self.render_mode = render_mode
-        self.queue = ReplayQueue(replay_memory_size)
+        # setup the replay queue
+        self.prioritized_experience_replay = prioritized_experience_replay
+        if prioritized_experience_replay:
+            self.queue = PrioritizedReplayQueue(replay_memory_size)
+        else:
+            self.queue = ReplayQueue(replay_memory_size)
+        # setup the Q learning algorithm variables
         self.discount_factor = discount_factor
         self.update_frequency = update_frequency
         self.optimizer = optimizer
@@ -116,6 +128,35 @@ class DeepQAgent(Agent):
             self.dueling_network
         )
 
+    def remember(self,
+        state: np.ndarray,
+        action: int,
+        reward: int,
+        done: bool,
+        next_state: np.ndarray,
+    ) -> None:
+        """
+        Push an experience onto the replay queue.
+
+        Args:
+            s: the current state
+            a: the action to get from current state `s` to next state `s2`
+            r: the reward resulting from taking action `a` in state `s`
+            d: the flag denoting whether the episode ended after action `a`
+            s2: the next state from taking action `a` in state `s`
+
+        Returns:
+            None
+
+        """
+        if self.prioritized_experience_replay:
+            # TODO:
+            # calculate the priority of the experience based on the TD error
+            p = 0
+            self.queue.push(state, action, reward, done, next_state, priority=p)
+        else:
+            self.queue.push(state, action, reward, done, next_state)
+
     def observe(self, replay_start_size: int=50000) -> None:
         """
         Observe random moves to initialize the replay memory.
@@ -143,7 +184,7 @@ class DeepQAgent(Agent):
                 # perform action and observe the reward and next state
                 next_state, reward, done = self._next_state(action)
                 # push the memory onto the replay queue
-                self.queue.push(state, action, reward, done, next_state)
+                self.remember(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
@@ -260,7 +301,7 @@ class DeepQAgent(Agent):
                 next_state, reward, done = self._next_state(action)
                 score += reward
                 # push the memory onto the replay queue
-                self.queue.push(state, action, reward, done, next_state)
+                self.remember(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
