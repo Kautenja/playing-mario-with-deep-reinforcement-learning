@@ -20,6 +20,7 @@ _REPR_TEMPLATE = """
     env={},
     render_mode={}
     replay_memory_size={},
+    prioritized_experience_replay={},
     discount_factor={},
     update_frequency={},
     optimizer={},
@@ -119,6 +120,7 @@ class DeepQAgent(Agent):
             self.env,
             repr(self.render_mode),
             self.queue.size,
+            self.prioritized_experience_replay,
             self.discount_factor,
             self.update_frequency,
             self.optimizer,
@@ -150,12 +152,94 @@ class DeepQAgent(Agent):
 
         """
         if self.prioritized_experience_replay:
-            # TODO:
             # calculate the priority of the experience based on the TD error
-            td_error = 0
-            self.queue.push(s, a, r, d, s2, priority=td_error)
+            self.queue.push(s, a, r, d, s2,
+                priority=self.td_error(s, a, r, d, s2)
+            )
         else:
             self.queue.push(s, a, r, d, s2)
+
+    def _replay(self,
+        s: np.ndarray,
+        a: np.ndarray,
+        r: np.ndarray,
+        d: np.ndarray,
+        s2: np.ndarray
+    ) -> float:
+        """
+        Train the network on a mini-batch of replay data.
+
+        Args:
+            s: a batch of current states
+            a: a batch of actions from each state in s
+            r: a batch of reward from each action in a
+            d: a batch of terminal flags after each action in a
+            s2: the next state from each state, action pair in s, a
+
+        Returns:
+            the loss as a result of the training
+
+        """
+        # initialize target y values
+        y = np.zeros((len(s), self.env.action_space.n))
+
+        # predict Q values for the next state of each memory in the batch and
+        # take the max value. don't mask any outputs, i.e. use ones
+        all_mask = np.ones((len(s), self.env.action_space.n))
+        Q = np.max(self.target_model.predict_on_batch([s2, all_mask]), axis=1)
+        # terminal states have a Q value of zero by definition
+        Q[d] = 0
+        # set the y value for each sample to the reward of the selected
+        # action plus the discounted Q value
+        y[range(y.shape[0]), a] = r + self.discount_factor * Q
+
+        # use an identity of size action space, and index rows from it using
+        # the action vector to produce a one-hot matrix representing the mask
+        action_mask = np.eye(self.env.action_space.n)[a]
+        # train the model on the batch and return the loss. use the mask that
+        # disables training for actions that aren't the selected actions.
+        return self.model.train_on_batch([s, action_mask], y)
+
+    def td_error(self,
+        s: np.ndarray,
+        a: np.ndarray,
+        r: np.ndarray,
+        d: np.ndarray,
+        s2: np.ndarray
+    ) -> float:
+        """
+        Calculate the TD-error for a single experience.
+
+        Args:
+            s: the current state
+            a: the action to get from current state `s` to next state `s2`
+            r: the reward resulting from taking action `a` in state `s`
+            d: the flag denoting whether the episode ended after action `a`
+            s2: the next state from taking action `a` in state `s`
+
+        Returns:
+            the TD-error as a result of the experience
+
+        """
+        if d:
+            # terminal states have a Q value of zero by definition
+            Q_t = 0.0
+        else:
+            # create a null mask to let all values pass through the output
+            Q_t_mask = np.ones((1, self.env.action_space.n))
+            # predict Q values for the next state and take the max value.
+            Q_t = self.target_model.predict([s2[None, :, :, :], Q_t_mask])
+
+        # use an identity of size action space, and index a row from it using
+        # the action to produce a one-hot vector representing the mask
+        Q_mask = np.eye(self.env.action_space.n)[a][np.newaxis, :]
+        # calculate the predicted Q value from the current state and action
+        Q = self.model.predict([s[None, :, :, :], Q_mask])
+        # calculate the TD error based on the reward, discounted future
+        # reward, and the predicted future reward
+        td_error = abs(r + self.discount_factor * np.max(Q_t) - np.max(Q))
+
+        return td_error
 
     def observe(self, replay_start_size: int=50000) -> None:
         """
@@ -193,47 +277,6 @@ class DeepQAgent(Agent):
                 progress.update(1)
 
         progress.close()
-
-    def _replay(self,
-        s: np.ndarray,
-        a: np.ndarray,
-        r: np.ndarray,
-        d: np.ndarray,
-        s2: np.ndarray
-    ) -> float:
-        """
-        Train the network on a mini-batch of replay data.
-
-        Args:
-            s: a batch of current states
-            a: a batch of actions from each state in s
-            r: a batch of reward from each action in a
-            d: a batch of terminal flags after each action in a
-            s2: the next state from each state, action pair in s, a
-
-        Returns:
-            the loss as a result of the training
-
-        """
-        # initialize target y values
-        y = np.zeros((len(s), self.env.action_space.n))
-
-        # predict Q values for the next state of each memory in the batch and
-        # take the maximum value. dont mask any outputs, i.e. use ones
-        all_mask = np.ones((len(s), self.env.action_space.n))
-        Q = np.max(self.target_model.predict_on_batch([s2, all_mask]), axis=1)
-        # terminal states have a Q value of zero by definition
-        Q[d] = 0
-        # set the y value for each sample to the reward of the selected
-        # action plus the discounted Q value
-        y[range(y.shape[0]), a] = r + self.discount_factor * Q
-
-        # use an identity of size action space, and index rows from it using
-        # the action vector to produce a one-hot matrix representing the mask
-        action_mask = np.eye(self.env.action_space.n)[a]
-        # train the model on the batch and return the loss. use the mask that
-        # disables training for actions that aren't the selected actions.
-        return self.model.train_on_batch([s, action_mask], y)
 
     def predict_action(self,
         frames: np.ndarray,
