@@ -128,7 +128,7 @@ class DeepQAgent(Agent):
             self.dueling_network
         )
 
-    def remember(self,
+    def _remember(self,
         state: np.ndarray,
         action: int,
         reward: int,
@@ -184,7 +184,7 @@ class DeepQAgent(Agent):
                 # perform action and observe the reward and next state
                 next_state, reward, done = self._next_state(action)
                 # push the memory onto the replay queue
-                self.remember(state, action, reward, done, next_state)
+                self._remember(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
@@ -301,7 +301,7 @@ class DeepQAgent(Agent):
                 next_state, reward, done = self._next_state(action)
                 score += reward
                 # push the memory onto the replay queue
-                self.remember(state, action, reward, done, next_state)
+                self._remember(state, action, reward, done, next_state)
                 # set the state to the new state
                 state = next_state
                 # decrement the observation counter
