@@ -1,5 +1,5 @@
 """Methods for training an agent."""
-import os
+import os, sys
 import datetime
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -60,7 +60,11 @@ def train(
         agent_file.write(repr(agent))
 
     # observe frames to fill the replay memory
-    agent.observe()
+    try:
+        agent.observe()
+    except KeyboardInterrupt:
+        env.close()
+        sys.exit(0)
 
     # train the agent
     try:
