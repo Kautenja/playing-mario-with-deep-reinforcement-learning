@@ -129,11 +129,11 @@ class DeepQAgent(Agent):
         )
 
     def _remember(self,
-        state: np.ndarray,
-        action: int,
-        reward: int,
-        done: bool,
-        next_state: np.ndarray,
+        s: np.ndarray,
+        a: int,
+        r: int,
+        d: bool,
+        s2: np.ndarray,
     ) -> None:
         """
         Push an experience onto the replay queue.
@@ -152,10 +152,10 @@ class DeepQAgent(Agent):
         if self.prioritized_experience_replay:
             # TODO:
             # calculate the priority of the experience based on the TD error
-            p = 0
-            self.queue.push(state, action, reward, done, next_state, priority=p)
+            td_error = 0
+            self.queue.push(s, a, r, d, s2, priority=td_error)
         else:
-            self.queue.push(state, action, reward, done, next_state)
+            self.queue.push(s, a, r, d, s2)
 
     def observe(self, replay_start_size: int=50000) -> None:
         """
