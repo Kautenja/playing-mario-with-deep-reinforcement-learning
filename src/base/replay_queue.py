@@ -32,7 +32,13 @@ class ReplayQueue(object):
         """Return the size of the queue."""
         return len(self.queue)
 
-    def push(self, s, a, r, d, s2) -> None:
+    def push(self,
+        s: np.ndarray,
+        a: int,
+        r: int,
+        d: bool,
+        s2: np.ndarray,
+    ) -> None:
         """
         Push a new experience onto the queue.
 
