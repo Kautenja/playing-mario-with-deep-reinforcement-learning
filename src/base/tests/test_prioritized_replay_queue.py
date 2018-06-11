@@ -160,5 +160,3 @@ class ReplyBuffer_should_push_items_with_uniform_priority(TestCase):
             else:
                 arb.push(*ones(), priority=0)
                 self.assertEqual(10, arb.top)
-
-        self.assertTrue(ones(), arb.heap[arb.index])
