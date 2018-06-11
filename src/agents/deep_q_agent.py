@@ -90,7 +90,7 @@ class DeepQAgent(Agent):
         self.target_update_freq = target_update_freq
         self.dueling_network = dueling_network
         # build an output mask that lets all action values pass through
-        mask_shape = (env.observation_space.shape[-1], env.action_space.n)
+        mask_shape = (1, env.action_space.n)
         self.predict_mask = np.ones(mask_shape)
         if dueling_network:
             build_model = build_dueling_deep_q_model
