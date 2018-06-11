@@ -130,6 +130,47 @@ class DeepQAgent(Agent):
             self.dueling_network
         )
 
+    def _td_error(self,
+        s: np.ndarray,
+        a: np.ndarray,
+        r: np.ndarray,
+        d: np.ndarray,
+        s2: np.ndarray
+    ) -> float:
+        """
+        Calculate the TD-error for a single experience.
+
+        Args:
+            s: the current state
+            a: the action to get from current state `s` to next state `s2`
+            r: the reward resulting from taking action `a` in state `s`
+            d: the flag denoting whether the episode ended after action `a`
+            s2: the next state from taking action `a` in state `s`
+
+        Returns:
+            the TD-error as a result of the experience
+
+        """
+        if d:
+            # terminal states have a Q value of zero by definition
+            Q_t = 0.0
+        else:
+            # create a null mask to let all values pass through the output
+            Q_t_mask = np.ones((1, self.env.action_space.n))
+            # predict Q values for the next state and take the max value.
+            Q_t = self.target_model.predict([s2[None, :, :, :], Q_t_mask])
+
+        # use an identity of size action space, and index a row from it using
+        # the action to produce a one-hot vector representing the mask
+        Q_mask = np.eye(self.env.action_space.n)[a][np.newaxis, :]
+        # calculate the predicted Q value from the current state and action
+        Q = self.model.predict([s[None, :, :, :], Q_mask])
+        # calculate the TD error based on the reward, discounted future
+        # reward, and the predicted future reward
+        td_error = abs(r + self.discount_factor * np.max(Q_t) - np.max(Q))
+
+        return td_error
+
     def _remember(self,
         s: np.ndarray,
         a: int,
@@ -153,9 +194,8 @@ class DeepQAgent(Agent):
         """
         if self.prioritized_experience_replay:
             # calculate the priority of the experience based on the TD error
-            self.queue.push(s, a, r, d, s2,
-                priority=self.td_error(s, a, r, d, s2)
-            )
+            priority = self._td_error(s, a, r, d, s2)
+            self.queue.push(s, a, r, d, s2, priority=priority)
         else:
             self.queue.push(s, a, r, d, s2)
 
@@ -200,47 +240,6 @@ class DeepQAgent(Agent):
         # disables training for actions that aren't the selected actions.
         return self.model.train_on_batch([s, action_mask], y)
 
-    def td_error(self,
-        s: np.ndarray,
-        a: np.ndarray,
-        r: np.ndarray,
-        d: np.ndarray,
-        s2: np.ndarray
-    ) -> float:
-        """
-        Calculate the TD-error for a single experience.
-
-        Args:
-            s: the current state
-            a: the action to get from current state `s` to next state `s2`
-            r: the reward resulting from taking action `a` in state `s`
-            d: the flag denoting whether the episode ended after action `a`
-            s2: the next state from taking action `a` in state `s`
-
-        Returns:
-            the TD-error as a result of the experience
-
-        """
-        if d:
-            # terminal states have a Q value of zero by definition
-            Q_t = 0.0
-        else:
-            # create a null mask to let all values pass through the output
-            Q_t_mask = np.ones((1, self.env.action_space.n))
-            # predict Q values for the next state and take the max value.
-            Q_t = self.target_model.predict([s2[None, :, :, :], Q_t_mask])
-
-        # use an identity of size action space, and index a row from it using
-        # the action to produce a one-hot vector representing the mask
-        Q_mask = np.eye(self.env.action_space.n)[a][np.newaxis, :]
-        # calculate the predicted Q value from the current state and action
-        Q = self.model.predict([s[None, :, :, :], Q_mask])
-        # calculate the TD error based on the reward, discounted future
-        # reward, and the predicted future reward
-        td_error = abs(r + self.discount_factor * np.max(Q_t) - np.max(Q))
-
-        return td_error
-
     def observe(self, replay_start_size: int=50000) -> None:
         """
         Observe random moves to initialize the replay memory.
@@ -278,7 +277,7 @@ class DeepQAgent(Agent):
 
         progress.close()
 
-    def predict_action(self,
+    def predict(self,
         frames: np.ndarray,
         exploration_rate: float
     ) -> int:
@@ -300,7 +299,7 @@ class DeepQAgent(Agent):
             # reshape the frames to pass through the loss network
             frames = frames[np.newaxis, :, :, :]
             # predict the values of each action
-            actions = self.model.predict([frames, self.predict_mask], batch_size=1)
+            actions = self.model.predict([frames, self.predict_mask])
             # return the action with the highest estimated future reward
             return np.argmax(actions)
 
@@ -337,7 +336,7 @@ class DeepQAgent(Agent):
 
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state, self.exploration_rate.value)
+                action = self.predict(state, self.exploration_rate.value)
                 # step the exploration rate forward
                 self.exploration_rate.step()
                 # fire the action and observe the next state, reward, and flag
@@ -378,10 +377,14 @@ class DeepQAgent(Agent):
             an array of scores, one for each game
 
         """
+        # the progress bar for the operation
+        progress = tqdm(range(games), unit='game')
+        progress.set_postfix(score='?')
+
         # a list to keep track of the scores
         scores = np.zeros(games)
         # iterate over the number of games
-        for game in tqdm(range(games), unit='game'):
+        for game in progress:
             done = False
             score = 0
             # reset the game and get the initial state
@@ -389,7 +392,7 @@ class DeepQAgent(Agent):
 
             while not done:
                 # predict the best action based on the current state
-                action = self.predict_action(state, exploration_rate)
+                action = self.predict(state, exploration_rate)
                 # hold the action for the number of frames
                 next_state, reward, done = self._next_state(action)
                 score += reward
@@ -397,6 +400,11 @@ class DeepQAgent(Agent):
                 state = next_state
             # push the score onto the history
             scores[game] = score
+            # update the progress bar
+            progress.set_postfix(score=score)
+            progress.update(1)
+
+        progress.close()
 
         return scores
 
