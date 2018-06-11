@@ -1,5 +1,5 @@
 """A priority queue for storing previous experiences to sample from."""
-from heapq import heappush
+from heapq import heappush, heappushpop
 import numpy as np
 
 
@@ -11,8 +11,7 @@ class PrioritizedReplayQueue(object):
         Initialize a new prioritized replay buffer with a given size.
 
         Args:
-            size: the size of the replay buffer
-                  (the number of previous experiences to store)
+            size: the max number of experiences to store in the queue
 
         Returns:
             None
@@ -32,22 +31,35 @@ class PrioritizedReplayQueue(object):
         """Return an executable string representation of priority queue."""
         return '{}(size={})'.format(self.__class__.__name__, self.size)
 
-    def push(self, *args, priority: float) -> None:
+    def push(self,
+        s: np.ndarray,
+        a: int,
+        r: int,
+        d: bool,
+        s2: np.ndarray,
+        priority: float
+    ) -> None:
         """
         Push a new experience onto the queue.
 
         Args:
-            *args: the experience s, a, r, d, s2
+            s: the current state
+            a: the action to get from current state `s` to next state `s2`
+            r: the reward resulting from taking action `a` in state `s`
+            d: the flag denoting whether the episode ended after action `a`
+            s2: the next state from taking action `a` in state `s`
             priority: the priority of the item to push to the queue
 
         Returns:
             None
 
         """
-        # push the variable onto the heap
-        heappush(self.heap, (priority, args))
-        # bound the heap within the size limit
-        self.heap = self.heap[:self.size]
+        # if the heap has arrived at capacity, use push pop to add new items
+        if len(self.heap) == self.size:
+            heappushpop(self.heap, (priority, (s, a, r, d, s2)))
+        # otherwise heap push the item onto the queue
+        else:
+            heappush(self.heap, (priority, (s, a, r, d, s2)))
 
     def sample(self, size: int=32) -> bool:
         """
@@ -62,7 +74,7 @@ class PrioritizedReplayQueue(object):
         """
         # extract a sample from the heap (priorities are in increasing order)
         # i.e. the lowest priority value is the first item in the sample
-        sample_batch = [x[1] for x in self.heap[:size]]
+        sample_batch = [x[1] for x in self.heap[-size:]]
         # initialize lists for each component of the batch
         s = [None] * len(sample_batch)
         a = [None] * len(sample_batch)
