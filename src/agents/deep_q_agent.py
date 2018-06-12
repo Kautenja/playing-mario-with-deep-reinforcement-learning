@@ -92,6 +92,10 @@ class DeepQAgent(Agent):
         # build an output mask that lets all action values pass through
         mask_shape = (1, env.action_space.n)
         self.mask = np.ones(mask_shape)
+        # use an identity of size action space, to index rows from it using
+        # an action vector to produce a one-hot vector masks for training error
+        self.action_onehot = np.eye(env.action_space.n)
+        # setup the model for predicting Q values
         if dueling_network:
             build_model = build_dueling_deep_q_model
         else:
@@ -220,20 +224,17 @@ class DeepQAgent(Agent):
 
         # predict Q values for the next state of each memory in the batch and
         # take the max value. don't mask any outputs, i.e. use ones
-        all_mask = np.ones((len(s), self.env.action_space.n))
-        Q = np.max(self.target_model.predict_on_batch([s2, all_mask]), axis=1)
+        mask = np.repeat(self.mask, len(s), axis=0)
+        Q = np.max(self.target_model.predict_on_batch([s2, mask]), axis=1)
         # terminal states have a Q value of zero by definition
         Q[d] = 0
         # set the y value for each sample to the reward of the selected
         # action plus the discounted Q value
         y[range(y.shape[0]), a] = r + self.discount_factor * Q
 
-        # use an identity of size action space, and index rows from it using
-        # the action vector to produce a one-hot matrix representing the mask
-        action_mask = np.eye(self.env.action_space.n)[a]
         # train the model on the batch and return the loss. use the mask that
         # disables training for actions that aren't the selected actions.
-        return self.model.train_on_batch([s, action_mask], y)
+        return self.model.train_on_batch([s, self.action_onehot[a]], y)
 
     def observe(self, replay_start_size: int=50000) -> None:
         """
@@ -299,7 +300,7 @@ class DeepQAgent(Agent):
             return np.argmax(actions)
 
     def train(self,
-        frames_to_play: int=25000000,
+        frames_to_play: int=50000000,
         batch_size: int=32,
         callback: Callable=None,
     ) -> None:
