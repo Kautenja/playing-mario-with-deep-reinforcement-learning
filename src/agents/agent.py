@@ -5,14 +5,15 @@ import numpy as np
 class Agent(object):
     """An abstract base class for building reinforcement agents."""
 
-    def __init__(self, env, render_mode: str='rgb_array') -> None:
+    def __init__(self, env, render_mode: str=None) -> None:
         """
         Create a new abstract reinforcement agent.
 
         Args:
             env: the environment for the agent to experience
-            render_mode: the method for rendering frames from the emulator
-
+            render_mode: the mode for rendering frames in the OpenAI gym env
+                - None: don't render (much faster execution)
+                - 'human': render in a window to observe on screen
         Returns:
             None
 
@@ -36,8 +37,11 @@ class Agent(object):
             the initial state of the game
 
         """
+        # reset the environment and get the initial state
         state = self.env.reset()
-        self.env.render(mode=self.render_mode)
+        # render the state if a render_mode exists
+        if self.render_mode is not None:
+            self.env.render(mode=self.render_mode)
 
         return state
 
@@ -55,8 +59,11 @@ class Agent(object):
                 - a flag determining end of episode
 
         """
+        # perform the action and observe the next state, reward, and done flag
         state, reward, done, _ = self.env.step(action=action)
-        self.env.render(mode=self.render_mode)
+        # render the state if a render_mode exists
+        if self.render_mode is not None:
+            self.env.render(mode=self.render_mode)
 
         return state, reward, done
 
