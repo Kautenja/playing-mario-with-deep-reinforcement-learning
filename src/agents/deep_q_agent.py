@@ -1,7 +1,7 @@
 """An implementation of Deep Q-Learning."""
+from typing import Callable
 import gym
 import numpy as np
-from typing import Callable
 from tqdm import tqdm
 from keras.optimizers import Optimizer
 from keras.optimizers import Adam
@@ -35,8 +35,9 @@ _REPR_TEMPLATE = """
 class DeepQAgent(Agent):
     """The Deep Q reinforcement learning algorithm."""
 
-    def __init__(self, env: gym.Env,
-        render_mode: str='rgb_array',
+    def __init__(self,
+        env: gym.Env,
+        render_mode: str=None,
         replay_memory_size: int=750000,
         prioritized_experience_replay: bool=False,
         discount_factor: float=0.99,
@@ -51,21 +52,23 @@ class DeepQAgent(Agent):
         Initialize a new Deep Q Agent.
 
         Args:
-            env: the environment to run on
+            env: the environment for the agent to experience
             render_mode: the mode for rendering frames in the OpenAI gym env
-                         -   'human': render in the emulator (default)
-                         -   'rgb_array': render in the backend and return a
-                                          numpy array (server/Jupyter)
-            discount_factor: the discount factor, γ, for discounting future
-                             reward
+                - None: don't render (much faster execution)
+                - 'human': render in a window to observe on screen
+            replay_memory_size: the number of previous experiences to store
+                in the experience replay queue
+            prioritized_experience_replay: whether to use prioritized
+                experience replay. If False, will use the standard replay
+                queue with uniform random sampling
+            discount_factor: discount factor, γ, for discounting future reward
             update_frequency: the number of actions between updates to the
-                              deep Q network from replay memory
+                deep Q network from replay memory
             optimizer: the optimization method to use on the CNN gradients
             exploration_rate: the exploration rate, ε, expected as an
-                              AnnealingVariable subclass for scheduled decay
+                AnnealingVariable subclass for scheduled decay
             loss: the loss method to use at the end of the CNN
-            target_update_freq: the frequency with which to update the target
-                                network
+            target_update_freq: frequency to update the target network (steps)
             dueling_network: whether to use the dueling architecture
 
         Returns:
@@ -73,8 +76,7 @@ class DeepQAgent(Agent):
 
         """
         # setup the Gym environment variables
-        self.env = env
-        self.render_mode = render_mode
+        super().__init__(env, render_mode)
         # setup the replay queue
         self.prioritized_experience_replay = prioritized_experience_replay
         if prioritized_experience_replay:
@@ -213,7 +215,7 @@ class DeepQAgent(Agent):
             a: a batch of actions from each state in s
             r: a batch of reward from each action in a
             d: a batch of terminal flags after each action in a
-            s2: the next state from each state, action pair in s, a
+            s2: a batch of next states from each state-action pair in s, a
 
         Returns:
             the loss as a result of the training
@@ -273,10 +275,7 @@ class DeepQAgent(Agent):
 
         progress.close()
 
-    def predict(self,
-        frames: np.ndarray,
-        exploration_rate: float
-    ) -> int:
+    def predict(self, frames: np.ndarray, exploration_rate: float) -> int:
         """
         Predict an action from a stack of frames.
 
@@ -363,7 +362,7 @@ class DeepQAgent(Agent):
 
     def play(self, games: int=100, exploration_rate: float=0.05) -> np.ndarray:
         """
-        Run the agent without training for a number of games.
+        Run the agent without training for the given number of games.
 
         Args:
             games: the number of games to play
