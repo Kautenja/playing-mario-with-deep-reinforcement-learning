@@ -37,7 +37,7 @@ class DeepQAgent(Agent):
 
     def __init__(self, env: gym.Env,
         render_mode: str='rgb_array',
-        replay_memory_size: int=1000000,
+        replay_memory_size: int=750000,
         prioritized_experience_replay: bool=False,
         discount_factor: float=0.99,
         update_frequency: int=4,
