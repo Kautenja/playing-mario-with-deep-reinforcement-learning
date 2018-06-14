@@ -45,7 +45,7 @@ class DeepQAgent(Agent):
         exploration_rate: AnnealingVariable=AnnealingVariable(1., .1, 1000000),
         loss: Callable=huber_loss,
         target_update_freq: int=10000,
-        dueling_network: bool=True
+        dueling_network: bool=False,
     ) -> None:
         """
         Initialize a new Deep Q Agent.
