@@ -1,11 +1,12 @@
 """An abstract base class for reinforcement agents."""
+import gym
 import numpy as np
 
 
 class Agent(object):
     """An abstract base class for building reinforcement agents."""
 
-    def __init__(self, env, render_mode: str=None) -> None:
+    def __init__(self, env: gym.Env, render_mode: str=None) -> None:
         """
         Create a new abstract reinforcement agent.
 
