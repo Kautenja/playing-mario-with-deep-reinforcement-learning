@@ -39,7 +39,6 @@ def train(
     from src.agents import DeepQAgent
     from src.util import BaseCallback
 
-    # TODO: replace this logic using an internal `wrap` command
     if 'Tetris' in env_id:
         env = gym_tetris.make(env_id)
         env = gym_tetris.wrap(env, clip_rewards=False)
