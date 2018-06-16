@@ -61,7 +61,7 @@ class ReplayQueue(object):
         if self.top < self.size:
             self.top += 1
 
-    def sample(self, size: int=32) -> bool:
+    def sample(self, size: int=32) -> tuple:
         """
         Return a random sample of items from the queue.
 
