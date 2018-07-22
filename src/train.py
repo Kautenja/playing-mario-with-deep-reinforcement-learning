@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 from gym.wrappers import Monitor
 import gym_tetris
 import gym_super_mario_bros
+from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
 
 def train(
@@ -44,7 +46,8 @@ def train(
         env = gym_tetris.wrap(env, clip_rewards=False)
     elif 'SuperMarioBros' in env_id:
         env = gym_super_mario_bros.make(env_id)
-        env = gym_super_mario_bros.wrap(env, clip_rewards=False)
+        env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
+        env = nes_py_wrap(env)
     else:
         env = build_atari_environment(env_id)
 
