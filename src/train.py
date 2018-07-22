@@ -1,5 +1,6 @@
 """Methods for training an agent."""
-import os, sys
+import os
+import sys
 import datetime
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -7,7 +8,11 @@ from gym.wrappers import Monitor
 import gym_tetris
 import gym_super_mario_bros
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import (
+    SIMPLE_MOVEMENT,
+    COMPLEX_MOVEMENT,
+    RIGHT_ONLY,
+)
 
 
 def train(
