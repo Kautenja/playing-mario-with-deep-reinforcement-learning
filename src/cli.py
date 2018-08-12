@@ -4,28 +4,36 @@ from .train import train
 from .play import play, play_random
 
 
+# mapping of command line arguments by their flags to the options they embody
+_CMD_LINE_ARGS = {
+    ('--env', '-e'): {
+        'type': str,
+        'default': 'SuperMarioBros-1-1-v2',
+        'help': 'The name of the environment to play',
+
+    },
+    ('--mode', '-m'): {
+        'type': str,
+        'default': 'train',
+        'help': 'The execution mode as either: train, play or random',
+        'choices': ['train', 'play', 'random'],
+    },
+    ('--output', '-o'): {
+        'type': str,
+        'default': 'results',
+        'help': 'The directory to (store/load) results (in/from)',
+
+    },
+}
+
+
 def _get_args() -> dict:
     """Parse command line arguments and return them."""
+    # create an argument parsers with the module's docstring as the description
     parser = argparse.ArgumentParser(description=__doc__)
-    # add the argument for the Super Mario Bros environment to run
-    parser.add_argument('--env', '-e',
-        type=str,
-        default='SuperMarioBros-1-1-v2',
-        help='The name of the environment to play.'
-    )
-    # add the argument for the mode of execution as either human or random
-    parser.add_argument('--mode', '-m',
-        type=str,
-        default='train',
-        choices=['train', 'play', 'random'],
-        help='The execution mode as either `train`, `play` or `random`.'
-    )
-    # add the argument for the output directory to store results in
-    parser.add_argument('--output', '-o',
-        type=str,
-        default='results',
-        help='The directory to (store/load) results (in/from).'
-    )
+    # iterate over the flags and options for the command line interface
+    for flags, options in _CMD_LINE_ARGS.items():
+        parser.add_argument(*flags, **options)
     # parse arguments and return them
     return parser.parse_args()
 
