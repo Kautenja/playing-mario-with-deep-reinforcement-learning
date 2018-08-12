@@ -6,7 +6,9 @@ from keras.layers import Lambda
 from keras.layers import Dense
 from keras.layers import Flatten
 from keras.layers import Activation
-from keras.layers import Multiply, Add, Subtract, Average
+from keras.layers import Multiply
+from keras.layers import Add
+from keras.layers import Subtract
 from keras.layers.convolutional import Conv2D
 from keras.optimizers import RMSprop
 from .losses import huber_loss
