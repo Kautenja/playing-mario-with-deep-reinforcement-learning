@@ -7,11 +7,7 @@ from matplotlib import pyplot as plt
 from .setup_env import setup_env
 
 
-def train(
-    env_id: str,
-    output_dir: str,
-    monitor: bool=False
-) -> None:
+def train(env_id: str, output_dir: str, monitor: bool=False) -> None:
     """
     Train an agent to actuate a certain environment.
 
