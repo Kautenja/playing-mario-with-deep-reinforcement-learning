@@ -31,7 +31,7 @@ def play(
 
     """
     try:
-        env_id = results_dir.split('/')[-3]
+        env_id = list(filter(None, results_dir.split('/')))[-3]
     except IndexError:
         raise ValueError('invalid results directory: {}'.format(results_dir))
 
