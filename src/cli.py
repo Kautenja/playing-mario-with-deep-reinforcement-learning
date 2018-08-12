@@ -23,6 +23,11 @@ _CMD_LINE_ARGS = {
         'default': 'results',
         'help': 'The directory to (store/load) results (in/from)',
     },
+    ('--monitor', '-M'): {
+        'type': bool,
+        'default': False,
+        'help': 'whether to monitor the operation (record frames)',
+    },
 }
 
 
@@ -46,16 +51,19 @@ def main() -> None:
     if mode == 'train':
         train(
             env_id=args.env,
-            output_dir=args.output
+            output_dir=args.output,
+            monitor=args.monitor,
         )
     elif mode == 'random':
         play_random(
             env_id=args.env,
-            output_dir=args.output
+            output_dir=args.output,
+            monitor=args.monitor,
         )
     elif mode == 'play':
         play(
-            results_dir=args.output
+            results_dir=args.output,
+            monitor=args.monitor,
         )
 
 
