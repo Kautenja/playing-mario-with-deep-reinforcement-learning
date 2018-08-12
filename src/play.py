@@ -4,27 +4,47 @@ import sys
 from datetime import datetime
 import pandas as pd
 from matplotlib import pyplot as plt
-from gym.wrappers import Monitor
-import gym_tetris
-import gym_super_mario_bros
-from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
-from gym_super_mario_bros.actions import (
-    SIMPLE_MOVEMENT,
-    COMPLEX_MOVEMENT,
-    RIGHT_ONLY,
-)
+from .setup_env import setup_env
+
+
+def plot_results(env: 'gym.Env', results_dir: str, filename: str) -> None:
+    """
+    Plot the results of a series of episodes and save them to disk.
+
+    Args:
+        env: the env with a RewardCacheWrapper to extract data from
+        results_dir: the directory to store the plots and data in
+        filename: the name of the file to use for the plots and data
+
+    Returns:
+        None
+
+    """
+    # collect the game scores, actual scores from the reward cache wrapper,
+    # not mutated, clipped, or whatever rewards that the agent sees
+    scores = pd.concat([pd.Series(env.unwrapped.episode_rewards)], axis=1)
+    scores.columns = ['Score']
+    scores.index.name = 'Episode'
+    print(scores.describe())
+    # write the scores and a histogram visualization to disk
+    scores.to_csv('{}/{}.csv'.format(results_dir, filename))
+    axis = scores['Score'].hist()
+    axis.set_title('Histogram of Scores')
+    axis.set_ylabel('Number of Episodes')
+    axis.set_xlabel('Score')
+    plt.savefig('{}/{}.pdf'.format(results_dir, filename))
 
 
 def play(
     results_dir: str,
-    is_monitor: bool=True
+    monitor: bool=False
 ) -> None:
     """
     Play an environment with a certain agent.
 
     Args:
         results_dir: the directory containing results of a training session
-        is_monitor: whether to wrap the environment with a monitor
+        monitor: whether to monitor the operation
 
     Returns:
         None
@@ -42,25 +62,12 @@ def play(
         raise OSError('weights file not found: {}'.format(weights_file))
 
     # these are long to import and train is only ever called once during
-    # an execution lifecycle. import here to save early execution time
-    from src.environment.atari import build_atari_environment
+    # an execution life-cycle. import here to save early execution time
     from src.agents import DeepQAgent
 
-    # TODO: replace this logic using an internal `wrap` command
-    if 'Tetris' in env_id:
-        env = gym_tetris.make(env_id)
-        env = gym_tetris.wrap(env, clip_rewards=False)
-    elif 'SuperMarioBros' in env_id:
-        env = gym_super_mario_bros.make(env_id)
-        env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-        env = nes_py_wrap(env)
-    else:
-        env = build_atari_environment(env_id, is_validation=True)
-
-    # wrap the environment with a monitor if enabled
-    if is_monitor:
-        env = Monitor(env, '{}/monitor_play'.format(results_dir), force=True)
-
+    # build the environment
+    monitor_dir = '{}/monitor_play'.format(results_dir) if monitor else None
+    env = setup_env(env_id, monitor_dir)
     # build the agent without any replay memory since we're just playing, load
     # the trained weights, and play some games
     agent = DeepQAgent(env, replay_memory_size=0)
@@ -73,19 +80,8 @@ def play(
         env.close()
         sys.exit(0)
 
-    # collect the game scores, actual scores from the reward cache wrapper,
-    # not mutated, clipped, or whatever rewards that the agent sees
-    scores = pd.concat([pd.Series(env.unwrapped.episode_rewards)], axis=1)
-    scores.columns = ['Score']
-    scores.index.name = 'Episode'
-    print(scores.describe())
-    # write the scores and a histogram visualization to disk
-    scores.to_csv('{}/final_scores.csv'.format(results_dir))
-    ax = scores['Score'].hist()
-    ax.set_title('Histogram of Scores')
-    ax.set_ylabel('Number of Episodes')
-    ax.set_xlabel('Score')
-    plt.savefig('{}/final_scores.pdf'.format(results_dir))
+    # plot the results and save data to disk
+    plot_results(env, results_dir, 'result_play')
 
     env.close()
 
@@ -93,7 +89,7 @@ def play(
 def play_random(
     env_id: str,
     output_dir: str,
-    is_monitor: bool=False
+    monitor: bool=False
 ) -> None:
     """
     Run a uniformly random agent in the given environment.
@@ -101,7 +97,7 @@ def play_random(
     Args:
         env_id: the ID of the environment to play
         output_dir: the base directory to store results into
-        is_monitor: whether to wrap the environment with a monitor
+        monitor: whether to monitor the operation
 
     Returns:
         None
@@ -115,41 +111,18 @@ def play_random(
     print('writing results to {}'.format(repr(output_dir)))
 
     # these are long to import and train is only ever called once during
-    # an execution lifecycle. import here to save early execution time
-    from src.environment.atari import build_atari_environment
+    # an execution life-cycle. import here to save early execution time
     from src.agents import RandomAgent
 
-    # TODO: replace this logic using an internal `wrap` command
-    if 'Tetris' in env_id:
-        env = gym_tetris.make(env_id)
-        env = gym_tetris.wrap(env, clip_rewards=False)
-    elif 'SuperMarioBros' in env_id:
-        env = gym_super_mario_bros.make(env_id)
-        env = gym_super_mario_bros.wrap(env, clip_rewards=False)
-    else:
-        env = build_atari_environment(env_id)
-
-    # wrap the environment with a monitor if enabled
-    if is_monitor:
-        env = Monitor(env, '{}/monitor_random'.format(output_dir), force=True)
-
+    # build the environment
+    monitor_dir = '{}/monitor_random'.format(output_dir) if monitor else None
+    env = setup_env(env_id, monitor_dir)
     # initialize a random agent on the environment and play a validation batch
     agent = RandomAgent(env)
     agent.play()
 
-    # collect the game scores, actual scores from the reward cache wrapper,
-    # not mutated, clipped, or whatever rewards that the agent sees
-    scores = pd.concat([pd.Series(env.unwrapped.episode_rewards)], axis=1)
-    scores.columns = ['Score']
-    scores.index.name = 'Episode'
-    print(scores.describe())
-    # write the scores and a histogram visualization to disk
-    scores.to_csv('{}/random_scores.csv'.format(output_dir))
-    ax = scores['Score'].hist()
-    ax.set_title('Histogram of Scores')
-    ax.set_ylabel('Number of Episodes')
-    ax.set_xlabel('Score')
-    plt.savefig('{}/random_scores.pdf'.format(output_dir))
+    # plot the results and save data to disk
+    plot_results(env, output_dir, 'result_random')
 
     env.close()
 

@@ -4,21 +4,13 @@ import sys
 import datetime
 import pandas as pd
 from matplotlib import pyplot as plt
-from gym.wrappers import Monitor
-import gym_tetris
-import gym_super_mario_bros
-from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
-from gym_super_mario_bros.actions import (
-    SIMPLE_MOVEMENT,
-    COMPLEX_MOVEMENT,
-    RIGHT_ONLY,
-)
+from .setup_env import setup_env
 
 
 def train(
     env_id: str,
     output_dir: str,
-    is_monitor: bool=False
+    monitor: bool=False
 ) -> None:
     """
     Train an agent to actuate a certain environment.
@@ -26,7 +18,7 @@ def train(
     Args:
         env_id: the ID of the environment to play
         output_dir: the base directory to store results into
-        is_monitor: whether to wrap the environment with a monitor
+        monitor: whether to monitor the operation
 
     Returns:
         None
@@ -42,24 +34,12 @@ def train(
 
     # these are long to import and train is only ever called once during
     # an execution lifecycle. import here to save early execution time
-    from src.environment.atari import build_atari_environment
     from src.agents import DeepQAgent
     from src.util import BaseCallback
 
-    if 'Tetris' in env_id:
-        env = gym_tetris.make(env_id)
-        env = gym_tetris.wrap(env, clip_rewards=False)
-    elif 'SuperMarioBros' in env_id:
-        env = gym_super_mario_bros.make(env_id)
-        env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
-        env = nes_py_wrap(env)
-    else:
-        env = build_atari_environment(env_id)
-
-    # wrap the environment with a monitor if enabled
-    if is_monitor:
-        env = Monitor(env, '{}/monitor_train'.format(output_dir), force=True)
-
+    # build the environment
+    monitor_dir = '{}/monitor_train'.format(output_dir) if monitor else None
+    env = setup_env(env_id, monitor_dir)
     # build the agent
     agent = DeepQAgent(env, replay_memory_size=int(7.5e5))
     # write some info about the agent's hyperparameters to disk
