@@ -13,5 +13,6 @@ opencv-python==3.4.0.12
 Pillow==5.0.0
 pydot==1.2.4
 pygame>=1.9.3
-tensorflow==1.6.0
+tensorflow-gpu==1.10.0
+cntk-gpu==2.5.1
 tqdm==4.19.5
