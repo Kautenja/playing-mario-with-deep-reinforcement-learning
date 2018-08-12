@@ -290,13 +290,12 @@ class DeepQAgent(Agent):
         if np.random.random() < exploration_rate:
             # select a random action and return it
             return self.env.action_space.sample()
-        else:
-            # reshape the frames to pass through the loss network
-            frames = frames[np.newaxis, :, :, :]
-            # predict the values of each action
-            actions = self.model.predict([frames, self.mask])
-            # return the action with the highest estimated future reward
-            return np.argmax(actions)
+        # reshape the frames to pass through the loss network
+        frames = frames[np.newaxis, :, :, :]
+        # predict the values of each action
+        actions = self.model.predict([frames, self.mask])
+        # return the action with the highest estimated future reward
+        return np.argmax(actions)
 
     def train(self,
         frames_to_play: int=50000000,

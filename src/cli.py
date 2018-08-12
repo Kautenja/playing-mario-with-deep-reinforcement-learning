@@ -4,8 +4,8 @@ from .train import train
 from .play import play, play_random
 
 
-def create_argparser() -> argparse.ArgumentParser:
-    """Create and return an argument parser for this command line interface."""
+def _get_args() -> dict:
+    """Parse command line arguments and return them."""
     parser = argparse.ArgumentParser(description=__doc__)
     # add the argument for the Super Mario Bros environment to run
     parser.add_argument('--env', '-e',
@@ -26,15 +26,14 @@ def create_argparser() -> argparse.ArgumentParser:
         default='results',
         help='The directory to (store/load) results (in/from).'
     )
-
-    return parser
+    # parse arguments and return them
+    return parser.parse_args()
 
 
 def main() -> None:
     """The main entry point for the command line interface."""
-    # parse arguments from the command line (args are validated by argparse)
-    args = create_argparser().parse_args()
-    # pass the arguments to the run method
+    # parse arguments from the command line (argparse validates arguments)
+    args = _get_args()
     # select the method for playing the game
     mode = args.mode
     if mode == 'train':
