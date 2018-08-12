@@ -1,4 +1,4 @@
-"""Various deep learning models for value function estimation in deep RL."""
+"""Deep learning models for value function estimation in deep RL."""
 from .deep_q_model import build_deep_q_model
 from .dueling_deep_q_model import build_dueling_deep_q_model
 
