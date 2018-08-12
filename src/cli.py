@@ -22,7 +22,6 @@ _CMD_LINE_ARGS = {
         'type': str,
         'default': 'results',
         'help': 'The directory to (store/load) results (in/from)',
-
     },
 }
 
