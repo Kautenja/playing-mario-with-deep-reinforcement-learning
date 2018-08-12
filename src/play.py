@@ -2,12 +2,13 @@
 import os
 import sys
 from datetime import datetime
+import gym
 import pandas as pd
 from matplotlib import pyplot as plt
 from .setup_env import setup_env
 
 
-def plot_results(env: 'gym.Env', results_dir: str, filename: str) -> None:
+def plot_results(env: gym.Env, results_dir: str, filename: str) -> None:
     """
     Plot the results of a series of episodes and save them to disk.
 
@@ -35,10 +36,7 @@ def plot_results(env: 'gym.Env', results_dir: str, filename: str) -> None:
     plt.savefig('{}/{}.pdf'.format(results_dir, filename))
 
 
-def play(
-    results_dir: str,
-    monitor: bool=False
-) -> None:
+def play(results_dir: str, monitor: bool=False) -> None:
     """
     Play an environment with a certain agent.
 
@@ -86,11 +84,7 @@ def play(
     env.close()
 
 
-def play_random(
-    env_id: str,
-    output_dir: str,
-    monitor: bool=False
-) -> None:
+def play_random(env_id: str, output_dir: str, monitor: bool=False) -> None:
     """
     Run a uniformly random agent in the given environment.
 
