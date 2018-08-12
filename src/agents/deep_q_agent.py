@@ -93,10 +93,10 @@ class DeepQAgent(Agent):
         self.dueling_network = dueling_network
         # build an output mask that lets all action values pass through
         mask_shape = (1, env.action_space.n)
-        self.mask = np.ones(mask_shape)
+        self.mask = np.ones(mask_shape, dtype=np.float32)
         # use an identity of size action space, to index rows from it using
         # an action vector to produce a one-hot vector masks for training error
-        self.action_onehot = np.eye(env.action_space.n)
+        self.action_onehot = np.eye(env.action_space.n, dtype=np.float32)
         # setup the model for predicting Q values
         if dueling_network:
             build_model = build_dueling_deep_q_model
@@ -222,7 +222,7 @@ class DeepQAgent(Agent):
 
         """
         # initialize target y values
-        y = np.zeros((len(s), self.env.action_space.n))
+        y = np.zeros((len(s), self.env.action_space.n), dtype=np.float32)
 
         # predict Q values for the next state of each memory in the batch and
         # take the max value. don't mask any outputs, i.e. use ones
