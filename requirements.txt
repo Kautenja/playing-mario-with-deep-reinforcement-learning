@@ -1,7 +1,7 @@
 atari_py==0.1.1
 graphviz==0.8.2
 gym==0.10.5
-gym-super-mario-bros==3.0.5
+gym-super-mario-bros>=3.0.6
 gym-tetris==1.2.4
 h5py==2.7.1
 image==1.5.20
