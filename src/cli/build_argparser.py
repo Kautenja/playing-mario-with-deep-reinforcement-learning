@@ -36,27 +36,28 @@ def build_argparser():
         required=False,
         default=1,
     )
-    # MARK: Agent
-    # add an argument for the environment to play
-    agent.add_argument('--environment', '-e',
-        type=str,
-        help='The gym ID of the environment to play.',
-        required=False,
-        default='SuperMarioBros-1-4-v0',
-    )
     # add an argument for whether to monitor
-    agent.add_argument('--monitor', '-M',
+    parser.add_argument('--monitor', '-M',
         action='store_true',
         help='whether to monitor the operation (periodically record episodes).',
         required=False,
         default=False,
     )
+    # MARK: Agent
+    # add an argument for the environment to play
+    agent.add_argument('--env', '-e',
+        type=str,
+        help='The gym ID of the environment to play.',
+        required=False,
+        default='SuperMarioBros-1-4-v0',
+    )
     # add an argument for the render mode
-    agent.add_argument('--render_human', '-R',
-        action='store_true',
+    agent.add_argument('--render_mode', '-R',
+        type=str,
         help='Whether to use the GUI to render frames (will slow the task).',
         required=False,
-        default=False,
+        default=None,
+        choices=['human', 'rgb_array'],
     )
     # MARK: play
     # add an argument for the number of games to play
