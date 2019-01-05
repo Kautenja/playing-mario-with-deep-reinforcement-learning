@@ -10,7 +10,6 @@ _CMD_LINE_ARGS = {
         'type': str,
         'default': 'SuperMarioBros-1-1-v2',
         'help': 'The name of the environment to play',
-
     },
     ('--mode', '-m'): {
         'type': str,
