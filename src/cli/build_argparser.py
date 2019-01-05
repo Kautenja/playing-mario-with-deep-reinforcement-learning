@@ -29,6 +29,13 @@ def build_argparser():
         required=False,
         default=-1,
     )
+    # add an argument for the RNG seed to use
+    parser.add_argument('--seed',
+        type=int,
+        help='The random number seed to use for NumPy, TensorFlow, and random.',
+        required=False,
+        default=1,
+    )
     # MARK: Agent
     # add an argument for the environment to play
     agent.add_argument('--environment', '-e',
@@ -50,17 +57,6 @@ def build_argparser():
         help='Whether to use the GUI to render frames (will slow the task).',
         required=False,
         default=False,
-    )
-    # add an argument for the agent class
-    agent.add_argument('--agent', '-a',
-        type=str,
-        help='The name of the agent to use.',
-        required=False,
-        default='DeepQAgent',
-        choices=[
-            'DeepQAgent',
-            'RandomAgent',
-        ]
     )
     # MARK: play
     # add an argument for the number of games to play
