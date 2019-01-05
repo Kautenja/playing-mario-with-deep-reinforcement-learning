@@ -1,5 +1,7 @@
 # Playing Super Mario Bros. With Deep Reinforcement Learning
 
+[![Build Status](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning.svg?branch=master)](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning)
+
 Using (Double/Dueling) Deep-Q Networks to play Super Mario Bros.
 
 # Installation
