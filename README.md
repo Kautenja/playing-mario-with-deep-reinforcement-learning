@@ -36,16 +36,6 @@ python -m pip install -r requirements.txt
 **NOTE** if you're NOT using `virtualenv`, ensure that `python` aliases
 python3; python2 is not supported.
 
-### Keras Backend
-
-To change the Keras back-end to CNTK before execution set the
-`KERAS_BACKEND` environment key to `cntk` before executing scripts
-or starting a jupyter notebook:
-
-```shell
-export KERAS_BACKEND=cntk
-```
-
 # Usage
 
 The following instructions assume you have a shell running at the top level
