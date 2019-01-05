@@ -22,6 +22,10 @@ class Agent(object):
         self.env = env
         self.render_mode = render_mode
 
+    def __str__(self) -> str:
+        """Return a human readable string representation of this object."""
+        return self.__class__.__name__
+
     def __repr__(self) -> str:
         """Return a debugging string of this agent."""
         return '{}(env={}, render_mode={})'.format(
