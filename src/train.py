@@ -31,7 +31,7 @@ def train(env_id: str, output_dir: str, monitor: bool=False) -> None:
     # these are long to import and train is only ever called once during
     # an execution lifecycle. import here to save early execution time
     from src.agents import DeepQAgent
-    from src.util import BaseCallback
+    from src.utils import BaseCallback
 
     # build the environment
     monitor_dir = '{}/monitor_train'.format(output_dir) if monitor else None
@@ -52,7 +52,7 @@ def train(env_id: str, output_dir: str, monitor: bool=False) -> None:
     # train the agent
     try:
         callback = BaseCallback(weights_file)
-        agent.train(frames_to_play=int(2.5e6), callback=callback)
+        agent.train(frames_to_play=int(5e6), callback=callback)
     except KeyboardInterrupt:
         print('canceled training')
 
