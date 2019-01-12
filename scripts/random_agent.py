@@ -90,9 +90,12 @@ def main():
     agent = RandomAgent(**vars(ARG_GROUPS['agent']))
     log_('Agent', agent)
     # get the observe, train, and play methods and call them
-    getattr_and_call(agent, 'observe', ARG_GROUPS)
-    getattr_and_call(agent, 'train', ARG_GROUPS)
-    getattr_and_call(agent, 'play', ARG_GROUPS)
+    try:
+        getattr_and_call(agent, 'observe', ARG_GROUPS)
+        getattr_and_call(agent, 'train', ARG_GROUPS)
+        getattr_and_call(agent, 'play', ARG_GROUPS)
+    except KeyboardInterrupt:
+        env.close()
 
 
 if __name__ == '__main__':
