@@ -1,4 +1,6 @@
 """A reward tracking callback for the command line."""
+import matplotlib.pyplot as plt
+import pandas as pd
 
 
 class BaseCallback(object):
@@ -52,6 +54,27 @@ class BaseCallback(object):
         # save the weights
         if self._episodes % self.update_every == 0:
             agent.model.save_weights(self.weights_file_name)
+
+    def export(self, basename: str) -> None:
+        """
+        Export the data to a file as a table (CSV) and plot (PDF).
+
+        Args:
+            basename: the basename of the output file (i.e., with no extension)
+
+        Returns:
+            None
+
+        """
+        # save the training results
+        rewards = pd.Series(self.scores)
+        losses = pd.Series(self.losses)
+        rewards_losses = pd.concat([rewards, losses], axis=1)
+        rewards_losses.columns = ['Reward', 'Loss']
+        rewards_losses.index.name = 'Episode'
+        rewards_losses.to_csv('{}.csv'.format(basename))
+        rewards_losses.plot(figsize=(12, 5), subplots=True)
+        plt.savefig('{}.pdf'.format(basename))
 
 
 # explicitly define the outward facing API of this module
