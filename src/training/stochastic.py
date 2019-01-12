@@ -26,7 +26,7 @@ def stochastic(seed_: int, gpu: int) -> 'Callable':
             a callable method wrapped by training boilerplate
 
         """
-        def do_method() -> any:
+        def do_method(*args, **kwargs) -> any:
             """Call a stochastic method with boilerplate functionality."""
             # seed the random number generators
             seed(seed_)
@@ -34,7 +34,7 @@ def stochastic(seed_: int, gpu: int) -> 'Callable':
             set_gpu(gpu)
             # call the method
             try:
-                return method()
+                return method(*args, **kwargs)
             except KeyboardInterrupt:
                 print('\ncaught Keyboard Interrupt. terminating...')
 
