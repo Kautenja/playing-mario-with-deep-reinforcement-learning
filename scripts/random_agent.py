@@ -7,6 +7,7 @@ import gym_super_mario_bros
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 import _top_level
+from src.agents import Agent
 from src.agents import RandomAgent
 from src.training import stochastic
 from src.utils import log_
@@ -70,8 +71,8 @@ def getattr_and_call(agent_: object, method_: str, groups) -> any:
 
 
 @stochastic(ARGS.seed, ARGS.gpu)
-def main():
-    """Train the model."""
+def run_experiment(build_agent: Agent):
+    """Train the agent."""
     # setup the output directory
     output_dir = experiment_dir(ARGS.output_dir, ARGS.env, RandomAgent.__name__)
     log_('Experiment Directory', output_dir)
@@ -87,7 +88,7 @@ def main():
     # create a the agent
     agent_kwargs = vars(ARG_GROUPS['agent'])
     agent_kwargs['env'] = env
-    agent = RandomAgent(**vars(ARG_GROUPS['agent']))
+    agent = build_agent(**vars(ARG_GROUPS['agent']))
     log_('Agent', agent)
     # get the observe, train, and play methods and call them
     try:
@@ -99,4 +100,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    run_experiment(RandomAgent)
