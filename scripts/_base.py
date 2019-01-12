@@ -45,7 +45,7 @@ def build_env(env, build_agent: 'Agent', output_dir: str, monitor: bool=False):
         monitor_dir = os.path.join(output_dir, 'monitor')
         env = gym.wrappers.Monitor(env, monitor_dir, force=True)
 
-    return env
+    return env, output_dir
 
 
 __all__ = [build_env.__name__,]
