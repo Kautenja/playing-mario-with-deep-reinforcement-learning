@@ -58,17 +58,7 @@ def train(env_id: str, output_dir: str, monitor: bool=False) -> None:
 
     # save the weights to disk
     agent.model.save_weights(weights_file, overwrite=True)
-
-    # save the training results
-    rewards = pd.Series(callback.scores)
-    losses = pd.Series(callback.losses)
-    rewards_losses = pd.concat([rewards, losses], axis=1)
-    rewards_losses.columns = ['Reward', 'Loss']
-    rewards_losses.index.name = 'Episode'
-    rewards_losses.to_csv('{}/rewards_losses.csv'.format(output_dir))
-    rewards_losses.plot(figsize=(12, 5), subplots=True)
-    plt.savefig('{}/rewards_losses.pdf'.format(output_dir))
-
+    callback.export('{}/rewards_losses'.format(output_dir))
     # close the environment to perform necessary cleanup
     env.close()
 
