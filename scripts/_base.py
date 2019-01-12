@@ -2,7 +2,6 @@
 import datetime
 import os
 import shutil
-import gym
 import gym_super_mario_bros
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
@@ -24,28 +23,35 @@ def experiment_dir(output_dir: str, env_id: str, agent_name: str) -> str:
     now = datetime.datetime.today().strftime('%Y-%m-%d_%H-%M')
     # join the directories into a single path
     output_dir = os.path.join(output_dir, env_id, agent_name, now)
-    # if the directory doesn't exist, make it
+    # if the directory exists already, delete it
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
+    # make the output directory
     os.makedirs(output_dir)
 
     return output_dir
 
 
-def build_env(env, build_agent: 'Agent', output_dir: str, monitor: bool=False):
-    """Train the agent."""
-    # setup the output directory
-    output_dir = experiment_dir(output_dir, env, build_agent.__name__)
-    # create the environment
+def build_env(env: str) -> 'gym.Env':
+    """
+    Build an environment for an agent.
+
+    Args:
+        env: the name of the environment to make
+
+    Returns:
+        a gym.Env based on the given env ID with the appropriate wrappers
+
+    """
     env = gym_super_mario_bros.make(env)
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     env = nes_py_wrap(env)
-    # if monitoring is enabled, setup the monitor for the environment
-    if monitor:
-        monitor_dir = os.path.join(output_dir, 'monitor')
-        env = gym.wrappers.Monitor(env, monitor_dir, force=True)
 
-    return env, output_dir
+    return env
 
 
-__all__ = [build_env.__name__,]
+# explicitly define the outward facing API of this module
+__all__ = [
+    build_env.__name__,
+    experiment_dir.__name__,
+]
