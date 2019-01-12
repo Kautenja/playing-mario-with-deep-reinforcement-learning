@@ -36,7 +36,7 @@ class RandomAgent(Agent):
             # push the score onto the history
             scores[game] = score
 
-        return scores
+        return self.episode_rewards
 
 
 # explicitly define the outward facing API of this module

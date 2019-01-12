@@ -1,6 +1,8 @@
 """An abstract base class for reinforcement agents."""
 import gym
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 class Agent(object):
@@ -71,6 +73,41 @@ class Agent(object):
             self.env.render(mode=self.render_mode)
 
         return state, reward, done
+
+    @property
+    def episode_rewards(self) -> pd.DataFrame:
+        """Return the episodic scores and losses."""
+        # collect the game scores, actual scores from the reward cache wrapper,
+        # not mutated, clipped, or whatever rewards that the agent sees
+        scores = [pd.Series(self.env.unwrapped.episode_rewards)]
+        scores = pd.concat(scores, axis=1)
+        scores.columns = ['Score']
+        scores.index.name = 'Episode'
+
+        return scores
+
+    def plot_episode_rewards(self, basename: str) -> None:
+        """
+        Plot the results of a series of episodes and save them to disk.
+
+        Args:
+            env: the env with a RewardCacheWrapper to extract data from
+            results_dir: the directory to store the plots and data in
+            filename: the name of the file to use for the plots and data
+
+        Returns:
+            None
+
+        """
+        # get the scores
+        scores = self.episode_rewards
+        # write the scores and a histogram visualization to disk
+        scores.to_csv('{}.csv'.format(basename))
+        axis = scores['Score'].hist()
+        axis.set_title('Histogram of Scores')
+        axis.set_ylabel('Number of Episodes')
+        axis.set_xlabel('Score')
+        plt.savefig('{}.pdf'.format(basename))
 
 
 # explicitly define the outward facing API of this module

@@ -400,7 +400,7 @@ class DeepQAgent(Agent):
 
         progress.close()
 
-        return scores
+        return self.episode_rewards
 
 
 # explicitly define the outward facing API of this module
