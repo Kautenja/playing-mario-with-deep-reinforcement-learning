@@ -86,7 +86,7 @@ class Agent(object):
 
         return scores
 
-    def plot_episode_rewards(self, basename: str) -> None:
+    def plot_episode_rewards(self, basename: str=None) -> None:
         """
         Plot the results of a series of episodes and save them to disk.
 
@@ -102,12 +102,14 @@ class Agent(object):
         # get the scores
         scores = self.episode_rewards
         # write the scores and a histogram visualization to disk
-        scores.to_csv('{}.csv'.format(basename))
+        if basename is not None:
+            scores.to_csv('{}.csv'.format(basename))
         axis = scores['Score'].hist()
         axis.set_title('Histogram of Scores')
         axis.set_ylabel('Number of Episodes')
         axis.set_xlabel('Score')
-        plt.savefig('{}.pdf'.format(basename))
+        if basename is not None:
+            plt.savefig('{}.pdf'.format(basename))
 
 
 # explicitly define the outward facing API of this module
