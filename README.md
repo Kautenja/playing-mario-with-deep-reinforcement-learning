@@ -63,7 +63,7 @@ python -m jupyter notebook
 To run a trained agent on validation games:
 
 ```shell
-python . -o <results directory>
+python scripts/play.py <results directory>
 ```
 
 -   `<results directory>` is a directory containing a `weights.h5` file from
@@ -74,5 +74,5 @@ python . -o <results directory>
 For instance, to play a trained Deep-Q agent on Super Mario Bros. level 4-2:
 
 ```shell
-python . -o results/SuperMarioBros-4-2-v0/DeepQAgent/TODO
+python scripts/play.py results/SuperMarioBros-4-2-v0/DeepQAgent/TODO
 ```
