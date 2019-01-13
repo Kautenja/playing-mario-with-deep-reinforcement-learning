@@ -51,22 +51,27 @@ python -m unittest discover .
 
 ## Notebooks
 
-To train agents, use notebooks in the `scripts` directory.
+To train agents, use notebooks in the `scripts` directory. Execute the
+following from within the `scripts` directory:
+
+```shell
+python -m jupyter notebook
+```
 
 ## Playing With A Trained Agent
 
-To run a trained Deep-Q agent on validation games:
+To run a trained agent on validation games:
 
 ```shell
 python . -o <results directory>
 ```
 
--   `<results directory>` is a directory containing a `weights.h5` file from a
-    training session
+-   `<results directory>` is a directory containing a `weights.h5` file from
+    a training session
 
 ### Example
 
-For instance, to play a Deep-Q agent on Super Mario Bros. level 4-2:
+For instance, to play a trained Deep-Q agent on Super Mario Bros. level 4-2:
 
 ```shell
 python . -o results/SuperMarioBros-4-2-v0/DeepQAgent/TODO
