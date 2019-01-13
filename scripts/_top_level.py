@@ -14,7 +14,7 @@ def top_level(is_headless: bool=False):
         # add the parent path to the python PATH
         _path.append(parent_dir)
 
-    if is_headless:
+    if 'DISPLAY' not in _os.environ:
         # set matplotlib to override default X11 environment
         matplotlib.use('Agg')
 
