@@ -2,7 +2,8 @@
 
 [![Build Status](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning.svg?branch=master)](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning)
 
-Using (Double/Dueling) Deep-Q Networks to play Super Mario Bros.
+Using deep reinforcement learning techniques to train agents to play Super
+Mario Bros on the Nintendo Entertainment System (NES).
 
 # Installation
 
