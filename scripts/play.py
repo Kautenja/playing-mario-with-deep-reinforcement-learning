@@ -33,7 +33,7 @@ def play(results_dir: str) -> None:
         raise OSError('weights file not found: {}'.format(weights_file))
 
     # build the environment
-    env = build_env(env_id)
+    env = build_env(env_id, monitor_dir=os.path.join(results_dir, 'play'))
 
     # try to find the agent class in the agents module
     try:
@@ -50,10 +50,10 @@ def play(results_dir: str) -> None:
     try:
         agent.play()
     except KeyboardInterrupt:
-        env.close()
+        pass
 
     # plot the results and save data to disk
-    agent.plot_episode_rewards()
+    agent.plot_episode_rewards(basename=os.path.join(results_dir, 'play'))
     # close the environment
     env.close()
 
