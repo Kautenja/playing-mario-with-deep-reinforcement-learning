@@ -27,7 +27,7 @@ def play(results_dir: str) -> None:
         raise ValueError('invalid results directory: {}'.format(results_dir))
 
     # set up the weights file
-    weights_file = '{}/weights.h5'.format(results_dir)
+    weights_file = os.path.join(results_dir, 'weights.h5')
     # make sure the weights exist
     if not os.path.exists(weights_file):
         raise OSError('weights file not found: {}'.format(weights_file))
