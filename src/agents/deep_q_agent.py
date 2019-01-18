@@ -301,7 +301,7 @@ class DeepQAgent(Agent):
         frames_to_play: int=50000000,
         batch_size: int=32,
         callback: Callable=None,
-        callback_steps: int=10000,
+        callback_freq: int=20000,
     ) -> None:
         """
         Train the network for a number of episodes (games).
@@ -352,7 +352,7 @@ class DeepQAgent(Agent):
                     self.target_model.set_weights(self.model.get_weights())
 
                 # if the frame counter has reached the callback step delimiter
-                if frames % callback_steps == 0:
+                if frames_to_play % callback_freq == 0:
                     # pass the score to the callback at the end of the episode
                     if callable(callback):
                         callback(self, score, loss)
