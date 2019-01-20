@@ -3,7 +3,7 @@ import gym
 import numpy as np
 
 
-class MaxFrameskipEnv(gym.Wrapper):
+class MaxFrameSkipEnv(gym.Wrapper):
     """An environment to skip k frames and return a max between the last two."""
 
     def __init__(self, env, skip: int=4) -> None:
@@ -51,4 +51,4 @@ class MaxFrameskipEnv(gym.Wrapper):
 
 
 # explicitly define the outward facing API of this module
-__all__ = [MaxFrameskipEnv.__name__]
+__all__ = [MaxFrameSkipEnv.__name__]

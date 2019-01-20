@@ -13,7 +13,7 @@ from .downsample_env import DownsampleEnv
 from .fire_reset_env import FireResetEnv
 from .frame_skip_env import FrameSkipEnv
 from .frame_stack_env import FrameStackEnv
-from .max_frameskip_env import MaxFrameskipEnv
+from .max_frame_skip_env import MaxFrameSkipEnv
 from .noop_reset_env import NoopResetEnv
 from .penalize_death_env import PenalizeDeathEnv
 from .reward_cache_env import RewardCacheEnv
@@ -55,7 +55,7 @@ def wrap(env,
     # wrap the environment with a frame skipper
     if frame_skip:
         if max_frame_skip:
-            env = MaxFrameskipEnv(env, skip=frame_skip)
+            env = MaxFrameSkipEnv(env, skip=frame_skip)
         else:
             env = FrameSkipEnv(env, frame_skip)
     # apply a down-sampler for the given game
@@ -81,7 +81,7 @@ __all__ = [
     FrameSkipEnv.__name__,
     FireResetEnv.__name__,
     FrameStackEnv.__name__,
-    MaxFrameskipEnv.__name__,
+    MaxFrameSkipEnv.__name__,
     NoopResetEnv.__name__,
     PenalizeDeathEnv.__name__,
     RewardCacheEnv.__name__,
