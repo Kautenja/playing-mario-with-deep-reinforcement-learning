@@ -5,29 +5,9 @@
 Using deep reinforcement learning techniques to train agents to play Super
 Mario Bros on the Nintendo Entertainment System (NES).
 
+<!-- TODO: example GIF or link or something -->
+
 # Installation
-
-## `virtualenv`
-
-Use `virtualenv` to contain the Python environment to a single local
-installation of python3:
-
-#### Setup
-
-To setup the virtual environment:
-
-```shell
-virtualenv -p python3 .env
-source .env/bin/activate
-```
-
-When you've concluded the session:
-
-```shell
-deactivate
-```
-
-## Dependencies
 
 [requirements.txt](requirements.txt) lists the Python dependencies for the
 project with frozen versions. To install dependencies:
