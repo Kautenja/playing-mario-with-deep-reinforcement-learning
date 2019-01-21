@@ -43,7 +43,7 @@ class DeepQAgent(Agent):
         discount_factor: float=0.99,
         update_frequency: int=4,
         optimizer: Optimizer=Adam(lr=2e-5),
-        exploration_rate: AnnealingVariable=AnnealingVariable(1., .1, 1000000),
+        exploration_rate: AnnealingVariable=AnnealingVariable(1.0, 0.01, 1e6),
         loss: Callable=huber_loss,
         target_update_freq: int=10000,
         dueling_network: bool=False,
@@ -367,7 +367,7 @@ class DeepQAgent(Agent):
 
         progress.close()
 
-    def play(self, games: int=100, exploration_rate: float=0.05) -> np.ndarray:
+    def play(self, games: int=100, exploration_rate: float=0.01) -> np.ndarray:
         """
         Run the agent without training for the given number of games.
 
