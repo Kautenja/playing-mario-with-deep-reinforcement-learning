@@ -1,12 +1,13 @@
 """The original Deep-Q model used by DeepMind."""
-from keras.models import Model
-from keras.layers import Input
-from keras.layers import Lambda
+from keras.layers import Activation
+from keras.layers import Conv2D
 from keras.layers import Dense
 from keras.layers import Flatten
-from keras.layers import Activation
+from keras.layers import Input
+from keras.layers import Lambda
 from keras.layers import Multiply
-from keras.layers.convolutional import Conv2D
+from keras.layers import ReLU
+from keras.models import Model
 from keras.optimizers import RMSprop
 from .losses import huber_loss
 
@@ -26,12 +27,12 @@ def build_deep_q_model(
 
     Args:
         image_size: the shape of the image states for the model
-                     Atari games are (192, 160), but DeepMind reduced the
-                     size to (84, 84) to reduce computational load
-        num_frames: the number of frames being stacked together
-                    DeepMind uses 4 frames in their original implementation
+            Atari games are (192, 160), but DeepMind reduced the size to
+            (84, 84) to reduce computational load
+        num_frames: the number of previous frames stacked together
+            DeepMind uses 4 frames in their original implementation
         num_actions: the output shape for the model, this represents the
-                     number of discrete actions available to a game
+            number of discrete actions available to a game
         loss: the loss metric to use at the end of the network
         optimizer: the optimizer for reducing error from batches
 
@@ -40,22 +41,29 @@ def build_deep_q_model(
 
     """
     # build the CNN using the functional API
-    cnn_input = Input((*image_size, num_frames), name='cnn')
+    cnn_input = Input((*image_size, num_frames))
+    # convert the pixels from an RGB byte to a float in [0, 1]
     cnn = Lambda(lambda x: x / 255.0)(cnn_input)
+    # block 1
     cnn = Conv2D(32, (8, 8), strides=(4, 4))(cnn)
-    cnn = Activation('relu')(cnn)
+    cnn = ReLU()(cnn)
+    # block 2
     cnn = Conv2D(64, (4, 4), strides=(2, 2))(cnn)
-    cnn = Activation('relu')(cnn)
+    cnn = ReLU()(cnn)
+    # block 3
     cnn = Conv2D(64, (3, 3), strides=(1, 1))(cnn)
-    cnn = Activation('relu')(cnn)
+    cnn = ReLU()(cnn)
+    # fully connected network
     cnn = Flatten()(cnn)
+    # block 1
     cnn = Dense(512)(cnn)
-    cnn = Activation('relu')(cnn)
-    cnn = Dense(num_actions)(cnn)
-    # build the mask using the functional API
-    mask_input = Input((num_actions,), name='mask')
+    cnn = ReLU()(cnn)
+    # output space transformation, i.e., logits
+    logits = Dense(num_actions)(cnn)
+    # build a mask using the functional API
+    mask_input = Input((num_actions,))
     # put the two pieces of the graph together
-    output = Multiply()([cnn, mask_input])
+    output = Multiply()([logits, mask_input])
 
     # build the model
     model = Model(inputs=[cnn_input, mask_input], outputs=output)
