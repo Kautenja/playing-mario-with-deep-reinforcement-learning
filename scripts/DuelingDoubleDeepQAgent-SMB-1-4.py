@@ -21,7 +21,6 @@ from src.base import AnnealingVariable
 from src.wrappers import wrap
 from src.models.losses import huber_loss
 from src.callbacks import BaseCallback
-from src.callbacks import JupyterCallback
 from src.utils import seed
 
 
@@ -133,10 +132,8 @@ agent.observe()
 
 # create a callback for the training procedure to log weights and metrics
 callback = BaseCallback(weights_file)
-# create a callback for the training procedure to plot in Jupyter
-plotter = JupyterCallback()
 # train the agent with given parameters and callbacks
-agent.train(6e6, callback=[callback, plotter])
+agent.train(6e6, callback=[callback])
 # save the weights to disk after the training procedure
 agent.model.save_weights(weights_file, overwrite=True)
 
