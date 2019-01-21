@@ -6,8 +6,10 @@
 
 import os
 import gym
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from keras import backend as K
 from keras import optimizers
+from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 from _base import experiment_dir
 from _top_level import top_level
 top_level()
@@ -65,6 +67,8 @@ def make_environment(monitor: bool=False, seed: int=1) -> gym.Env:
     """
     # make the environment
     env = gym.make(env_id)
+    # wrap the environment with an action space reducer
+    env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     # wrap the environment with transformers
     env = wrap(env,
         cache_rewards=True,
