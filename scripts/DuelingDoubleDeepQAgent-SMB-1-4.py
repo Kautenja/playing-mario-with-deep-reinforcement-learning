@@ -77,7 +77,7 @@ def make_environment(monitor: bool=False, seed: int=1) -> gym.Env:
         max_frame_skip=False,
         image_size=(84, 84),
         death_penalty=None,
-        clip_rewards=False,
+        clip_rewards=True,
         agent_history_length=4
     )
     # monitor the video / data feed from the environment
