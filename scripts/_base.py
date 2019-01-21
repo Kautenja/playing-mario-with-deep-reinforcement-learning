@@ -4,7 +4,7 @@ import os
 import shutil
 import gym
 import gym_super_mario_bros
-from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
+from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
 
@@ -49,7 +49,6 @@ def build_env(env: str, monitor_dir: str=None) -> 'gym.Env':
     env = BinarySpaceToDiscreteSpaceEnv(env, SIMPLE_MOVEMENT)
     if monitor_dir is not None:
         env = gym.wrappers.Monitor(env, monitor_dir, force=True)
-    env = nes_py_wrap(env)
 
     return env
 
