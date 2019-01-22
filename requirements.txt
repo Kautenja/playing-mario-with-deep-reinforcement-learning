@@ -1,7 +1,7 @@
 atari_py>=0.1.7
 graphviz>=0.8.2
 gym>=0.10.9
-gym-super-mario-bros>=7.1.5
+gym-super-mario-bros>=7.1.6
 h5py>=2.8.0
 jupyter>=1.0.0
 Keras>=2.2.4
