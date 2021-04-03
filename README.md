@@ -4,6 +4,8 @@
 
 Using (Double/Dueling) Deep-Q Networks to play Super Mario Bros.
 
+![DDQN-SMB-1-4](https://user-images.githubusercontent.com/2184469/113493396-8e6d3080-94a4-11eb-8e4c-956c277ac76f.gif)
+
 # Installation
 
 ## `virtualenv`
