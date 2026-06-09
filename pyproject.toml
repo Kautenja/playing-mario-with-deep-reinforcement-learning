@@ -55,4 +55,4 @@ Repository = "https://github.com/Kautenja/playing-mario-with-deep-reinforcement-
 include = ["mario_rl*"]
 
 [tool.setuptools.package-data]
-mario_rl = ["configs/**/*.yaml", "configs/**/*.yml", "data/**/*"]
+mario_rl = ["config/data/*.yaml", "configs/**/*.yaml", "configs/**/*.yml", "data/**/*"]
