@@ -1,4 +1,4 @@
-"""A method to setup an environment based on its string ID."""
+"""Legacy Gym environment setup used by the original Keras scripts."""
 import gym
 from nes_py.wrappers import BinarySpaceToDiscreteSpaceEnv, wrap as nes_py_wrap
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT

@@ -1,4 +1,4 @@
-"""Methods for setting up an Atari environment."""
+"""Legacy Gym Atari setup used by the original Keras scripts."""
 import gym
 from src.environment.wrappers import (
     ClipRewardEnv,
