@@ -4,12 +4,15 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from .config import MarioRLConfig, cli, to_dict
+from .config import MarioRLConfig, cli
 
 
-def run(config: MarioRLConfig) -> int:
-    """Report the resolved evaluation config until checkpoint loading lands."""
-    print(json.dumps({"command": "play", "config": to_dict(config)}, sort_keys=True))
+def run(config: MarioRLConfig, *, env_factory=None) -> int:
+    """Evaluate a Lightning checkpoint and write metrics artifacts."""
+    from mario_rl.lightning import evaluate_checkpoint
+
+    payload = evaluate_checkpoint(config, env_factory=env_factory)
+    print(json.dumps({"command": "play", **payload}, sort_keys=True))
     return 0
 
 

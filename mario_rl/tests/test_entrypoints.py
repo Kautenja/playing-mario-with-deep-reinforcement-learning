@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib
 import io
-import json
 import sys
 from contextlib import redirect_stdout
 from unittest import TestCase
@@ -38,28 +37,15 @@ class EntrypointTest(TestCase):
             imported_by_help,
         )
 
-    def test_train_and_play_parse_configs_without_training(self):
-        for module_name, command in (
-            ("mario_rl.train", "train"),
-            ("mario_rl.play", "play"),
-        ):
+    def test_train_and_play_keep_runners_lazy_and_callable(self):
+        before_modules = set(sys.modules)
+        for module_name in ("mario_rl.train", "mario_rl.play"):
             module = importlib.import_module(module_name)
-            output = io.StringIO()
-            with self.subTest(module_name=module_name), redirect_stdout(output):
-                self.assertEqual(
-                    0,
-                    module.main(
-                        [
-                            "--config",
-                            "smb_dqn_fast_dev",
-                            "--train.fast_dev_run",
-                            "true",
-                            "--env.id",
-                            "SuperMarioBros1-1-v0",
-                        ]
-                    ),
-                )
-            payload = json.loads(output.getvalue())
-            self.assertEqual(command, payload["command"])
-            self.assertEqual("SuperMarioBros1-1-v0", payload["config"]["env"]["id"])
-            self.assertTrue(payload["config"]["train"]["fast_dev_run"])
+            with self.subTest(module_name=module_name):
+                self.assertTrue(callable(module.run))
+
+        imported_by_lookup = set(sys.modules) - before_modules
+        self.assertFalse(
+            {"gym_super_mario_bros", "mario_rl.envs", "lightning", "torch"} & imported_by_lookup,
+            imported_by_lookup,
+        )

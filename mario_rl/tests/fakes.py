@@ -1,0 +1,96 @@
+"""Shared deterministic fake env helpers for fast Mario RL tests."""
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+
+import gymnasium as gym
+import numpy as np
+
+from mario_rl.config import MarioRLConfig, load
+
+
+class FakeMarioEnv(gym.Env):
+    """Deterministic channel-first image env with Gymnasium step semantics."""
+
+    action_space = gym.spaces.Discrete(7)
+    observation_space = gym.spaces.Box(
+        low=0,
+        high=255,
+        shape=(4, 84, 84),
+        dtype=np.uint8,
+    )
+
+    def __init__(self, episode_length: int = 4) -> None:
+        self.episode_length = int(episode_length)
+        self.step_count = 0
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        self.action_space.seed(seed)
+        self.observation_space.seed(seed)
+        self.step_count = 0
+        return self._obs(0), {"seed": seed, "options": options}
+
+    def step(self, action):
+        self.step_count += 1
+        reward = float((int(action) % 3) - 1)
+        terminated = self.step_count >= self.episode_length
+        truncated = False
+        return (
+            self._obs(self.step_count),
+            reward,
+            terminated,
+            truncated,
+            {"frames_skipped": 1, "fake_step": self.step_count},
+        )
+
+    def _obs(self, value: int):
+        return np.full(self.observation_space.shape, value % 256, dtype=np.uint8)
+
+
+def fake_env_factory(_config: MarioRLConfig) -> FakeMarioEnv:
+    """Create the fake env used by training and evaluation tests."""
+    return FakeMarioEnv()
+
+
+def tiny_training_config(save_dir: str | Path) -> MarioRLConfig:
+    """Return a fast CPU config that exercises replay and checkpoints."""
+    config = load("smb_dqn_fast_dev")
+    return replace(
+        config,
+        experiment_name="fake_lightning",
+        save_dir=str(save_dir),
+        trainer=replace(config.trainer, accelerator="cpu", devices=1, seed=123),
+        env=replace(
+            config.env,
+            id="FakeMario-v0",
+            render_mode=None,
+            frame_skip=1,
+            max_smoke_steps=8,
+        ),
+        replay=replace(
+            config.replay,
+            capacity=32,
+            batch_size=2,
+            warmup=2,
+            state_shape=(4, 84, 84),
+        ),
+        model=replace(
+            config.model,
+            hidden_size=64,
+            target_update_frequency=2,
+            num_actions=7,
+        ),
+        epsilon=replace(config.epsilon, decay_frames=8),
+        train=replace(
+            config.train,
+            max_frames=8,
+            max_steps=5,
+            log_interval=1,
+            accelerator="cpu",
+            devices=1,
+            checkpoint_name="fake.ckpt",
+        ),
+        eval=replace(config.eval, episodes=1, max_steps=4, checkpoint=None),
+    )
