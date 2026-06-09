@@ -1,10 +1,16 @@
-"""A package with implementations of deep reinforcement agents."""
-from .random_agent import RandomAgent
-from .deep_q_agent import DeepQAgent
+"""A package with legacy reinforcement agents."""
+
+__all__ = ["RandomAgent", "DeepQAgent"]
 
 
-# explicitly define the outward facing API of this package.
-__all__ = [
-    RandomAgent.__class__,
-    DeepQAgent.__class__,
-]
+def __getattr__(name):
+    """Lazily import legacy agents and their optional framework dependencies."""
+    if name == "RandomAgent":
+        from .random_agent import RandomAgent
+
+        return RandomAgent
+    if name == "DeepQAgent":
+        from .deep_q_agent import DeepQAgent
+
+        return DeepQAgent
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -1,114 +1,59 @@
 # Playing Super Mario Bros. With Deep Reinforcement Learning
 
-[![Build Status](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning.svg?branch=master)](https://travis-ci.com/Kautenja/playing-mario-with-deep-reinforcement-learning)
-
-Using (Double/Dueling) Deep-Q Networks to play Super Mario Bros.
+Using Deep-Q style agents to play Super Mario Bros.
 
 ![DDQN-SMB-1-4](https://user-images.githubusercontent.com/2184469/113493396-8e6d3080-94a4-11eb-8e4c-956c277ac76f.gif)
 
-# Installation
+## Installation
 
-## `virtualenv`
+Python 3.13 or 3.14 is required. The modern package surface is `mario_rl`.
+Legacy Keras/TensorFlow code remains in the repository for reference, but it is
+not part of the default runtime install path.
 
-Use `virtualenv` to contain the Python environment to a single local
-installation of python3:
+### Umbrella Editable Checkout
 
-#### Setup
-
-To setup the virtual environment:
+From `gym-nes/playing-mario-with-deep-reinforcement-learning`:
 
 ```shell
-virtualenv -p python3 .env
-source .env/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ../nes-py -e ../gym-super-mario-bros
+python -m pip install -e .
+python -m pip check
+python -m unittest discover .
+./main.sh unittest
 ```
 
-When you've concluded the session:
+This installs `nes-py` and `gym-super-mario-bros` from the umbrella checkout so
+imports resolve to the active submodules instead of older PyPI wheels.
+
+### PyPI Dependency Path
+
+From a standalone checkout outside the umbrella repository:
 
 ```shell
-deactivate
-```
-
-## Dependencies
-
-[requirements.txt](requirements.txt) lists the Python dependencies for the
-project with frozen versions. To install dependencies:
-
-```shell
-python -m pip install -r requirements.txt
-```
-
-**NOTE** if you're NOT using `virtualenv`, ensure that `python` aliases
-python3; python2 is not supported.
-
-# Usage
-
-The following instructions assume you have a shell running at the top level
-directory of the project. For comprehensive documentation on command line
-options, run the following:
-
-```shell
-python . -h
-```
-
-## Test Cases
-
-To execute the `unittest` suite for the project run:
-
-```shell
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e .
+python -m pip check
 python -m unittest discover .
 ```
 
-## Random Agent
+At the last dependency refresh, PyPI exposed `gym-super-mario-bros` 7.4.0 and
+`nes-py` 8.2.1, while the umbrella checkout carried compatible 8.0.0 and 9.0.0
+development releases. The dependency ranges accept both paths.
 
-To play games with an agent that makes random decisions:
-
-```shell
-python . -m random -e <environment ID>
-```
-
--   `<environment ID>` is the ID of the environment to play randomly.
-
-### Example
-
-For instance, to play a random agent on Pong:
+## Tests
 
 ```shell
-python . -m random -e Pong-v0
+python -m unittest discover .
+./main.sh unittest
 ```
 
-## Training A Deep-Q Agent
+## Legacy Scripts
 
-To train a Deep-Q agent to play a game:
-
-```shell
-python . -m train -e <environment ID>
-```
-
--   `<environment ID>` is the ID of the environment to train on.
-
-### Example
-
-For instance, to train a Deep-Q agent on Pong:
-
-```shell
-python . -m train -e Pong-v0
-```
-
-## Playing With A Trained Agent
-
-To run a trained Deep-Q agent on validation games:
-
-```shell
-python . -m play -o <results directory>
-```
-
--   `<results directory>` is a directory containing a `weights.h5` file from a
-    training session
-
-### Example
-
-For instance, to play a Deep-Q agent on Pong:
-
-```shell
-python . -m play -e results/Pong-v0/DeepQAgent/2018-06-07_09-24
-```
+The original `python . -m train`, `python . -m random`, and `python . -m play`
+entrypoints still live under `src/`. They use the old Gym/Keras assumptions and
+will be ported by the later PyTorch and Gymnasium migration specs.
