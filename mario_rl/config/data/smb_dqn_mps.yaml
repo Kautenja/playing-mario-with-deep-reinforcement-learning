@@ -1,0 +1,70 @@
+experiment_name: smb_dqn_mps
+save_dir: runs
+trainer:
+  accelerator: mps
+  devices: 1
+  precision: 32-true
+  deterministic: true
+  seed: 123
+env:
+  id: SuperMarioBros1-1-v0
+  render_mode: null
+  action_set: simple
+  seed: 123
+  image_size: [84, 84]
+  frame_stack: 4
+  reward_clipping: true
+  frame_skip: 4
+  preprocess: true
+  grayscale: true
+  channel_first: true
+  interpolation: area
+  record_statistics: true
+  video_enabled: false
+  video_dir: null
+  video_length: 0
+  video_name_prefix: mario-rl-mps
+  max_smoke_steps: 1000
+replay:
+  capacity: 100000
+  batch_size: 32
+  warmup: 1000
+  prioritized: false
+  priority_alpha: 0.6
+  priority_beta: 0.4
+  sample_dtype: uint8
+  state_shape: [4, 84, 84]
+model:
+  architecture: dueling_dqn
+  input_channels: 4
+  hidden_size: 512
+  optimizer: adam
+  learning_rate: 0.00025
+  discount_factor: 0.99
+  double_dqn: true
+  target_update_frequency: 10000
+  compile: false
+  num_actions: 7
+epsilon:
+  start: 1.0
+  final: 0.1
+  decay_frames: 1000000
+train:
+  max_frames: 1000000
+  max_steps: 250000
+  fast_dev_run: false
+  log_interval: 1000
+  checkpoint_path: null
+  accelerator: mps
+  devices: 1
+  output_dir_name: checkpoints
+  checkpoint_name: last.ckpt
+  resolved_config_name: resolved-config.yaml
+  metrics_name: train-metrics.csv
+eval:
+  checkpoint: null
+  episodes: 5
+  max_steps: 1000
+  deterministic: true
+  metrics_name: eval-metrics.json
+  video_name: eval.mp4

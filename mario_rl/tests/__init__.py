@@ -1,0 +1,1 @@
+"""Modern package-level tests."""

@@ -52,6 +52,32 @@ python -m unittest discover .
 ./main.sh unittest
 ```
 
+## Config-Driven Commands
+
+Packaged YAML configs live under `mario_rl.config` and can be addressed by
+name or path:
+
+```shell
+python -m mario_rl.config list
+python -m mario_rl.config path smb_dqn_fast_dev
+python -m mario_rl.train --config smb_dqn_fast_dev --train.fast_dev_run true
+python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
+python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
+```
+
+`main.sh` exposes the same command surface:
+
+```shell
+./main.sh config list
+./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+./main.sh play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
+./main.sh random --config smb_dqn_fast_dev
+```
+
+Nested overrides use `--section.field value` syntax. Bare positional
+`KEY=VALUE` overrides are intentionally rejected so experiment configuration is
+always explicit.
+
 ## Modern Environments
 
 The Gymnasium environment surface lives under `mario_rl.envs`:
