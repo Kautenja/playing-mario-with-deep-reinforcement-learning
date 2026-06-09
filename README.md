@@ -52,6 +52,24 @@ python -m unittest discover .
 ./main.sh unittest
 ```
 
+## Modern Environments
+
+The Gymnasium environment surface lives under `mario_rl.envs`:
+
+```python
+from mario_rl.envs import make_env
+
+env = make_env("SuperMarioBros1-1-v0", render_mode="rgb_array", seed=123)
+obs, info = env.reset(seed=123)
+obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+env.close()
+```
+
+The default preprocessing output is a channel-first grayscale frame stack with
+shape `(4, 84, 84)` and `uint8` dtype. `make_env` accepts `right_only`,
+`simple`, and `complex` action-set names, explicit preprocessing keyword
+arguments, or a `MarioEnvConfig` object.
+
 ## Legacy Scripts
 
 The original `python . -m train`, `python . -m random`, and `python . -m play`
