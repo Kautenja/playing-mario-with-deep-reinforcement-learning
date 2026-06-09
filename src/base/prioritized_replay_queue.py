@@ -109,7 +109,7 @@ class PrioritizedReplayQueue(object):
             np.array(s),
             np.array(a, dtype=np.uint8),
             np.array(r, dtype=np.int8),
-            np.array(d, dtype=np.bool),
+            np.array(d, dtype=bool),
             np.array(s2),
         )
 
