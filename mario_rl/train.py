@@ -1,15 +1,76 @@
-"""Config-driven training entrypoint placeholder for the PyTorch port."""
+"""Config-driven Lightning training entrypoint for the PyTorch port."""
 from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 
-from .config import MarioRLConfig, cli, to_dict
+from .config import MarioRLConfig, cli
 
 
-def run(config: MarioRLConfig) -> int:
-    """Report the resolved config until the Lightning training spec owns work."""
-    print(json.dumps({"command": "train", "config": to_dict(config)}, sort_keys=True))
+def run(config: MarioRLConfig, *, env_factory=None) -> int:
+    """Run a bounded Lightning DQN training job and write smoke artifacts."""
+    from lightning.pytorch import Trainer, seed_everything
+    from lightning.pytorch.loggers import CSVLogger
+
+    from mario_rl.lightning import (
+        DQNLightningModule,
+        experiment_paths,
+        trainer_accelerator,
+        trainer_devices,
+        write_resolved_config,
+        write_train_metrics,
+    )
+
+    paths = experiment_paths(config)
+    if config.env.video_enabled and config.env.video_dir is None:
+        config = replace(
+            config,
+            env=replace(
+                config.env,
+                render_mode=config.env.render_mode or "rgb_array",
+                video_dir=str(paths.videos),
+            ),
+        )
+    write_resolved_config(config, paths.resolved_config)
+    if config.trainer.seed is not None:
+        seed_everything(config.trainer.seed, workers=True)
+
+    module = DQNLightningModule(config, env_factory=env_factory)
+    logger = CSVLogger(save_dir=str(paths.logs), name="lightning")
+    trainer = Trainer(
+        accelerator=trainer_accelerator(config),
+        devices=trainer_devices(config),
+        precision=config.trainer.precision,
+        deterministic=config.trainer.deterministic,
+        default_root_dir=str(paths.root),
+        max_epochs=1,
+        max_steps=-1,
+        limit_train_batches=int(config.train.max_steps),
+        logger=logger,
+        enable_checkpointing=False,
+        enable_progress_bar=False,
+        log_every_n_steps=max(1, min(int(config.train.log_interval), int(config.train.max_steps))),
+    )
+    trainer.fit(module, ckpt_path=config.train.checkpoint_path)
+    trainer.save_checkpoint(str(paths.checkpoint))
+
+    metrics = module.metrics_summary()
+    write_train_metrics(paths.train_metrics, metrics)
+    print(
+        json.dumps(
+            {
+                "command": "train",
+                "checkpoint": str(paths.checkpoint),
+                "experiment_dir": str(paths.root),
+                "metrics": str(paths.train_metrics),
+                "resolved_config": str(paths.resolved_config),
+                "env_frames": metrics["env_frames"],
+                "global_step": metrics["global_step"],
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 

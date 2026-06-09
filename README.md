@@ -60,8 +60,8 @@ name or path:
 ```shell
 python -m mario_rl.config list
 python -m mario_rl.config path smb_dqn_fast_dev
-python -m mario_rl.train --config smb_dqn_fast_dev --train.fast_dev_run true
-python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
+python -m mario_rl.train --config smb_dqn_fast_dev --train.accelerator cpu
+python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/smb_dqn_fast_dev/checkpoints/fast-dev.ckpt
 python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ```
 
@@ -77,6 +77,33 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 Nested overrides use `--section.field value` syntax. Bare positional
 `KEY=VALUE` overrides are intentionally rejected so experiment configuration is
 always explicit.
+
+## Lightning DQN Smoke Training
+
+The active training path uses PyTorch Lightning, native PyTorch DQN modules,
+uniform replay, and the packaged config tree. Smoke runs write a resolved
+config, Lightning CSV logs, train metrics, and a checkpoint under
+`runs/<experiment_name>/`.
+
+```shell
+./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+./main.sh play --config smb_dqn_fast_dev --eval.episodes 1 --eval.max_steps 32
+```
+
+On Apple Silicon with MPS available:
+
+```shell
+./main.sh train --config smb_dqn_fast_dev --train.accelerator mps --train.devices 1
+```
+
+On a CUDA host:
+
+```shell
+MARIO_RL_RUN_CUDA_SMOKE=1 ./main.sh train --config smb_dqn_fast_dev --train.accelerator gpu --train.devices 1
+```
+
+The play command defaults to the smoke checkpoint path for the selected config.
+Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
 
 ## Modern Environments
 
