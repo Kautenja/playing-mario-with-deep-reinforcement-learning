@@ -173,6 +173,25 @@ DQN:
 ./main.sh play --config smb_dqn_task_conditioned_fast_dev
 ```
 
+## Task Suites
+
+`TaskSuiteConfig` and `TaskSuite` build deterministic curricula from registered
+task metadata without constructing environments. Suites can filter by game
+family, single-stage or full-game tasks, train/eval split, validation status,
+aliases, explicit environment IDs, worlds, and stages. Sampling chooses a game
+family first, using per-family weights, so large SMB1 and Lost Levels catalogs
+do not automatically swamp smaller SMB2 USA and SMB3 task sets.
+
+The task-suite smoke config alternates between a tiny validated SMB1/SMB3
+surface and switches tasks at episode boundaries:
+
+```shell
+./main.sh train --config smb_dqn_task_suite_fast_dev
+```
+
+For custom configs, set `task_suite.enabled: true` and leave `env.id` as a
+single-task fallback for legacy commands and disabled-suite runs.
+
 ## Modern Environments
 
 The Gymnasium environment surface lives under `mario_rl.envs`:
@@ -195,17 +214,18 @@ The default single-stage config uses the canonical
 `SuperMarioBros-1-1-v0` ID from the 9.x environment surface. The
 separator-free alias `SuperMarioBros1-1-v0` is still accepted by
 `gym-super-mario-bros` 9.1.0 for compatibility, and Mario RL re-exports task
-metadata helpers for curriculum or smoke selection:
+metadata helpers for curriculum, smoke selection, and catalog reporting:
 
 ```python
-from mario_rl.envs import available_env_ids, choose_stage_env_id
+from mario_rl.envs import TaskSuite, TaskSuiteConfig, available_env_ids
 
 env_ids = available_env_ids(game_family="smb1", single_stage=True)
-env_id = choose_stage_env_id(seed=123)
+suite = TaskSuite(TaskSuiteConfig(game_families=("smb1", "smb3"), seed=123))
+env_id = suite.task_for_episode(0).env_id
 ```
 
 The old `SuperMarioBrosRandomStages-*` IDs were removed upstream in
-`gym-super-mario-bros` 9.0.0. Use `choose_stage_env_id` for seeded stage
+`gym-super-mario-bros` 9.0.0. Use task-suite sampling for seeded stage
 selection, or pass any registered 9.x ID directly, including
 `SuperMarioBros2USA-v0`, `SuperMarioBros2USA-<world>-<stage>-v0`,
 `SuperMarioBros3-v0`, and `SuperMarioBros3-1-1-v0`.

@@ -12,8 +12,9 @@ import torch
 from lightning.pytorch import LightningModule, Trainer
 
 from mario_rl.envs import UNKNOWN_TASK_VALUE
+from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.lightning import DQNLightningModule, trainer_accelerator
-from mario_rl.tests.fakes import fake_env_factory, tiny_training_config
+from mario_rl.tests.fakes import FakeMarioEnv, fake_env_factory, tiny_training_config
 
 
 class LightningModuleTest(TestCase):
@@ -118,6 +119,85 @@ class LightningModuleTest(TestCase):
             self.assertIsNotNone(batch.task_features)
             self.assertEqual(module.q_network.task_feature_size, batch.task_features.shape[1])
             self.assertGreaterEqual(module.training_updates, 1)
+
+    def test_task_suite_switches_fake_envs_at_episode_boundaries(self):
+        with TemporaryDirectory() as tmpdir:
+            seen_env_ids = []
+
+            def tracking_env_factory(config):
+                seen_env_ids.append(config.env.id)
+                return FakeMarioEnv(episode_length=1)
+
+            config = tiny_training_config(tmpdir)
+            suite_config = TaskSuiteConfig(
+                enabled=True,
+                include_env_ids=("SuperMarioBros-1-1-v0", "SuperMarioBros3-1-1-v0"),
+                single_stage=True,
+                seed=2,
+                switch_interval_episodes=1,
+            )
+            config = replace(
+                config,
+                env=replace(config.env, id="SuperMarioBros-1-1-v0"),
+                task_suite=suite_config,
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=6),
+            )
+            module = DQNLightningModule(config, env_factory=tracking_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            expected = []
+            last_env_id = None
+            suite = TaskSuite(suite_config)
+            for episode in range(module.episodes + 1):
+                env_id = suite.task_for_episode(episode).env_id
+                if env_id != last_env_id:
+                    expected.append(env_id)
+                    last_env_id = env_id
+            self.assertEqual(expected, seen_env_ids)
+            self.assertGreater(len(set(seen_env_ids)), 1)
+
+    def test_single_env_path_keeps_configured_env_id(self):
+        with TemporaryDirectory() as tmpdir:
+            seen_env_ids = []
+
+            def tracking_env_factory(config):
+                seen_env_ids.append(config.env.id)
+                return FakeMarioEnv(episode_length=1)
+
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=4),
+            )
+            module = DQNLightningModule(config, env_factory=tracking_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            self.assertFalse(config.task_suite.enabled)
+            self.assertEqual([config.env.id], seen_env_ids)
 
 
 class LightningDeviceSelectionTest(TestCase):

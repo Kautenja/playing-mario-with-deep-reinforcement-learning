@@ -13,6 +13,7 @@ from mario_rl.config import (
     MarioRLConfig,
     ModelConfig,
     ReplayConfig,
+    TaskSuiteConfig,
     TrainConfig,
     TrainerConfig,
     available_configs,
@@ -30,6 +31,7 @@ class ConfigSchemaTest(TestCase):
         config = MarioRLConfig()
 
         self.assertIsInstance(config.trainer, TrainerConfig)
+        self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
         self.assertEqual("runs", config.save_dir)
 
@@ -92,12 +94,27 @@ class ConfigSchemaTest(TestCase):
 
         self.assertIn("checkpoint", EvalConfig.__dataclass_fields__)
 
+        task_suite_fields = TaskSuiteConfig.__dataclass_fields__
+        for name in (
+            "enabled",
+            "game_families",
+            "single_stage",
+            "splits",
+            "include_validated",
+            "include_aliases",
+            "family_weights",
+            "seed",
+            "switch_interval_episodes",
+        ):
+            self.assertIn(name, task_suite_fields)
+
     def test_packaged_configs_are_discoverable_and_load_typed_objects(self):
         names = available_configs()
 
         self.assertIn("smb_dqn_fast_dev", names)
         self.assertIn("smb_dqn_macbook_gate", names)
         self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
+        self.assertIn("smb_dqn_task_suite_fast_dev", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
 
@@ -114,6 +131,14 @@ class ConfigSchemaTest(TestCase):
         conditioned = load("smb_dqn_task_conditioned_fast_dev")
         self.assertTrue(conditioned.model.task_conditioning)
         self.assertEqual(0, conditioned.model.task_feature_size)
+
+        task_suite = load("smb_dqn_task_suite_fast_dev")
+        self.assertTrue(task_suite.task_suite.enabled)
+        self.assertEqual(("smb1", "smb3"), task_suite.task_suite.game_families)
+        self.assertEqual(
+            {"smb1": 1.0, "smb3": 1.0},
+            task_suite.task_suite.family_weights,
+        )
 
         from_path = load(path)
         self.assertEqual(config, from_path)
@@ -144,12 +169,18 @@ class ConfigCliTest(TestCase):
                 "SuperMarioBros-1-1-v0",
                 "--env.image_size",
                 "20,24",
+                "--task_suite.enabled",
+                "true",
+                "--task_suite.family_weights",
+                "smb1=1,smb3=2",
             ]
         )
 
         self.assertTrue(config.train.fast_dev_run)
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
         self.assertEqual((20, 24), config.env.image_size)
+        self.assertTrue(config.task_suite.enabled)
+        self.assertEqual({"smb1": 1, "smb3": 2}, config.task_suite.family_weights)
 
         with NamedTemporaryFile("w", suffix=".yaml") as config_file:
             config_file.write(
