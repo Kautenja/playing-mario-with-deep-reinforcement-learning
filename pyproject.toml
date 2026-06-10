@@ -53,6 +53,7 @@ Repository = "https://github.com/Kautenja/playing-mario-with-deep-reinforcement-
 
 [tool.setuptools.packages.find]
 include = ["mario_rl*"]
+exclude = ["src", "src.*"]
 
 [tool.setuptools.package-data]
 mario_rl = ["config/data/*.yaml", "configs/**/*.yaml", "configs/**/*.yml", "data/**/*"]
