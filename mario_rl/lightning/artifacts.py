@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from mario_rl.config import MarioRLConfig, to_dict
+from mario_rl.metrics import flatten_global_metrics
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class ExperimentPaths:
     checkpoint: Path
     resolved_config: Path
     train_metrics: Path
+    train_metrics_json: Path
     eval_metrics: Path
 
 
@@ -40,6 +42,7 @@ def experiment_paths(config: MarioRLConfig) -> ExperimentPaths:
         checkpoint=checkpoints / config.train.checkpoint_name,
         resolved_config=root / config.train.resolved_config_name,
         train_metrics=root / config.train.metrics_name,
+        train_metrics_json=(root / config.train.metrics_name).with_suffix(".json"),
         eval_metrics=root / config.eval.metrics_name,
     )
 
@@ -83,6 +86,10 @@ def write_resolved_config(config: MarioRLConfig, path: Path) -> None:
 def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
     """Write one stable CSV row with final smoke-training metrics."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    metric_payload = metrics.get("metrics_payload")
+    structured_fields = (
+        flatten_global_metrics(metric_payload) if isinstance(metric_payload, dict) else {}
+    )
     fieldnames = [
         "action_set",
         "action_count",
@@ -101,8 +108,32 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "epsilon",
         "loss",
         "learning_rate",
+        "metric_episode_count",
+        "metric_completed_episode_count",
+        "metric_step_count",
+        "metric_frame_count",
+        "episode_return_total",
+        "episode_return_mean",
+        "transformed_return_total",
+        "transformed_return_mean",
+        "raw_return_total",
+        "unclipped_return_total",
+        "clipped_return_total",
+        "clear_count",
+        "clear_rate",
+        "death_count",
+        "death_rate",
+        "timeout_count",
+        "timeout_rate",
+        "truncation_count",
+        "truncation_rate",
+        "max_progress",
+        "final_progress_mean",
+        "reward_component_sums_json",
+        "missing_info_counts_json",
     ]
-    row = {name: metrics.get(name, "") for name in fieldnames}
+    row = {**structured_fields, **metrics}
+    row = {name: _csv_value(row.get(name, "")) for name in fieldnames}
     with path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
@@ -113,3 +144,9 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON metrics or command payloads with deterministic formatting."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _csv_value(value: Any) -> Any:
+    if value is None:
+        return ""
+    return value

@@ -518,7 +518,10 @@ def parse_json_payload(output: str, *, expected_command: str) -> dict[str, Any]:
 
 def verify_train_artifacts(payload: dict[str, Any]) -> tuple[ArtifactCheck, ...]:
     """Verify required training files and TensorBoard event output."""
-    checks = verify_file_artifacts(payload, ("checkpoint", "metrics", "resolved_config"))
+    keys = ["checkpoint", "metrics", "resolved_config"]
+    if "metrics_json" in payload:
+        keys.append("metrics_json")
+    checks = verify_file_artifacts(payload, keys)
     tensorboard_dir = Path(str(payload.get("tensorboard", ""))).expanduser()
     if not tensorboard_dir.is_dir():
         raise GateError(f"missing tensorboard directory: {tensorboard_dir}")

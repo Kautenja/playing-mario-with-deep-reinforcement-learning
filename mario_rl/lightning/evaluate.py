@@ -13,6 +13,8 @@ from mario_rl.config import MarioRLConfig, action_space_summary, with_resolved_m
 from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.lightning.artifacts import checkpoint_path, experiment_paths, write_json
 from mario_rl.lightning.module import DQNLightningModule
+from mario_rl.metrics import MarioMetricsAccumulator
+from mario_rl.rewards import RewardTransformer
 from mario_rl.schedules import EpsilonGreedyActionSelector
 
 
@@ -66,10 +68,17 @@ def evaluate_checkpoint(
         task_features = encoder.encode_env_id(config.env.id).to_tensor().unsqueeze(0)
     episode_metrics = []
     env = env_factory(config)
+    reward_transformer = RewardTransformer(config.reward_transform)
+    metrics = MarioMetricsAccumulator(default_task_id=config.env.id)
     try:
         for episode in range(int(config.eval.episodes)):
-            state, _ = env.reset(seed=config.env.seed)
+            state, reset_info = env.reset(seed=config.env.seed)
+            metrics.start_episode(
+                reset_info if isinstance(reset_info, dict) else None,
+                fallback_env_id=config.env.id,
+            )
             total_reward = 0.0
+            total_transformed_reward = 0.0
             steps = 0
             terminated = False
             truncated = False
@@ -85,30 +94,59 @@ def evaluate_checkpoint(
                     epsilon=0.0,
                     deterministic=config.eval.deterministic,
                 )
-                state, reward, terminated, truncated, _ = env.step(action)
+                state, reward, terminated, truncated, info = env.step(action)
+                transformed = reward_transformer.transform(
+                    float(reward),
+                    info if isinstance(info, dict) else None,
+                )
+                frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
+                metrics.observe_step(
+                    reward=float(reward),
+                    transformed=transformed,
+                    terminated=bool(terminated),
+                    truncated=bool(truncated),
+                    info=info if isinstance(info, dict) else None,
+                    fallback_env_id=config.env.id,
+                    frame_count=max(frames, 1),
+                )
                 total_reward += float(reward)
+                total_transformed_reward += transformed.training_reward
                 steps += 1
                 if terminated or truncated:
                     break
+            limit_truncated = (
+                steps >= int(config.eval.max_steps)
+                and not bool(terminated)
+                and not bool(truncated)
+            )
+            metrics.finish_episode(
+                terminated=bool(terminated),
+                truncated=bool(truncated or limit_truncated),
+            )
             episode_metrics.append(
                 {
                     "episode": episode,
                     "reward": total_reward,
+                    "transformed_reward": total_transformed_reward,
                     "steps": steps,
                     "terminated": bool(terminated),
-                    "truncated": bool(truncated),
+                    "truncated": bool(truncated or limit_truncated),
                 }
             )
     finally:
         env.close()
 
+    metrics_payload = metrics.to_payload(include_active=False)
+    global_metrics = metrics_payload["global"]
     payload = {
         **action_space_summary(config),
         "checkpoint": str(ckpt_path),
-        "episodes": episode_metrics,
+        **metrics_payload,
+        "legacy_episodes": episode_metrics,
         "episode_count": len(episode_metrics),
-        "total_reward": float(sum(item["reward"] for item in episode_metrics)),
-        "total_steps": int(sum(item["steps"] for item in episode_metrics)),
+        "total_reward": float(global_metrics["episode_return_total"]),
+        "total_transformed_reward": float(global_metrics["transformed_return_total"]),
+        "total_steps": int(global_metrics["step_count"]),
     }
     write_json(paths.eval_metrics, payload)
     payload["metrics_path"] = str(paths.eval_metrics)

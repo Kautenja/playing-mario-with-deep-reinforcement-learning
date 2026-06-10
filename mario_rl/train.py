@@ -19,6 +19,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         experiment_paths,
         trainer_accelerator,
         trainer_devices,
+        write_json,
         write_resolved_config,
         write_train_metrics,
     )
@@ -64,7 +65,23 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     reward_summary = reward_transform_summary(config.reward_transform)
     metrics.update(action_summary)
     metrics.update(reward_summary)
+    metrics_payload = {
+        "command": "train",
+        **action_summary,
+        **reward_summary,
+        "lightning": {
+            "global_step": metrics["global_step"],
+            "env_frames": metrics["env_frames"],
+            "episodes": metrics["episodes"],
+            "epsilon": metrics["epsilon"],
+            "loss": metrics["loss"],
+            "learning_rate": metrics["learning_rate"],
+        },
+        **module.metrics_payload(include_active=True),
+    }
+    metrics["metrics_payload"] = metrics_payload
     write_train_metrics(paths.train_metrics, metrics)
+    write_json(paths.train_metrics_json, metrics_payload)
     print(
         json.dumps(
             {
@@ -74,10 +91,13 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "checkpoint": str(paths.checkpoint),
                 "experiment_dir": str(paths.root),
                 "metrics": str(paths.train_metrics),
+                "metrics_json": str(paths.train_metrics_json),
                 "resolved_config": str(paths.resolved_config),
                 "tensorboard": str(tensorboard_logger.log_dir),
                 "env_frames": metrics["env_frames"],
                 "global_step": metrics["global_step"],
+                "clear_rate": metrics["clear_rate"],
+                "death_rate": metrics["death_rate"],
             },
             sort_keys=True,
         )
