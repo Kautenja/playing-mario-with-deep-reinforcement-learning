@@ -44,6 +44,37 @@ class ReplayBufferTest(TestCase):
         self.assertEqual(np.bool_, batch.terminated.dtype)
         self.assertEqual(np.bool_, batch.truncated.dtype)
 
+    def test_reward_info_survives_push_sample_and_to_torch(self):
+        replay = UniformReplayBuffer(
+            capacity=2,
+            state_shape=(4, 8, 8),
+            store_reward_info=True,
+            seed=123,
+        )
+        replay.push(
+            self._state(1),
+            2,
+            1.25,
+            False,
+            True,
+            self._state(2),
+            env_reward=3.0,
+            raw_reward=4.0,
+            unclipped_reward=5.0,
+            clipped_reward=6.0,
+        )
+
+        batch = replay.sample(1)
+        torch_batch = batch.to_torch(device=torch.device("cpu"))
+
+        self.assertEqual(1.25, float(batch.reward[0]))
+        self.assertEqual(3.0, float(batch.env_reward[0]))
+        self.assertEqual(4.0, float(batch.raw_reward[0]))
+        self.assertEqual(5.0, float(batch.unclipped_reward[0]))
+        self.assertEqual(6.0, float(batch.clipped_reward[0]))
+        self.assertEqual(torch.float32, torch_batch.raw_reward.dtype)
+        self.assertEqual(5.0, float(torch_batch.unclipped_reward[0]))
+
     def test_replay_batch_can_move_to_torch_device(self):
         replay = UniformReplayBuffer(capacity=2, state_shape=(4, 8, 8), seed=123)
         replay.push(self._state(1), 2, 1.5, False, True, self._state(2))
@@ -98,6 +129,7 @@ class ReplayBufferTest(TestCase):
         self.assertIsInstance(replay, UniformReplayBuffer)
         self.assertEqual(config.replay.capacity, replay.capacity)
         self.assertEqual(config.replay.state_shape, replay.state_shape)
+        self.assertTrue(replay.store_reward_info)
 
         prioritized = replace(config, replay=replace(config.replay, prioritized=True))
         with self.assertRaises(NotImplementedError):

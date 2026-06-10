@@ -18,6 +18,10 @@ class TorchReplayBatch:
     terminated: torch.Tensor
     truncated: torch.Tensor
     next_state: torch.Tensor
+    env_reward: torch.Tensor | None = None
+    raw_reward: torch.Tensor | None = None
+    unclipped_reward: torch.Tensor | None = None
+    clipped_reward: torch.Tensor | None = None
     task_features: torch.Tensor | None = None
     next_task_features: torch.Tensor | None = None
 
@@ -32,6 +36,10 @@ class ReplayBatch:
     terminated: np.ndarray
     truncated: np.ndarray
     next_state: np.ndarray
+    env_reward: np.ndarray | None = None
+    raw_reward: np.ndarray | None = None
+    unclipped_reward: np.ndarray | None = None
+    clipped_reward: np.ndarray | None = None
     task_features: np.ndarray | None = None
     next_task_features: np.ndarray | None = None
 
@@ -44,6 +52,13 @@ class ReplayBatch:
             terminated=torch.as_tensor(self.terminated, dtype=torch.bool, device=device),
             truncated=torch.as_tensor(self.truncated, dtype=torch.bool, device=device),
             next_state=torch.as_tensor(self.next_state, device=device),
+            env_reward=_optional_float_tensor(self.env_reward, device=device),
+            raw_reward=_optional_float_tensor(self.raw_reward, device=device),
+            unclipped_reward=_optional_float_tensor(
+                self.unclipped_reward,
+                device=device,
+            ),
+            clipped_reward=_optional_float_tensor(self.clipped_reward, device=device),
             task_features=_optional_tensor(self.task_features, device=device),
             next_task_features=_optional_tensor(self.next_task_features, device=device),
         )
@@ -60,6 +75,7 @@ class UniformReplayBuffer:
         state_dtype: np.dtype | str = np.uint8,
         task_feature_shape: tuple[int, ...] | None = None,
         task_feature_dtype: np.dtype | str = np.float32,
+        store_reward_info: bool = False,
         seed: int | None = None,
     ) -> None:
         capacity = int(capacity)
@@ -74,6 +90,7 @@ class UniformReplayBuffer:
             else None
         )
         self.task_feature_dtype = np.dtype(task_feature_dtype)
+        self.store_reward_info = bool(store_reward_info)
         self._rng = np.random.default_rng(seed)
         self._position = 0
         self._size = 0
@@ -83,8 +100,17 @@ class UniformReplayBuffer:
         self._rewards = np.empty(capacity, dtype=np.float32)
         self._terminated = np.empty(capacity, dtype=np.bool_)
         self._truncated = np.empty(capacity, dtype=np.bool_)
+        self._env_rewards = None
+        self._raw_rewards = None
+        self._unclipped_rewards = None
+        self._clipped_rewards = None
         self._task_features = None
         self._next_task_features = None
+        if self.store_reward_info:
+            self._env_rewards = np.empty(capacity, dtype=np.float32)
+            self._raw_rewards = np.empty(capacity, dtype=np.float32)
+            self._unclipped_rewards = np.empty(capacity, dtype=np.float32)
+            self._clipped_rewards = np.empty(capacity, dtype=np.float32)
         if self.task_feature_shape is not None:
             self._task_features = np.empty(
                 (capacity, *self.task_feature_shape),
@@ -108,6 +134,10 @@ class UniformReplayBuffer:
         truncated: bool,
         next_state: np.ndarray,
         *,
+        env_reward: float | None = None,
+        raw_reward: float | None = None,
+        unclipped_reward: float | None = None,
+        clipped_reward: float | None = None,
         task_features: np.ndarray | None = None,
         next_task_features: np.ndarray | None = None,
     ) -> None:
@@ -118,6 +148,28 @@ class UniformReplayBuffer:
         self._terminated[self._position] = bool(terminated)
         self._truncated[self._position] = bool(truncated)
         self._next_states[self._position] = self._coerce_state(next_state)
+        if self.store_reward_info:
+            if (
+                self._env_rewards is None
+                or self._raw_rewards is None
+                or self._unclipped_rewards is None
+                or self._clipped_rewards is None
+            ):
+                raise AssertionError("reward info arrays were not initialized")
+            self._env_rewards[self._position] = _optional_reward_value(
+                env_reward,
+                default=reward,
+            )
+            self._raw_rewards[self._position] = _optional_reward_value(
+                raw_reward,
+                default=reward,
+            )
+            self._unclipped_rewards[self._position] = _optional_reward_value(
+                unclipped_reward,
+            )
+            self._clipped_rewards[self._position] = _optional_reward_value(
+                clipped_reward,
+            )
         if self.task_feature_shape is not None:
             if self._task_features is None or self._next_task_features is None:
                 raise AssertionError("task feature arrays were not initialized")
@@ -154,6 +206,22 @@ class UniformReplayBuffer:
             terminated=self._terminated[indices],
             truncated=self._truncated[indices],
             next_state=self._next_states[indices],
+            env_reward=(
+                self._env_rewards[indices] if self._env_rewards is not None else None
+            ),
+            raw_reward=(
+                self._raw_rewards[indices] if self._raw_rewards is not None else None
+            ),
+            unclipped_reward=(
+                self._unclipped_rewards[indices]
+                if self._unclipped_rewards is not None
+                else None
+            ),
+            clipped_reward=(
+                self._clipped_rewards[indices]
+                if self._clipped_rewards is not None
+                else None
+            ),
             task_features=(
                 self._task_features[indices] if self._task_features is not None else None
             ),
@@ -207,6 +275,7 @@ def build_replay_buffer(config: Any, *, seed: int | None = None) -> UniformRepla
         state_shape=tuple(getattr(replay_config, "state_shape")),
         state_dtype=np.dtype(getattr(replay_config, "sample_dtype", np.uint8)),
         task_feature_shape=task_feature_shape,
+        store_reward_info=bool(getattr(replay_config, "store_reward_info", False)),
         seed=seed,
     )
 
@@ -219,3 +288,25 @@ def _optional_tensor(
     if value is None:
         return None
     return torch.as_tensor(value, dtype=torch.float32, device=device)
+
+
+def _optional_float_tensor(
+    value: np.ndarray | None,
+    *,
+    device: torch.device | str | None,
+) -> torch.Tensor | None:
+    if value is None:
+        return None
+    return torch.as_tensor(value, dtype=torch.float32, device=device)
+
+
+def _optional_reward_value(
+    value: float | None,
+    *,
+    default: float | None = None,
+) -> float:
+    if value is None:
+        value = default
+    if value is None:
+        return float("nan")
+    return float(value)

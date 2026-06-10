@@ -52,11 +52,37 @@ class MaxFrameskipEnv(gym.Wrapper):
         info: dict[str, Any] = {}
         obs = None
         frames_skipped = 0
+        raw_reward_sum = 0.0
+        has_raw_reward = False
+        unclipped_reward_sum = 0.0
+        has_unclipped_reward = False
+        clipped_reward_sum = 0.0
+        has_clipped_reward = False
+        component_sums: dict[str, float] = {}
 
         for _ in range(self.skip):
             obs, reward, terminated, truncated, info = self.env.step(action)
             frames_skipped += 1
             total_reward += float(reward)
+            if isinstance(info, dict):
+                raw_reward = info.get("raw_reward")
+                if raw_reward is not None:
+                    raw_reward_sum += float(raw_reward)
+                    has_raw_reward = True
+                unclipped_reward = info.get("reward_total_unclipped")
+                if unclipped_reward is not None:
+                    unclipped_reward_sum += float(unclipped_reward)
+                    has_unclipped_reward = True
+                clipped_reward = info.get("reward_total_clipped")
+                if clipped_reward is not None:
+                    clipped_reward_sum += float(clipped_reward)
+                    has_clipped_reward = True
+                components = info.get("reward_components")
+                if isinstance(components, dict):
+                    for name, value in components.items():
+                        component_sums[str(name)] = (
+                            component_sums.get(str(name), 0.0) + float(value)
+                        )
             self._obs_buffer.append(np.array(obs, copy=True))
             if terminated or truncated:
                 break
@@ -67,6 +93,14 @@ class MaxFrameskipEnv(gym.Wrapper):
             obs = np.maximum(self._obs_buffer[0], self._obs_buffer[1])
 
         info = dict(info)
+        if has_raw_reward:
+            info["raw_reward"] = raw_reward_sum
+        if has_unclipped_reward:
+            info["reward_total_unclipped"] = unclipped_reward_sum
+        if has_clipped_reward:
+            info["reward_total_clipped"] = clipped_reward_sum
+        if component_sums:
+            info["reward_components"] = component_sums
         info["frames_skipped"] = frames_skipped
         return obs, total_reward, terminated, truncated, info
 

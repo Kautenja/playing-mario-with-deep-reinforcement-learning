@@ -148,6 +148,32 @@ Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
 Training shows Lightning progress by default. Pass
 `--trainer.enable_progress_bar false` for quiet/headless runs.
 
+## Reward Transforms
+
+`gym-super-mario-bros` 9.x exposes shaped per-step reward diagnostics in
+`info`, including `reward_total_unclipped`, `reward_total_clipped`, and
+`reward_components`. Mario RL therefore no longer applies Atari-style sign
+clipping by default. Packaged configs use `reward_transform.mode: env`, which
+trains on the environment reward unchanged and records raw, unclipped, clipped,
+and training rewards in replay diagnostics and train metrics.
+
+Available reward modes are `env`, `sign`, `unclipped`, `clipped`, and
+`component_weights`:
+
+```shell
+./main.sh train --config smb_dqn_fast_dev --reward_transform.mode sign
+./main.sh train --config smb_dqn_fast_dev \
+  --reward_transform.mode component_weights \
+  --reward_transform.component_weights progress=1,death=0.5
+```
+
+Use `sign` only when comparing against the old clipped baseline. `unclipped`
+and `clipped` read the matching 9.x info fields, and
+`reward_transform.missing_total_policy` controls whether missing totals fail or
+fall back to the environment reward. `component_weights` combines named
+`reward_components`; `reward_transform.missing_component_policy` controls
+whether absent components contribute zero or fail fast.
+
 ## Task Conditioning
 
 `mario_rl.tasks` and `mario_rl.envs` expose the `gym-super-mario-bros` 9.1

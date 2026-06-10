@@ -8,12 +8,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, skipIf
 
+import numpy as np
 import torch
 from lightning.pytorch import LightningModule, Trainer
 
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.lightning import DQNLightningModule, trainer_accelerator
+from mario_rl.rewards import RewardTransformConfig
 from mario_rl.tests.fakes import FakeMarioEnv, fake_env_factory, tiny_training_config
 
 
@@ -56,6 +58,37 @@ class LightningModuleTest(TestCase):
             self.assertGreaterEqual(module.training_updates, 1)
             self.assertTrue(math.isfinite(module.last_loss))
             self.assertGreaterEqual(len(module.replay), config.replay.warmup)
+
+    def test_component_reward_transform_trains_with_fake_reward_components(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                reward_transform=RewardTransformConfig(
+                    mode="component_weights",
+                    component_weights={"progress": 2.0},
+                ),
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=4),
+            )
+            module = DQNLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+            batch = module.replay.sample(len(module.replay))
+
+            self.assertIsNotNone(batch.unclipped_reward)
+            self.assertTrue(np.allclose(batch.reward, batch.unclipped_reward * 2.0))
+            self.assertGreaterEqual(module.training_updates, 1)
 
     def test_checkpoint_round_trip_restores_weights_and_schedule_state(self):
         with TemporaryDirectory() as tmpdir:

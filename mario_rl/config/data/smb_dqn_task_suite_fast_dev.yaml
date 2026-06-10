@@ -14,7 +14,7 @@ env:
   seed: 123
   image_size: [40, 40]
   frame_stack: 4
-  reward_clipping: true
+  reward_clipping: false
   frame_skip: 4
   preprocess: true
   grayscale: true
@@ -26,6 +26,11 @@ env:
   video_length: 0
   video_name_prefix: mario-rl-task-suite-fast-dev
   max_smoke_steps: 16
+reward_transform:
+  mode: env
+  missing_total_policy: error
+  component_weights: {}
+  missing_component_policy: zero
 task_suite:
   enabled: true
   game_families: [smb1, smb3]
@@ -55,6 +60,7 @@ replay:
   priority_beta: 0.4
   sample_dtype: uint8
   state_shape: [4, 40, 40]
+  store_reward_info: true
 model:
   architecture: dqn
   input_channels: 4
