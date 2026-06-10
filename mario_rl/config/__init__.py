@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, fields, is_dataclass, replace
+from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from importlib import resources
 from pathlib import Path
 from typing import Any
+
+from mario_rl.envs.tasks import TaskSuiteConfig
 
 try:  # pragma: no cover - exercised when optional dependency is installed.
     from jsonargparse import ArgumentParser as _ArgumentParser
@@ -152,6 +154,7 @@ class MarioRLConfig:
     save_dir: str = "runs"
     trainer: TrainerConfig = TrainerConfig()
     env: EnvConfig = EnvConfig()
+    task_suite: TaskSuiteConfig = field(default_factory=TaskSuiteConfig)
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
     epsilon: EpsilonConfig = EpsilonConfig()
@@ -164,6 +167,7 @@ _CONFIG_DATA = "data"
 _SECTIONS = {
     "trainer": TrainerConfig,
     "env": EnvConfig,
+    "task_suite": TaskSuiteConfig,
     "replay": ReplayConfig,
     "model": ModelConfig,
     "epsilon": EpsilonConfig,
@@ -435,6 +439,22 @@ def _coerce_cli_value(value: Any, current: Any) -> Any:
         else:
             parsed = [part.strip() for part in value.split(",")]
         return tuple(_coerce_sequence_items(parsed, current))
+    if isinstance(current, Mapping):
+        if value.startswith("{"):
+            parsed = json.loads(value)
+            if not isinstance(parsed, Mapping):
+                raise ValueError(f"expected mapping value, got {value!r}")
+            return dict(parsed)
+        pairs = [part.strip() for part in value.split(",") if part.strip()]
+        result = {}
+        for pair in pairs:
+            key, separator, item_value = pair.partition("=")
+            if not separator:
+                raise ValueError(
+                    f"expected comma-separated KEY=VALUE mapping, got {value!r}"
+                )
+            result[key.strip()] = _parse_scalar(item_value.strip())
+        return result
     return value
 
 
@@ -495,6 +515,7 @@ __all__ = [
     "MarioRLConfig",
     "ModelConfig",
     "ReplayConfig",
+    "TaskSuiteConfig",
     "TrainConfig",
     "TrainerConfig",
     "apply_overrides",

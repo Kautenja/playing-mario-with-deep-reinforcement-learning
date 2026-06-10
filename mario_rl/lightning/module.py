@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -10,7 +11,7 @@ import torch
 from lightning.pytorch import LightningModule
 
 from mario_rl.config import MarioRLConfig, to_dict
-from mario_rl.envs import TaskFeatureEncoder
+from mario_rl.envs import TaskFeatureEncoder, TaskSuite
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
@@ -53,11 +54,17 @@ class DQNLightningModule(LightningModule):
             num_actions=config.model.num_actions,
             seed=seed,
         )
+        self.task_suite = (
+            TaskSuite(config.task_suite)
+            if bool(getattr(config.task_suite, "enabled", False))
+            else None
+        )
         self.task_encoder = None
         self._task_features: np.ndarray | None = None
         self._configure_task_features()
 
         self.env = None
+        self._active_task_env_id: str | None = None
         self._last_state: np.ndarray | None = None
         self.env_frames = 0
         self.episodes = 0
@@ -129,6 +136,7 @@ class DQNLightningModule(LightningModule):
         if self.env is not None:
             self.env.close()
             self.env = None
+            self._active_task_env_id = None
             self._last_state = None
 
     def metrics_summary(self) -> dict[str, float | int]:
@@ -146,15 +154,39 @@ class DQNLightningModule(LightningModule):
     def _ensure_env(self) -> None:
         if self.env is not None and self._last_state is not None:
             return
-        if self._env_factory is None:
-            from mario_rl.envs import make_env
+        self._reset_active_episode()
 
-            self.env = make_env(config=self.config.env.to_mario_env_config())
-        else:
-            self.env = self._env_factory(self.config)
+    def _reset_active_episode(self) -> None:
+        task = self._task_for_current_episode()
+        env_id = task.env_id if task is not None else self.config.env.id
+        if self.env is not None and self._active_task_env_id != env_id:
+            self.env.close()
+            self.env = None
+            self._last_state = None
+        if self.env is None:
+            active_config = self._config_for_env_id(env_id)
+            if self._env_factory is None:
+                from mario_rl.envs import make_env
+
+                self.env = make_env(config=active_config.env.to_mario_env_config())
+            else:
+                self.env = self._env_factory(active_config)
+            self._active_task_env_id = env_id
+            self._set_task_features_for_env_id(env_id)
+        assert self.env is not None
         state, _ = self.env.reset(seed=self.config.env.seed)
         self._last_state = self._coerce_state(state)
         self.episode_reward = 0.0
+
+    def _task_for_current_episode(self):
+        if self.task_suite is None:
+            return None
+        return self.task_suite.task_for_episode(self.episodes)
+
+    def _config_for_env_id(self, env_id: str) -> MarioRLConfig:
+        if env_id == self.config.env.id:
+            return self.config
+        return replace(self.config, env=replace(self.config.env, id=env_id))
 
     def _collect_transition(self) -> float:
         assert self.env is not None
@@ -192,9 +224,7 @@ class DQNLightningModule(LightningModule):
 
         if terminated or truncated:
             self.episodes += 1
-            reset_state, _ = self.env.reset(seed=self.config.env.seed)
-            self._last_state = self._coerce_state(reset_state)
-            self.episode_reward = 0.0
+            self._reset_active_episode()
         else:
             self._last_state = next_state
         return float(reward)
@@ -244,7 +274,12 @@ class DQNLightningModule(LightningModule):
                 "configured task feature size "
                 f"{feature_size} does not match encoder size {self.task_encoder.feature_size}"
             )
-        self._task_features = self.task_encoder.encode_env_id(self.config.env.id).vector
+        self._set_task_features_for_env_id(self.config.env.id)
+
+    def _set_task_features_for_env_id(self, env_id: str) -> None:
+        if self.task_encoder is None:
+            return
+        self._task_features = self.task_encoder.encode_env_id(env_id).vector
 
     def _task_feature_tensor(self, *, batch_size: int) -> torch.Tensor | None:
         if self._task_features is None:

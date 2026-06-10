@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import random
 from typing import Any
 
@@ -33,6 +33,193 @@ class TaskFeatures:
     def to_tensor(self, device: torch.device | str | None = None) -> torch.Tensor:
         """Return this feature vector as a float32 torch tensor."""
         return torch.as_tensor(self.vector, dtype=torch.float32, device=device)
+
+
+@dataclass(frozen=True)
+class TaskSuiteConfig:
+    """Configuration for metadata-only Mario task-suite resolution and sampling."""
+
+    enabled: bool = False
+    game_families: tuple[str, ...] = ()
+    single_stage: bool | None = True
+    splits: tuple[str, ...] = ("train",)
+    exclude_splits: tuple[str, ...] = ()
+    include_validated: bool | None = True
+    exclude_validated: bool | None = None
+    include_aliases: bool = False
+    include_env_ids: tuple[str, ...] = ()
+    exclude_env_ids: tuple[str, ...] = ()
+    include_worlds: tuple[int, ...] = ()
+    exclude_worlds: tuple[int, ...] = ()
+    include_stages: tuple[int, ...] = ()
+    exclude_stages: tuple[int, ...] = ()
+    family_weights: dict[str, float] = field(default_factory=dict)
+    seed: int | None = None
+    switch_interval_episodes: int = 1
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "enabled", _bool(self.enabled))
+        object.__setattr__(self, "game_families", _str_tuple(self.game_families))
+        object.__setattr__(self, "single_stage", _optional_bool(self.single_stage))
+        object.__setattr__(self, "splits", _str_tuple(self.splits))
+        object.__setattr__(self, "exclude_splits", _str_tuple(self.exclude_splits))
+        object.__setattr__(
+            self,
+            "include_validated",
+            _optional_bool(self.include_validated),
+        )
+        object.__setattr__(
+            self,
+            "exclude_validated",
+            _optional_bool(self.exclude_validated),
+        )
+        object.__setattr__(self, "include_aliases", _bool(self.include_aliases))
+        object.__setattr__(self, "include_env_ids", _str_tuple(self.include_env_ids))
+        object.__setattr__(self, "exclude_env_ids", _str_tuple(self.exclude_env_ids))
+        object.__setattr__(self, "include_worlds", _int_tuple(self.include_worlds))
+        object.__setattr__(self, "exclude_worlds", _int_tuple(self.exclude_worlds))
+        object.__setattr__(self, "include_stages", _int_tuple(self.include_stages))
+        object.__setattr__(self, "exclude_stages", _int_tuple(self.exclude_stages))
+        object.__setattr__(
+            self,
+            "family_weights",
+            _family_weight_mapping(self.family_weights),
+        )
+        if self.seed is not None:
+            object.__setattr__(self, "seed", int(self.seed))
+        interval = int(self.switch_interval_episodes)
+        if interval <= 0:
+            raise ValueError("switch_interval_episodes must be > 0")
+        object.__setattr__(self, "switch_interval_episodes", interval)
+
+
+class TaskSuite:
+    """Resolve and sample registered Mario tasks without constructing envs."""
+
+    def __init__(
+        self,
+        config: TaskSuiteConfig | Mapping[str, Any] | None = None,
+        *,
+        tasks: Iterable[MarioTask] | None = None,
+    ) -> None:
+        self.config = _coerce_task_suite_config(config)
+        self.candidates = self._resolve_candidates(tasks)
+        self._tasks_by_family = _group_tasks_by_family(self.candidates)
+        self._families = tuple(sorted(self._tasks_by_family))
+        self._weights = tuple(
+            self.config.family_weights.get(family, 1.0)
+            for family in self._families
+        )
+        if any(weight <= 0.0 for weight in self._weights):
+            raise ValueError("family weights must be positive")
+        missing_weights = set(self.config.family_weights) - set(self._families)
+        if missing_weights:
+            names = ", ".join(sorted(missing_weights))
+            raise ValueError(f"family_weights reference empty task families: {names}")
+        self._sample_index = 0
+
+    @property
+    def env_ids(self) -> tuple[str, ...]:
+        """Return candidate environment IDs in stable resolver order."""
+        return tuple(task.env_id for task in self.candidates)
+
+    @property
+    def family_counts(self) -> dict[str, int]:
+        """Return candidate counts by game family."""
+        return {family: len(tasks) for family, tasks in self._tasks_by_family.items()}
+
+    def task_for_index(self, index: int) -> MarioTask:
+        """Return the deterministic sampled task for a zero-based sample index."""
+        if index < 0:
+            raise ValueError("sample index must be >= 0")
+        rng = random.Random(f"{self.config.seed}:{int(index)}")
+        family = _weighted_choice(rng, self._families, self._weights)
+        return rng.choice(self._tasks_by_family[family])
+
+    def sample(self) -> MarioTask:
+        """Return the next deterministic sample and advance the local cursor."""
+        task = self.task_for_index(self._sample_index)
+        self._sample_index += 1
+        return task
+
+    def task_for_episode(self, episode: int) -> MarioTask:
+        """Return the active task for an episode number and switch interval."""
+        if episode < 0:
+            raise ValueError("episode must be >= 0")
+        index = int(episode) // int(self.config.switch_interval_episodes)
+        return self.task_for_index(index)
+
+    def smb3_catalog(self, *, validated: bool | None = None):
+        """Return the full SMB3 stage catalog for reports, not train sampling."""
+        return tuple(smb3_stage_matrix(validated=validated))
+
+    def _resolve_candidates(
+        self,
+        tasks: Iterable[MarioTask] | None,
+    ) -> tuple[MarioTask, ...]:
+        config = self.config
+        _validate_task_suite_filters(config)
+        candidates = tuple(tasks) if tasks is not None else available_tasks(
+            include_aliases=config.include_aliases
+        )
+        if not config.include_aliases:
+            candidates = tuple(task for task in candidates if task.alias_of is None)
+        if config.game_families:
+            families = set(config.game_families)
+            candidates = tuple(
+                task for task in candidates if task.game_family in families
+            )
+        if config.single_stage is not None:
+            candidates = tuple(
+                task
+                for task in candidates
+                if task.single_stage is bool(config.single_stage)
+            )
+        if config.splits:
+            candidates = tuple(
+                task for task in candidates if _task_in_any_split(task, config.splits)
+            )
+        if config.exclude_splits:
+            candidates = tuple(
+                task
+                for task in candidates
+                if not _task_in_any_split(task, config.exclude_splits)
+            )
+        if config.include_validated is not None:
+            candidates = tuple(
+                task
+                for task in candidates
+                if task.validated is bool(config.include_validated)
+            )
+        if config.exclude_validated is not None:
+            candidates = tuple(
+                task
+                for task in candidates
+                if task.validated is not bool(config.exclude_validated)
+            )
+        if config.include_env_ids:
+            env_ids = set(config.include_env_ids)
+            candidates = tuple(task for task in candidates if task.env_id in env_ids)
+        if config.exclude_env_ids:
+            env_ids = set(config.exclude_env_ids)
+            candidates = tuple(task for task in candidates if task.env_id not in env_ids)
+        if config.include_worlds:
+            worlds = set(config.include_worlds)
+            candidates = tuple(task for task in candidates if task.world in worlds)
+        if config.exclude_worlds:
+            worlds = set(config.exclude_worlds)
+            candidates = tuple(task for task in candidates if task.world not in worlds)
+        if config.include_stages:
+            stages = set(config.include_stages)
+            candidates = tuple(task for task in candidates if task.stage in stages)
+        if config.exclude_stages:
+            stages = set(config.exclude_stages)
+            candidates = tuple(task for task in candidates if task.stage not in stages)
+
+        candidates = tuple(sorted(candidates, key=_task_sort_key))
+        if not candidates:
+            raise ValueError("task suite has no candidate tasks")
+        return candidates
 
 
 class TaskFeatureEncoder:
@@ -230,6 +417,76 @@ def encode_task_features(
     return active_encoder.encode_env_id(env_id)
 
 
+def _coerce_task_suite_config(
+    config: TaskSuiteConfig | Mapping[str, Any] | None,
+) -> TaskSuiteConfig:
+    if config is None:
+        return TaskSuiteConfig()
+    if isinstance(config, TaskSuiteConfig):
+        return config
+    if isinstance(config, Mapping):
+        return TaskSuiteConfig(**dict(config))
+    values = {
+        field_name: getattr(config, field_name)
+        for field_name in TaskSuiteConfig.__dataclass_fields__
+        if hasattr(config, field_name)
+    }
+    return TaskSuiteConfig(**values)
+
+
+def _validate_task_suite_filters(config: TaskSuiteConfig) -> None:
+    valid_splits = {"train", "eval"}
+    unknown_splits = set(config.splits) - valid_splits
+    unknown_excluded_splits = set(config.exclude_splits) - valid_splits
+    if unknown_splits or unknown_excluded_splits:
+        names = ", ".join(sorted(unknown_splits | unknown_excluded_splits))
+        raise ValueError(f"task suite splits must be train/eval, got: {names}")
+    if config.include_validated is not None and config.exclude_validated is not None:
+        if bool(config.include_validated) == bool(config.exclude_validated):
+            raise ValueError("include_validated and exclude_validated conflict")
+
+
+def _group_tasks_by_family(tasks: Iterable[MarioTask]) -> dict[str, tuple[MarioTask, ...]]:
+    grouped: dict[str, list[MarioTask]] = {}
+    for task in tasks:
+        grouped.setdefault(task.game_family, []).append(task)
+    return {family: tuple(values) for family, values in grouped.items()}
+
+
+def _task_in_any_split(task: MarioTask, splits: Sequence[str]) -> bool:
+    return (
+        ("train" in splits and bool(task.train_split))
+        or ("eval" in splits and bool(task.eval_split))
+    )
+
+
+def _task_sort_key(task: MarioTask) -> tuple[Any, ...]:
+    return (
+        task.game_family,
+        not task.single_stage,
+        task.world if task.world is not None else 0,
+        task.stage if task.stage is not None else 0,
+        task.env_id,
+    )
+
+
+def _weighted_choice(
+    rng: random.Random,
+    values: Sequence[str],
+    weights: Sequence[float],
+) -> str:
+    total = float(sum(weights))
+    if total <= 0.0:
+        raise ValueError("family weights must sum to a positive value")
+    threshold = rng.random() * total
+    cumulative = 0.0
+    for value, weight in zip(values, weights):
+        cumulative += float(weight)
+        if threshold < cumulative:
+            return value
+    return values[-1]
+
+
 def _vocabulary(values: Iterable[str | None]) -> tuple[str, ...]:
     return (UNKNOWN_TASK_VALUE, *sorted({str(value) for value in values if value is not None}))
 
@@ -261,10 +518,66 @@ def _optional_str(value: Any) -> str | None:
     return str(value)
 
 
+def _str_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return tuple(part.strip() for part in value.split(",") if part.strip())
+    return tuple(str(item) for item in value)
+
+
+def _int_tuple(value: Any) -> tuple[int, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        values = [part.strip() for part in value.split(",") if part.strip()]
+    else:
+        values = list(value)
+    return tuple(int(item) for item in values)
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value is None or isinstance(value, bool):
+        return value
+    lowered = str(value).strip().lower()
+    if lowered in {"none", "null"}:
+        return None
+    return _bool(value)
+
+
+def _bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    lowered = str(value).strip().lower()
+    if lowered in {"1", "true", "yes", "on"}:
+        return True
+    if lowered in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"expected boolean value, got {value!r}")
+
+
+def _family_weight_mapping(value: Any) -> dict[str, float]:
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        return {str(family): float(weight) for family, weight in value.items()}
+    weights: dict[str, float] = {}
+    for item in _str_tuple(value):
+        family, separator, weight = item.partition("=")
+        if not separator:
+            raise ValueError(
+                "family_weights string entries must use FAMILY=WEIGHT"
+            )
+        weights[family.strip()] = float(weight.strip())
+    return weights
+
+
 __all__ = [
     "MarioTask",
     "TaskFeatureEncoder",
     "TaskFeatures",
+    "TaskSuite",
+    "TaskSuiteConfig",
     "UNKNOWN_TASK_VALUE",
     "available_env_ids",
     "available_tasks",
