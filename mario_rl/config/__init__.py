@@ -31,7 +31,7 @@ class TrainerConfig:
 class EnvConfig:
     """Gymnasium environment, preprocessing, smoke, and video settings."""
 
-    id: str = "SuperMarioBros1-1-v0"
+    id: str = "SuperMarioBros-1-1-v0"
     render_mode: str | None = None
     action_set: str = "simple"
     seed: int | None = 123

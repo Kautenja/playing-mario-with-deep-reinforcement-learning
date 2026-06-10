@@ -103,7 +103,7 @@ class ConfigSchemaTest(TestCase):
 
         config = load("smb_dqn_fast_dev")
         self.assertIsInstance(config, MarioRLConfig)
-        self.assertEqual("SuperMarioBros1-1-v0", config.env.id)
+        self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
 
@@ -133,21 +133,21 @@ class ConfigCliTest(TestCase):
                 "--train.fast_dev_run",
                 "true",
                 "--env.id",
-                "SuperMarioBros1-1-v0",
+                "SuperMarioBros-1-1-v0",
                 "--env.image_size",
                 "20,24",
             ]
         )
 
         self.assertTrue(config.train.fast_dev_run)
-        self.assertEqual("SuperMarioBros1-1-v0", config.env.id)
+        self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
         self.assertEqual((20, 24), config.env.image_size)
 
         with NamedTemporaryFile("w", suffix=".yaml") as config_file:
             config_file.write(
                 "experiment_name: path_config\n"
                 "env:\n"
-                "  id: SuperMarioBrosRandomStages-v0\n"
+                "  id: SuperMarioBros3-1-1-v0\n"
                 "train:\n"
                 "  fast_dev_run: true\n"
             )
@@ -155,7 +155,7 @@ class ConfigCliTest(TestCase):
 
             loaded = parse_cli_config(["--config", config_file.name])
             self.assertEqual("path_config", loaded.experiment_name)
-            self.assertEqual("SuperMarioBrosRandomStages-v0", loaded.env.id)
+            self.assertEqual("SuperMarioBros3-1-1-v0", loaded.env.id)
             self.assertTrue(loaded.train.fast_dev_run)
 
     def test_bare_key_value_overrides_are_rejected(self):

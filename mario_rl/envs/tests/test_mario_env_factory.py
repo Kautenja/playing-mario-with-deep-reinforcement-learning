@@ -5,10 +5,16 @@ from unittest import TestCase
 
 import numpy as np
 
-from mario_rl.envs import MarioEnvConfig, make_env
+from mario_rl.envs import (
+    MarioEnvConfig,
+    available_env_ids,
+    choose_stage_env_id,
+    make_env,
+    task_for_env_id,
+)
 
 
-def _first_rollout(seed=123, env_id="SuperMarioBros1-1-v0", actions=(0, 1, 0)):
+def _first_rollout(seed=123, env_id="SuperMarioBros-1-1-v0", actions=(0, 1, 0)):
     """Run a short deterministic rollout and return comparable metadata."""
     env = make_env(
         env_id,
@@ -43,7 +49,7 @@ class MarioEnvFactoryTest(TestCase):
 
     def test_factory_creates_preprocessed_gymnasium_env(self):
         env = make_env(
-            "SuperMarioBros1-1-v0",
+            "SuperMarioBros-1-1-v0",
             render_mode="rgb_array",
             seed=123,
             action_set="simple",
@@ -90,23 +96,56 @@ class MarioEnvFactoryTest(TestCase):
         second = _first_rollout(seed=123)
         self.assertEqual(first, second)
 
-    def test_random_stage_env_preserves_seeded_stage_selection(self):
-        first = _first_rollout(
+    def test_stage_task_metadata_replaces_removed_random_stage_env(self):
+        env_ids = available_env_ids()
+        self.assertIn("SuperMarioBros-1-1-v0", env_ids)
+        self.assertIn("SuperMarioBros1-1-v0", available_env_ids(include_aliases=True))
+        self.assertIn("SuperMarioBros2USA-v0", env_ids)
+        self.assertIn("SuperMarioBros3-1-1-v0", env_ids)
+        self.assertNotIn("SuperMarioBrosRandomStages-v0", env_ids)
+
+        first = choose_stage_env_id(seed=321)
+        second = choose_stage_env_id(seed=321)
+        self.assertEqual(first, second)
+        self.assertIn(first, available_env_ids(game_family="smb1", single_stage=True))
+
+        task = task_for_env_id(first)
+        self.assertTrue(task.single_stage)
+        self.assertEqual(first, task.env_id)
+
+    def test_legacy_separator_free_stage_alias_still_creates_env(self):
+        obs_shape, world, stage, _ = _first_rollout(
             seed=321,
-            env_id="SuperMarioBrosRandomStages-v0",
+            env_id="SuperMarioBros1-1-v0",
             actions=(),
         )
-        second = _first_rollout(
-            seed=321,
-            env_id="SuperMarioBrosRandomStages-v0",
-            actions=(),
-        )
-        self.assertEqual(first[1:3], second[1:3])
+        self.assertEqual((2, 16, 16), obs_shape)
+        self.assertEqual(1, world)
+        self.assertEqual(1, stage)
+
+    def test_factory_creates_representative_9x_game_family_envs(self):
+        for env_id in ("SuperMarioBros2USA-v0", "SuperMarioBros3-1-1-v0"):
+            with self.subTest(env_id=env_id):
+                env = make_env(
+                    env_id,
+                    render_mode="rgb_array",
+                    seed=123,
+                    action_set="right_only",
+                    preprocess=False,
+                    record_statistics=False,
+                )
+                try:
+                    obs, info = env.reset(seed=123)
+                    self.assertEqual((240, 256, 3), obs.shape)
+                    self.assertIn("task_id", info)
+                    self.assertEqual(5, len(env.step(0)))
+                finally:
+                    env.close()
 
     def test_optional_video_recording_writes_gymnasium_artifacts(self):
         with TemporaryDirectory() as tmpdir:
             env = make_env(
-                "SuperMarioBros1-1-v0",
+                "SuperMarioBros-1-1-v0",
                 render_mode="rgb_array",
                 seed=123,
                 action_set="right_only",
