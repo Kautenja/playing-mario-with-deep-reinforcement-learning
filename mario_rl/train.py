@@ -11,7 +11,7 @@ from .config import MarioRLConfig, cli
 def run(config: MarioRLConfig, *, env_factory=None) -> int:
     """Run a bounded Lightning DQN training job and write smoke artifacts."""
     from lightning.pytorch import Trainer, seed_everything
-    from lightning.pytorch.loggers import CSVLogger
+    from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 
     from mario_rl.lightning import (
         DQNLightningModule,
@@ -37,7 +37,8 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         seed_everything(config.trainer.seed, workers=True)
 
     module = DQNLightningModule(config, env_factory=env_factory)
-    logger = CSVLogger(save_dir=str(paths.logs), name="lightning")
+    csv_logger = CSVLogger(save_dir=str(paths.logs), name="lightning")
+    tensorboard_logger = TensorBoardLogger(save_dir=str(paths.logs), name="tensorboard")
     trainer = Trainer(
         accelerator=trainer_accelerator(config),
         devices=trainer_devices(config),
@@ -47,7 +48,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         max_epochs=1,
         max_steps=-1,
         limit_train_batches=int(config.train.max_steps),
-        logger=logger,
+        logger=[csv_logger, tensorboard_logger],
         enable_checkpointing=False,
         enable_progress_bar=bool(config.trainer.enable_progress_bar),
         log_every_n_steps=max(1, min(int(config.train.log_interval), int(config.train.max_steps))),
@@ -65,6 +66,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "experiment_dir": str(paths.root),
                 "metrics": str(paths.train_metrics),
                 "resolved_config": str(paths.resolved_config),
+                "tensorboard": str(tensorboard_logger.log_dir),
                 "env_frames": metrics["env_frames"],
                 "global_step": metrics["global_step"],
             },
