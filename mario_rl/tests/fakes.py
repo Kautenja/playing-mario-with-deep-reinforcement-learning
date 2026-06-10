@@ -37,12 +37,22 @@ class FakeMarioEnv(gym.Env):
         reward = float((int(action) % 3) - 1)
         terminated = self.step_count >= self.episode_length
         truncated = False
+        clipped_reward = max(-15.0, min(15.0, reward))
         return (
             self._obs(self.step_count),
             reward,
             terminated,
             truncated,
-            {"frames_skipped": 1, "fake_step": self.step_count},
+            {
+                "frames_skipped": 1,
+                "fake_step": self.step_count,
+                "reward_components": {
+                    "progress": reward,
+                    "death": 0.0,
+                },
+                "reward_total_unclipped": reward,
+                "reward_total_clipped": clipped_reward,
+            },
         )
 
     def _obs(self, value: int):

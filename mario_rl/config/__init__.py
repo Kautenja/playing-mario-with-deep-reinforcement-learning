@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from mario_rl.envs.tasks import TaskSuiteConfig
+from mario_rl.rewards import RewardTransformConfig
 
 try:  # pragma: no cover - exercised when optional dependency is installed.
     from jsonargparse import ArgumentParser as _ArgumentParser
@@ -42,7 +43,7 @@ class EnvConfig:
     seed: int | None = 123
     image_size: tuple[int, int] = (84, 84)
     frame_stack: int | None = 4
-    reward_clipping: bool = True
+    reward_clipping: bool = False
     frame_skip: int | None = 4
     preprocess: bool = True
     grayscale: bool = True
@@ -91,6 +92,7 @@ class ReplayConfig:
     priority_beta: float = 0.4
     sample_dtype: str = "uint8"
     state_shape: tuple[int, int, int] = (4, 84, 84)
+    store_reward_info: bool = True
 
 
 @dataclass(frozen=True)
@@ -158,6 +160,7 @@ class MarioRLConfig:
     trainer: TrainerConfig = TrainerConfig()
     env: EnvConfig = EnvConfig()
     task_suite: TaskSuiteConfig = field(default_factory=TaskSuiteConfig)
+    reward_transform: RewardTransformConfig = field(default_factory=RewardTransformConfig)
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
     epsilon: EpsilonConfig = EpsilonConfig()
@@ -171,6 +174,7 @@ _SECTIONS = {
     "trainer": TrainerConfig,
     "env": EnvConfig,
     "task_suite": TaskSuiteConfig,
+    "reward_transform": RewardTransformConfig,
     "replay": ReplayConfig,
     "model": ModelConfig,
     "epsilon": EpsilonConfig,
@@ -426,6 +430,8 @@ def _parse_scalar(value: str) -> Any:
         return None
     if value.startswith("[") and value.endswith("]"):
         return json.loads(value)
+    if value.startswith("{") and value.endswith("}"):
+        return json.loads(value)
     try:
         return int(value)
     except ValueError:
@@ -582,6 +588,7 @@ __all__ = [
     "MarioRLConfig",
     "ModelConfig",
     "ReplayConfig",
+    "RewardTransformConfig",
     "TaskSuiteConfig",
     "TrainConfig",
     "TrainerConfig",

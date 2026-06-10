@@ -23,7 +23,7 @@ class MarioEnvConfig:
     dtype: type[np.uint8] = np.uint8
     channel_first: bool = True
     frame_stack: int | None = 4
-    clip_rewards: bool = True
+    clip_rewards: bool = False
     record_statistics: bool = True
     video_dir: str | Path | None = None
     video_episode_trigger: Callable[[int], bool] | None = None

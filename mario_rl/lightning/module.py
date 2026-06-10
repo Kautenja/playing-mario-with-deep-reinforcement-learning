@@ -15,6 +15,7 @@ from mario_rl.envs import TaskFeatureEncoder, TaskSuite
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
+from mario_rl.rewards import RewardTransformer
 from mario_rl.schedules import EpsilonGreedyActionSelector, LinearEpsilonSchedule
 
 
@@ -49,6 +50,7 @@ class DQNLightningModule(LightningModule):
             else self.config.env.seed
         )
         self.replay: UniformReplayBuffer = build_replay_buffer(self.config, seed=seed)
+        self.reward_transformer = RewardTransformer(self.config.reward_transform)
         self.epsilon_schedule = LinearEpsilonSchedule(
             start=self.config.epsilon.start,
             final=self.config.epsilon.final,
@@ -73,6 +75,10 @@ class DQNLightningModule(LightningModule):
         self.env_frames = 0
         self.episodes = 0
         self.episode_reward = 0.0
+        self.episode_env_reward = 0.0
+        self.episode_raw_reward = 0.0
+        self.episode_unclipped_reward = 0.0
+        self.episode_clipped_reward = 0.0
         self.last_loss = 0.0
         self.training_updates = 0
 
@@ -99,6 +105,30 @@ class DQNLightningModule(LightningModule):
         lr = self._current_learning_rate()
         self.log("train/loss", loss_tensor, on_step=True, prog_bar=False)
         self.log("train/episode_reward", self.episode_reward, on_step=True, prog_bar=False)
+        self.log(
+            "train/episode_env_reward",
+            self.episode_env_reward,
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/episode_raw_reward",
+            self.episode_raw_reward,
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/episode_unclipped_reward",
+            self.episode_unclipped_reward,
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/episode_clipped_reward",
+            self.episode_clipped_reward,
+            on_step=True,
+            prog_bar=False,
+        )
         self.log("train/epsilon", epsilon, on_step=True, prog_bar=False)
         self.log("train/env_frames", float(self.env_frames), on_step=True, prog_bar=False)
         if lr is not None:
@@ -119,6 +149,10 @@ class DQNLightningModule(LightningModule):
             "env_frames": int(self.env_frames),
             "episodes": int(self.episodes),
             "episode_reward": float(self.episode_reward),
+            "episode_env_reward": float(self.episode_env_reward),
+            "episode_raw_reward": float(self.episode_raw_reward),
+            "episode_unclipped_reward": float(self.episode_unclipped_reward),
+            "episode_clipped_reward": float(self.episode_clipped_reward),
             "last_loss": float(self.last_loss),
             "training_updates": int(self.training_updates),
             "epsilon_schedule": self.epsilon_schedule.state_dict(),
@@ -130,6 +164,18 @@ class DQNLightningModule(LightningModule):
         self.env_frames = int(state.get("env_frames", self.env_frames))
         self.episodes = int(state.get("episodes", self.episodes))
         self.episode_reward = float(state.get("episode_reward", self.episode_reward))
+        self.episode_env_reward = float(
+            state.get("episode_env_reward", self.episode_env_reward)
+        )
+        self.episode_raw_reward = float(
+            state.get("episode_raw_reward", self.episode_raw_reward)
+        )
+        self.episode_unclipped_reward = float(
+            state.get("episode_unclipped_reward", self.episode_unclipped_reward)
+        )
+        self.episode_clipped_reward = float(
+            state.get("episode_clipped_reward", self.episode_clipped_reward)
+        )
         self.last_loss = float(state.get("last_loss", self.last_loss))
         self.training_updates = int(state.get("training_updates", self.training_updates))
         if "epsilon_schedule" in state:
@@ -150,6 +196,10 @@ class DQNLightningModule(LightningModule):
             "env_frames": int(self.env_frames),
             "episodes": int(self.episodes),
             "episode_reward": float(self.episode_reward),
+            "episode_env_reward": float(self.episode_env_reward),
+            "episode_raw_reward": float(self.episode_raw_reward),
+            "episode_unclipped_reward": float(self.episode_unclipped_reward),
+            "episode_clipped_reward": float(self.episode_clipped_reward),
             "epsilon": float(self.epsilon_schedule.value()),
             "loss": float(self.last_loss),
             "learning_rate": float(self.config.model.learning_rate),
@@ -181,6 +231,10 @@ class DQNLightningModule(LightningModule):
         state, _ = self.env.reset(seed=self.config.env.seed)
         self._last_state = self._coerce_state(state)
         self.episode_reward = 0.0
+        self.episode_env_reward = 0.0
+        self.episode_raw_reward = 0.0
+        self.episode_unclipped_reward = 0.0
+        self.episode_clipped_reward = 0.0
 
     def _task_for_current_episode(self):
         if self.task_suite is None:
@@ -209,14 +263,22 @@ class DQNLightningModule(LightningModule):
         action = self.action_selector.select(q_values, epsilon=epsilon)
 
         next_state, reward, terminated, truncated, info = self.env.step(action)
+        transformed = self.reward_transformer.transform(
+            float(reward),
+            info if isinstance(info, dict) else None,
+        )
         next_state = self._coerce_state(next_state)
         self.replay.push(
             self._last_state,
             action,
-            float(reward),
+            transformed.training_reward,
             bool(terminated),
             bool(truncated),
             next_state,
+            env_reward=transformed.env_reward,
+            raw_reward=transformed.raw_reward,
+            unclipped_reward=transformed.unclipped_reward,
+            clipped_reward=transformed.clipped_reward,
             task_features=self._task_features,
             next_task_features=self._task_features,
         )
@@ -224,14 +286,20 @@ class DQNLightningModule(LightningModule):
         frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
         self.env_frames += max(frames, 1)
         self.epsilon_schedule.current_step = self.env_frames
-        self.episode_reward += float(reward)
+        self.episode_reward += transformed.training_reward
+        self.episode_env_reward += transformed.env_reward
+        self.episode_raw_reward += transformed.raw_reward
+        if transformed.unclipped_reward is not None:
+            self.episode_unclipped_reward += transformed.unclipped_reward
+        if transformed.clipped_reward is not None:
+            self.episode_clipped_reward += transformed.clipped_reward
 
         if terminated or truncated:
             self.episodes += 1
             self._reset_active_episode()
         else:
             self._last_state = next_state
-        return float(reward)
+        return transformed.training_reward
 
     def _optimize_from_replay(self) -> torch.Tensor | None:
         if len(self.replay) < int(self.config.replay.warmup):

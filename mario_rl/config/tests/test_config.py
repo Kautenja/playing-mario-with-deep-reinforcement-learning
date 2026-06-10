@@ -14,6 +14,7 @@ from mario_rl.config import (
     MarioRLConfig,
     ModelConfig,
     ReplayConfig,
+    RewardTransformConfig,
     TaskSuiteConfig,
     TrainConfig,
     TrainerConfig,
@@ -35,6 +36,7 @@ class ConfigSchemaTest(TestCase):
 
         self.assertIsInstance(config.trainer, TrainerConfig)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
+        self.assertIsInstance(config.reward_transform, RewardTransformConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
         self.assertEqual("runs", config.save_dir)
 
@@ -64,8 +66,18 @@ class ConfigSchemaTest(TestCase):
             "priority_beta",
             "sample_dtype",
             "state_shape",
+            "store_reward_info",
         ):
             self.assertIn(name, replay_fields)
+
+        reward_transform_fields = RewardTransformConfig.__dataclass_fields__
+        for name in (
+            "mode",
+            "missing_total_policy",
+            "component_weights",
+            "missing_component_policy",
+        ):
+            self.assertIn(name, reward_transform_fields)
 
         model_fields = ModelConfig.__dataclass_fields__
         for name in (
@@ -129,6 +141,9 @@ class ConfigSchemaTest(TestCase):
         config = load("smb_dqn_fast_dev")
         self.assertIsInstance(config, MarioRLConfig)
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
+        self.assertFalse(config.env.reward_clipping)
+        self.assertEqual("env", config.reward_transform.mode)
+        self.assertTrue(config.replay.store_reward_info)
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
         self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
@@ -209,6 +224,12 @@ class ConfigCliTest(TestCase):
                 "true",
                 "--task_suite.family_weights",
                 "smb1=1,smb3=2",
+                "--reward_transform.mode",
+                "component_weights",
+                "--reward_transform.component_weights",
+                "progress=1,death=-0.5",
+                "--reward_transform.missing_component_policy",
+                "error",
             ]
         )
 
@@ -217,6 +238,12 @@ class ConfigCliTest(TestCase):
         self.assertEqual((20, 24), config.env.image_size)
         self.assertTrue(config.task_suite.enabled)
         self.assertEqual({"smb1": 1, "smb3": 2}, config.task_suite.family_weights)
+        self.assertEqual("component_weights", config.reward_transform.mode)
+        self.assertEqual(
+            {"progress": 1.0, "death": -0.5},
+            config.reward_transform.component_weights,
+        )
+        self.assertEqual("error", config.reward_transform.missing_component_policy)
 
         with NamedTemporaryFile("w", suffix=".yaml") as config_file:
             config_file.write(
