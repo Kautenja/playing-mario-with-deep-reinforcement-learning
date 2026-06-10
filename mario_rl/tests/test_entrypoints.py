@@ -12,7 +12,12 @@ class EntrypointTest(TestCase):
     """Validate import-safe config-driven entrypoints."""
 
     def test_entrypoint_imports_do_not_start_legacy_frameworks_or_work(self):
-        for module_name in ("mario_rl.train", "mario_rl.play", "mario_rl.random"):
+        for module_name in (
+            "mario_rl.train",
+            "mario_rl.play",
+            "mario_rl.eval_matrix",
+            "mario_rl.random",
+        ):
             with self.subTest(module_name=module_name):
                 importlib.import_module(module_name)
 
@@ -21,7 +26,12 @@ class EntrypointTest(TestCase):
 
     def test_help_is_available_without_creating_environments(self):
         before_modules = set(sys.modules)
-        for module_name in ("mario_rl.train", "mario_rl.play", "mario_rl.random"):
+        for module_name in (
+            "mario_rl.train",
+            "mario_rl.play",
+            "mario_rl.eval_matrix",
+            "mario_rl.random",
+        ):
             module = importlib.import_module(module_name)
             output = io.StringIO()
             with self.subTest(module_name=module_name), redirect_stdout(output):
@@ -37,9 +47,9 @@ class EntrypointTest(TestCase):
             imported_by_help,
         )
 
-    def test_train_and_play_keep_runners_lazy_and_callable(self):
+    def test_train_play_and_matrix_keep_runners_lazy_and_callable(self):
         before_modules = set(sys.modules)
-        for module_name in ("mario_rl.train", "mario_rl.play"):
+        for module_name in ("mario_rl.train", "mario_rl.play", "mario_rl.eval_matrix"):
             module = importlib.import_module(module_name)
             with self.subTest(module_name=module_name):
                 self.assertTrue(callable(module.run))

@@ -9,6 +9,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from mario_rl.evaluation_matrix import EvaluationMatrixConfig
 from mario_rl.envs.tasks import TaskSuiteConfig
 from mario_rl.rewards import RewardTransformConfig
 
@@ -179,6 +180,7 @@ class MarioRLConfig:
     env: EnvConfig = EnvConfig()
     task_suite: TaskSuiteConfig = field(default_factory=TaskSuiteConfig)
     reward_transform: RewardTransformConfig = field(default_factory=RewardTransformConfig)
+    evaluation_matrix: EvaluationMatrixConfig = field(default_factory=EvaluationMatrixConfig)
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
     ppo: PPOConfig = PPOConfig()
@@ -194,6 +196,7 @@ _SECTIONS = {
     "env": EnvConfig,
     "task_suite": TaskSuiteConfig,
     "reward_transform": RewardTransformConfig,
+    "evaluation_matrix": EvaluationMatrixConfig,
     "replay": ReplayConfig,
     "model": ModelConfig,
     "ppo": PPOConfig,
@@ -605,6 +608,7 @@ __all__ = [
     "EnvConfig",
     "EpsilonConfig",
     "EvalConfig",
+    "EvaluationMatrixConfig",
     "MarioRLConfig",
     "ModelConfig",
     "ReplayConfig",

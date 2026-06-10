@@ -62,6 +62,7 @@ python -m mario_rl.config list
 python -m mario_rl.config path smb_dqn_fast_dev
 python -m mario_rl.train --config smb_dqn_fast_dev --train.accelerator cpu
 python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/smb_dqn_fast_dev/checkpoints/fast-dev.ckpt
+python -m mario_rl.eval_matrix --config smb_dqn_eval_matrix_fast_dev
 python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ```
 
@@ -71,6 +72,7 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ./main.sh config list
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
 ./main.sh play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
+./main.sh eval-matrix --config smb_dqn_eval_matrix_fast_dev
 ./main.sh random --config smb_dqn_fast_dev
 ```
 
@@ -189,6 +191,39 @@ and final-progress summaries, reward component sums, and
 Lightning logs the key scalar metrics with stable `train/*` names, including
 `train/clear_rate`, `train/death_rate`, `train/truncation_count`,
 `train/max_progress`, and `train/final_progress_mean`.
+
+## Evaluation Matrix
+
+`eval-matrix` evaluates a checkpoint across a deterministic task matrix instead
+of collapsing all progress into one averaged return:
+
+```shell
+./main.sh train --config smb_dqn_eval_matrix_fast_dev
+./main.sh eval-matrix --config smb_dqn_eval_matrix_fast_dev
+```
+
+Matrix filters live under `evaluation_matrix` and support game families,
+single-stage versus full-game tasks, train/eval split selection, validated task
+selection, explicit include/exclude environment IDs, `max_tasks`, deterministic
+seed expansion, and per-task episode counts. Use train split filters for model
+selection smoke runs and eval split filters for held-out reporting. For
+all-game reports, leave `game_families` empty and include both full-game and
+single-stage configs in separate runs so stage transfer and complete-game
+rollouts stay comparable.
+
+Each run writes `eval-matrix-summary.json` and `eval-matrix-episodes.csv` under
+the experiment directory. The JSON summary contains global, per-game-family,
+and per-task aggregates from the shared metrics accumulator plus the selected
+task matrix. The CSV has one row per task, seed, and episode for spreadsheet
+inspection. Set `evaluation_matrix.include_smb3_catalog: true` to include the
+full 56-stage SMB3 catalog as non-runnable metadata alongside the validated
+registered SMB3 stage entries.
+
+Video capture is disabled by default. When
+`evaluation_matrix.video_enabled: true`, the runner uses stable task/seed/
+episode prefixes such as
+`eval-matrix-supermariobros3-1-1-v0-seed-123-episode-0` and only enables
+`rgb_array` rendering for those video episodes.
 
 ## Reward Transforms
 

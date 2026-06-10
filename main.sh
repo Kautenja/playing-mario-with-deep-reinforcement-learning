@@ -28,6 +28,10 @@ case "$command" in
         shift
         "$python_bin" -m mario_rl.play "$@"
         ;;
+    eval-matrix)
+        shift
+        "$python_bin" -m mario_rl.eval_matrix "$@"
+        ;;
     random)
         shift
         "$python_bin" -m mario_rl.random "$@"

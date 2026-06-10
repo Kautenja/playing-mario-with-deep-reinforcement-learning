@@ -11,6 +11,7 @@ from mario_rl.config import (
     AUTO_NUM_ACTIONS,
     EnvConfig,
     EvalConfig,
+    EvaluationMatrixConfig,
     MarioRLConfig,
     ModelConfig,
     PPOConfig,
@@ -38,6 +39,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIsInstance(config.trainer, TrainerConfig)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIsInstance(config.reward_transform, RewardTransformConfig)
+        self.assertIsInstance(config.evaluation_matrix, EvaluationMatrixConfig)
         self.assertIsInstance(config.ppo, PPOConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
         self.assertEqual("runs", config.save_dir)
@@ -143,6 +145,27 @@ class ConfigSchemaTest(TestCase):
         ):
             self.assertIn(name, task_suite_fields)
 
+        matrix_fields = EvaluationMatrixConfig.__dataclass_fields__
+        for name in (
+            "enabled",
+            "game_families",
+            "single_stage",
+            "splits",
+            "include_validated",
+            "include_env_ids",
+            "exclude_env_ids",
+            "max_tasks",
+            "include_smb3_catalog",
+            "seeds",
+            "seed",
+            "seed_count",
+            "episodes_per_task",
+            "summary_name",
+            "table_name",
+            "video_enabled",
+        ):
+            self.assertIn(name, matrix_fields)
+
     def test_packaged_configs_are_discoverable_and_load_typed_objects(self):
         names = available_configs()
 
@@ -150,6 +173,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_macbook_gate", names)
         self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
         self.assertIn("smb_dqn_task_suite_fast_dev", names)
+        self.assertIn("smb_dqn_eval_matrix_fast_dev", names)
         self.assertIn("smb_ppo_fast_dev", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
@@ -179,6 +203,15 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual(
             {"smb1": 1.0, "smb3": 1.0},
             task_suite.task_suite.family_weights,
+        )
+
+        eval_matrix = load("smb_dqn_eval_matrix_fast_dev")
+        self.assertTrue(eval_matrix.evaluation_matrix.enabled)
+        self.assertEqual(2, eval_matrix.evaluation_matrix.max_tasks)
+        self.assertTrue(eval_matrix.evaluation_matrix.include_smb3_catalog)
+        self.assertEqual(
+            ("SuperMarioBros-1-1-v0", "SuperMarioBros3-1-1-v0"),
+            eval_matrix.evaluation_matrix.include_env_ids,
         )
 
         actor_critic = load("smb_ppo_fast_dev")
@@ -250,6 +283,12 @@ class ConfigCliTest(TestCase):
                 "true",
                 "--task_suite.family_weights",
                 "smb1=1,smb3=2",
+                "--evaluation_matrix.enabled",
+                "true",
+                "--evaluation_matrix.max_tasks",
+                "2",
+                "--evaluation_matrix.seeds",
+                "7,8",
                 "--reward_transform.mode",
                 "component_weights",
                 "--reward_transform.component_weights",
@@ -268,6 +307,9 @@ class ConfigCliTest(TestCase):
         self.assertEqual((20, 24), config.env.image_size)
         self.assertTrue(config.task_suite.enabled)
         self.assertEqual({"smb1": 1, "smb3": 2}, config.task_suite.family_weights)
+        self.assertTrue(config.evaluation_matrix.enabled)
+        self.assertEqual(2, config.evaluation_matrix.max_tasks)
+        self.assertEqual((7, 8), config.evaluation_matrix.seeds)
         self.assertEqual("component_weights", config.reward_transform.mode)
         self.assertEqual(
             {"progress": 1.0, "death": -0.5},
