@@ -7,6 +7,7 @@ import torch
 
 from mario_rl.models import (
     DQN,
+    compute_auxiliary_loss,
     compute_dqn_loss,
     compute_ppo_loss,
     compute_td_targets,
@@ -134,3 +135,71 @@ class PPOLossTest(TestCase):
         self.assertTrue(torch.allclose(expected_total, loss.total))
         self.assertTrue(torch.isfinite(loss.approximate_kl))
         self.assertTrue(torch.isfinite(loss.clip_fraction))
+
+
+class AuxiliaryLossTest(TestCase):
+    """Validate masked auxiliary losses and weighted composition."""
+
+    def test_weighted_auxiliary_loss_uses_masks(self):
+        predictions = {
+            "progress_delta": torch.tensor([0.0, 2.0, 10.0]),
+            "clear": torch.tensor([-20.0, 0.0, 0.0]),
+        }
+        targets = {
+            "progress_delta": torch.tensor([1.0, 2.0, 100.0]),
+            "clear": torch.tensor([0.0, 1.0, 1.0]),
+        }
+        masks = {
+            "progress_delta": torch.tensor([True, True, False]),
+            "clear": torch.tensor([True, False, False]),
+        }
+
+        loss = compute_auxiliary_loss(
+            predictions,
+            targets,
+            masks,
+            weights={"progress_delta": 2.0, "clear": 0.5},
+        )
+
+        self.assertTrue(torch.allclose(torch.tensor(0.25), loss.terms["progress_delta"]))
+        self.assertTrue(torch.allclose(torch.tensor(0.0), loss.terms["clear"]))
+        self.assertTrue(torch.allclose(torch.tensor(0.5), loss.weighted_terms["progress_delta"]))
+        self.assertTrue(torch.allclose(torch.tensor(0.5), loss.total))
+        self.assertEqual(2.0, float(loss.valid_counts["progress_delta"]))
+        self.assertEqual(1.0, float(loss.valid_counts["clear"]))
+
+    def test_classification_auxiliary_loss_handles_partial_multi_game_batch(self):
+        predictions = {
+            "game_family": torch.tensor(
+                [
+                    [4.0, 0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 4.0, 0.0],
+                    [0.0, 4.0, 0.0, 0.0, 0.0],
+                ]
+            )
+        }
+        targets = {"game_family": torch.tensor([0, 3, 2])}
+        masks = {"game_family": torch.tensor([True, True, False])}
+
+        loss = compute_auxiliary_loss(
+            predictions,
+            targets,
+            masks,
+            weights={"game_family": 1.0},
+        )
+
+        self.assertLess(float(loss.terms["game_family"]), 0.1)
+        self.assertEqual(2.0, float(loss.valid_counts["game_family"]))
+
+    def test_missing_auxiliary_masks_make_zero_loss(self):
+        predictions = {"death": torch.tensor([0.0, 1.0])}
+
+        loss = compute_auxiliary_loss(
+            predictions,
+            targets={"death": torch.tensor([1.0, 0.0])},
+            masks={"death": torch.tensor([False, False])},
+            weights={"death": 1.0},
+        )
+
+        self.assertTrue(torch.allclose(torch.tensor(0.0), loss.total))
+        self.assertEqual(0.0, float(loss.valid_counts["death"]))

@@ -1,6 +1,8 @@
 """Native PyTorch model core."""
 from .losses import (
+    AuxiliaryLoss,
     PPOLoss,
+    compute_auxiliary_loss,
     compute_dqn_loss,
     compute_ppo_loss,
     compute_td_targets,
@@ -22,9 +24,11 @@ __all__ = [
     "ActorCriticOutput",
     "DQN",
     "DuelingDQN",
+    "AuxiliaryLoss",
     "PPOLoss",
     "RecurrentActorCritic",
     "build_model",
+    "compute_auxiliary_loss",
     "compute_dqn_loss",
     "compute_ppo_loss",
     "compute_td_targets",

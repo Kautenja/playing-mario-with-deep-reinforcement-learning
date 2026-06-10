@@ -153,6 +153,26 @@ class DQNModelTest(TestCase):
         self.assertEqual((3, 2), tuple(output.value.shape))
         self.assertEqual((1, 2, 32), tuple(output.hidden_state.shape))
 
+    def test_recurrent_actor_critic_auxiliary_head_shapes(self):
+        model = RecurrentActorCritic(
+            input_channels=4,
+            num_actions=7,
+            input_shape=(4, 84, 84),
+            hidden_size=64,
+            recurrent_hidden_size=32,
+            auxiliary_outputs={"clear": 1, "game_family": 5},
+            auxiliary_hidden_size=16,
+        )
+        x = torch.zeros(4, 2, 4, 84, 84, dtype=torch.uint8)
+
+        with torch.no_grad():
+            output = model(x)
+
+        self.assertEqual((4, 2), tuple(output.auxiliary["clear"].shape))
+        self.assertEqual((4, 2, 5), tuple(output.auxiliary["game_family"].shape))
+        self.assertTrue(torch.isfinite(output.auxiliary["clear"]).all())
+        self.assertTrue(torch.isfinite(output.auxiliary["game_family"]).all())
+
     def test_recurrent_hidden_state_reset_masks_completed_episodes(self):
         hidden = torch.arange(12, dtype=torch.float32).reshape(1, 3, 4)
 

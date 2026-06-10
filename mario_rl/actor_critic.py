@@ -27,6 +27,8 @@ class RolloutBatch:
     unclipped_reward: torch.Tensor | None = None
     clipped_reward: torch.Tensor | None = None
     frames_skipped: torch.Tensor | None = None
+    auxiliary_targets: dict[str, torch.Tensor] | None = None
+    auxiliary_masks: dict[str, torch.Tensor] | None = None
 
 
 class RolloutStorage:
@@ -41,6 +43,7 @@ class RolloutStorage:
         hidden_state_shape: tuple[int, int],
         observation_dtype: np.dtype | str = np.uint8,
         task_feature_shape: tuple[int, ...] | None = None,
+        auxiliary_target_names: tuple[str, ...] = (),
         seed: int | None = None,
     ) -> None:
         self.rollout_steps = _positive_int(rollout_steps, "rollout_steps")
@@ -54,6 +57,7 @@ class RolloutStorage:
             if task_feature_shape is not None
             else None
         )
+        self.auxiliary_target_names = tuple(str(name) for name in auxiliary_target_names)
         self._rng = np.random.default_rng(seed)
         self._position = 0
         self._advantages_ready = False
@@ -85,6 +89,14 @@ class RolloutStorage:
         self.unclipped_rewards = np.empty(shape, dtype=np.float32)
         self.clipped_rewards = np.empty(shape, dtype=np.float32)
         self.frames_skipped = np.ones(shape, dtype=np.int32)
+        self.auxiliary_targets = {
+            name: np.zeros(shape, dtype=np.float32)
+            for name in self.auxiliary_target_names
+        }
+        self.auxiliary_masks = {
+            name: np.zeros(shape, dtype=np.bool_)
+            for name in self.auxiliary_target_names
+        }
 
     def __len__(self) -> int:
         """Return the number of inserted rollout steps."""
@@ -117,6 +129,8 @@ class RolloutStorage:
         unclipped_reward: float | np.ndarray | None = None,
         clipped_reward: float | np.ndarray | None = None,
         frames_skipped: int | np.ndarray = 1,
+        auxiliary_targets: dict[str, float | np.ndarray] | None = None,
+        auxiliary_masks: dict[str, bool | np.ndarray] | None = None,
     ) -> None:
         """Insert one vectorized step at the next rollout position."""
         if self.full:
@@ -143,6 +157,11 @@ class RolloutStorage:
         self.clipped_rewards[index] = _float_row(clipped_reward, self.num_envs)
         self.frames_skipped[index] = np.asarray(frames_skipped, dtype=np.int32).reshape(
             self.num_envs
+        )
+        self._insert_auxiliary_targets(
+            index,
+            auxiliary_targets=auxiliary_targets,
+            auxiliary_masks=auxiliary_masks,
         )
         self._position += 1
         self._advantages_ready = False
@@ -228,6 +247,22 @@ class RolloutStorage:
                     self.frames_skipped.reshape(total)[batch_indices],
                     device=device,
                 ),
+                auxiliary_targets=(
+                    {
+                        name: _tensor(values.reshape(total)[batch_indices], device=device)
+                        for name, values in self.auxiliary_targets.items()
+                    }
+                    if self.auxiliary_target_names
+                    else None
+                ),
+                auxiliary_masks=(
+                    {
+                        name: _bool_tensor(values.reshape(total)[batch_indices], device=device)
+                        for name, values in self.auxiliary_masks.items()
+                    }
+                    if self.auxiliary_target_names
+                    else None
+                ),
             )
 
     def _coerce_observation(self, observation: np.ndarray) -> np.ndarray:
@@ -269,6 +304,31 @@ class RolloutStorage:
                 f"or {self.task_feature_shape}, got {array.shape}"
             )
         return array
+
+    def _insert_auxiliary_targets(
+        self,
+        index: int,
+        *,
+        auxiliary_targets: dict[str, float | np.ndarray] | None,
+        auxiliary_masks: dict[str, bool | np.ndarray] | None,
+    ) -> None:
+        if not self.auxiliary_target_names:
+            if auxiliary_targets or auxiliary_masks:
+                raise ValueError("auxiliary targets require auxiliary_target_names")
+            return
+        auxiliary_targets = auxiliary_targets or {}
+        auxiliary_masks = auxiliary_masks or {}
+        unknown = (set(auxiliary_targets) | set(auxiliary_masks)) - set(
+            self.auxiliary_target_names
+        )
+        if unknown:
+            names = ", ".join(sorted(unknown))
+            raise ValueError(f"unknown auxiliary target(s): {names}")
+        for name in self.auxiliary_target_names:
+            value = auxiliary_targets.get(name, 0.0)
+            mask = auxiliary_masks.get(name, False)
+            self.auxiliary_targets[name][index] = _float_row(value, self.num_envs)
+            self.auxiliary_masks[name][index] = _bool_row(mask, self.num_envs)
 
 
 def _positive_int(value: int, name: str) -> int:

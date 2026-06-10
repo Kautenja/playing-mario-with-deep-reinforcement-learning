@@ -19,6 +19,7 @@ class RolloutStorageTest(TestCase):
             observation_shape=(4, 84, 84),
             hidden_state_shape=(1, 8),
             task_feature_shape=(5,),
+            auxiliary_target_names=("clear", "game_family"),
             seed=123,
         )
         observation = np.zeros((4, 84, 84), dtype=np.uint8)
@@ -40,6 +41,14 @@ class RolloutStorageTest(TestCase):
                 unclipped_reward=1.0,
                 clipped_reward=1.0,
                 frames_skipped=4,
+                auxiliary_targets={
+                    "clear": float(step == 2),
+                    "game_family": float(step % 2),
+                },
+                auxiliary_masks={
+                    "clear": True,
+                    "game_family": step != 1,
+                },
             )
 
         storage.compute_returns_and_advantages(
@@ -54,6 +63,13 @@ class RolloutStorageTest(TestCase):
         self.assertEqual((2, 4, 84, 84), tuple(batches[0].observation.shape))
         self.assertEqual((2, 1, 8), tuple(batches[0].hidden_state.shape))
         self.assertEqual((2, 5), tuple(batches[0].task_features.shape))
+        self.assertEqual((2,), tuple(batches[0].auxiliary_targets["clear"].shape))
+        self.assertTrue(
+            torch.equal(
+                torch.tensor([True, False]),
+                batches[0].auxiliary_masks["game_family"],
+            )
+        )
         self.assertTrue(
             np.allclose(np.array([2.5, 1.5, 0.5], dtype=np.float32), storage.advantages[:, 0])
         )

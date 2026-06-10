@@ -11,13 +11,20 @@ from lightning.pytorch import LightningModule
 from torch.distributions import Categorical
 
 from mario_rl.actor_critic import RolloutStorage
+from mario_rl.auxiliary import (
+    auxiliary_loss_weights,
+    auxiliary_target_names,
+    extract_auxiliary_targets,
+)
 from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder, TaskSuite
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import (
+    AuxiliaryLoss,
     RecurrentActorCritic,
     build_model,
+    compute_auxiliary_loss,
     compute_ppo_loss,
     make_optimizer,
 )
@@ -59,6 +66,12 @@ class PPOLightningModule(LightningModule):
         self.task_encoder = None
         self._task_features: np.ndarray | None = None
         self._configure_task_features()
+        self._auxiliary_target_names = auxiliary_target_names(self.config.auxiliary)
+        self._auxiliary_loss_weights = (
+            auxiliary_loss_weights(self.config.auxiliary)
+            if self._auxiliary_target_names
+            else {}
+        )
 
         self.env = None
         self._active_task_env_id: str | None = None
@@ -77,6 +90,13 @@ class PPOLightningModule(LightningModule):
         self.last_entropy = 0.0
         self.last_approximate_kl = 0.0
         self.last_clip_fraction = 0.0
+        self.last_auxiliary_loss = 0.0
+        self.last_auxiliary_losses = {
+            target: 0.0 for target in self._auxiliary_target_names
+        }
+        self.last_auxiliary_valid_counts = {
+            target: 0.0 for target in self._auxiliary_target_names
+        }
         self.training_updates = 0
 
     def train_dataloader(self):
@@ -104,8 +124,17 @@ class PPOLightningModule(LightningModule):
         self.last_entropy = float(losses["entropy"].detach().cpu().item())
         self.last_approximate_kl = float(losses["approximate_kl"].detach().cpu().item())
         self.last_clip_fraction = float(losses["clip_fraction"].detach().cpu().item())
+        self.last_auxiliary_loss = float(losses["auxiliary"].detach().cpu().item())
+        for target in self._auxiliary_target_names:
+            self.last_auxiliary_losses[target] = float(
+                losses[f"auxiliary/{target}"].detach().cpu().item()
+            )
+            self.last_auxiliary_valid_counts[target] = float(
+                losses[f"auxiliary_valid/{target}"].detach().cpu().item()
+            )
 
         self.log("train/loss", losses["total"], on_step=True, prog_bar=False)
+        self.log("train/ppo_loss", losses["ppo_total"], on_step=True, prog_bar=False)
         self.log("train/ppo_policy_loss", losses["policy"], on_step=True, prog_bar=False)
         self.log("train/ppo_value_loss", losses["value"], on_step=True, prog_bar=False)
         self.log("train/ppo_entropy", losses["entropy"], on_step=True, prog_bar=False)
@@ -121,6 +150,25 @@ class PPOLightningModule(LightningModule):
             on_step=True,
             prog_bar=False,
         )
+        self.log(
+            "train/auxiliary_loss",
+            losses["auxiliary"],
+            on_step=True,
+            prog_bar=False,
+        )
+        for target in self._auxiliary_target_names:
+            self.log(
+                f"train/auxiliary_{target}_loss",
+                losses[f"auxiliary/{target}"],
+                on_step=True,
+                prog_bar=False,
+            )
+            self.log(
+                f"train/auxiliary_{target}_valid",
+                losses[f"auxiliary_valid/{target}"],
+                on_step=True,
+                prog_bar=False,
+            )
         self.log("train/episode_reward", self.episode_reward, on_step=True, prog_bar=False)
         self.log(
             "train/episode_env_reward",
@@ -213,6 +261,9 @@ class PPOLightningModule(LightningModule):
             "last_entropy": float(self.last_entropy),
             "last_approximate_kl": float(self.last_approximate_kl),
             "last_clip_fraction": float(self.last_clip_fraction),
+            "last_auxiliary_loss": float(self.last_auxiliary_loss),
+            "last_auxiliary_losses": dict(self.last_auxiliary_losses),
+            "last_auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
             "training_updates": int(self.training_updates),
         }
 
@@ -245,6 +296,25 @@ class PPOLightningModule(LightningModule):
         )
         self.last_clip_fraction = float(
             state.get("last_clip_fraction", self.last_clip_fraction)
+        )
+        self.last_auxiliary_loss = float(
+            state.get("last_auxiliary_loss", self.last_auxiliary_loss)
+        )
+        self.last_auxiliary_losses.update(
+            {
+                str(name): float(value)
+                for name, value in dict(state.get("last_auxiliary_losses", {})).items()
+                if str(name) in self.last_auxiliary_losses
+            }
+        )
+        self.last_auxiliary_valid_counts.update(
+            {
+                str(name): float(value)
+                for name, value in dict(
+                    state.get("last_auxiliary_valid_counts", {})
+                ).items()
+                if str(name) in self.last_auxiliary_valid_counts
+            }
         )
         self.training_updates = int(state.get("training_updates", self.training_updates))
 
@@ -297,6 +367,9 @@ class PPOLightningModule(LightningModule):
             "ppo_entropy": float(self.last_entropy),
             "ppo_approximate_kl": float(self.last_approximate_kl),
             "ppo_clip_fraction": float(self.last_clip_fraction),
+            "auxiliary_loss": float(self.last_auxiliary_loss),
+            "auxiliary_losses": dict(self.last_auxiliary_losses),
+            "auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
             "metrics_payload": metrics_payload,
         }
 
@@ -385,6 +458,11 @@ class PPOLightningModule(LightningModule):
             )
             next_state = self._coerce_state(next_state)
             info_map = info if isinstance(info, dict) else None
+            auxiliary_targets = extract_auxiliary_targets(
+                info_map,
+                transformed_reward=transformed.training_reward,
+                targets=self._auxiliary_target_names,
+            )
             frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
             rollout.insert(
                 observation,
@@ -401,6 +479,8 @@ class PPOLightningModule(LightningModule):
                 unclipped_reward=transformed.unclipped_reward,
                 clipped_reward=transformed.clipped_reward,
                 frames_skipped=max(frames, 1),
+                auxiliary_targets=auxiliary_targets.values,
+                auxiliary_masks=auxiliary_targets.masks,
             )
             self.metrics.observe_step(
                 reward=float(reward),
@@ -455,12 +535,17 @@ class PPOLightningModule(LightningModule):
         optimizer = self.optimizers()
         totals = {
             "total": 0.0,
+            "ppo_total": 0.0,
             "policy": 0.0,
             "value": 0.0,
             "entropy": 0.0,
             "approximate_kl": 0.0,
             "clip_fraction": 0.0,
+            "auxiliary": 0.0,
         }
+        for target in self._auxiliary_target_names:
+            totals[f"auxiliary/{target}"] = 0.0
+            totals[f"auxiliary_valid/{target}"] = 0.0
         count = 0
         for _ in range(int(self.config.ppo.epochs)):
             for batch in rollout.minibatches(
@@ -485,15 +570,31 @@ class PPOLightningModule(LightningModule):
                     entropy_coefficient=self.config.ppo.entropy_coefficient,
                     normalize_advantages=self.config.ppo.normalize_advantages,
                 )
+                if self._auxiliary_loss_weights:
+                    auxiliary_loss = compute_auxiliary_loss(
+                        output.auxiliary,
+                        batch.auxiliary_targets,
+                        batch.auxiliary_masks,
+                        weights=self._auxiliary_loss_weights,
+                    )
+                else:
+                    auxiliary_loss = AuxiliaryLoss(
+                        total=loss.total * 0.0,
+                        terms={},
+                        weighted_terms={},
+                        valid_counts={},
+                    )
+                total_loss = loss.total + auxiliary_loss.total
                 optimizer.zero_grad()
-                self.manual_backward(loss.total)
+                self.manual_backward(total_loss)
                 if self.config.ppo.max_grad_norm is not None:
                     max_norm = float(self.config.ppo.max_grad_norm)
                     if max_norm > 0.0:
                         torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm)
                 optimizer.step()
                 self.training_updates += 1
-                totals["total"] += float(loss.total.detach().cpu().item())
+                totals["total"] += float(total_loss.detach().cpu().item())
+                totals["ppo_total"] += float(loss.total.detach().cpu().item())
                 totals["policy"] += float(loss.policy.detach().cpu().item())
                 totals["value"] += float(loss.value.detach().cpu().item())
                 totals["entropy"] += float(loss.entropy.detach().cpu().item())
@@ -501,6 +602,16 @@ class PPOLightningModule(LightningModule):
                     loss.approximate_kl.detach().cpu().item()
                 )
                 totals["clip_fraction"] += float(loss.clip_fraction.detach().cpu().item())
+                totals["auxiliary"] += float(
+                    auxiliary_loss.total.detach().cpu().item()
+                )
+                for target in self._auxiliary_target_names:
+                    totals[f"auxiliary/{target}"] += float(
+                        auxiliary_loss.terms[target].detach().cpu().item()
+                    )
+                    totals[f"auxiliary_valid/{target}"] += float(
+                        auxiliary_loss.valid_counts[target].detach().cpu().item()
+                    )
                 count += 1
         if count == 0:
             raise RuntimeError("PPO rollout produced no minibatches")
@@ -520,6 +631,7 @@ class PPOLightningModule(LightningModule):
             observation_dtype=np.dtype(self.config.replay.sample_dtype),
             hidden_state_shape=(1, int(self.policy.recurrent_hidden_size)),
             task_feature_shape=task_feature_shape,
+            auxiliary_target_names=self._auxiliary_target_names,
             seed=(
                 self.config.trainer.seed
                 if self.config.trainer.seed is not None
