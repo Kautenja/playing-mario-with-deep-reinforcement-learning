@@ -5,7 +5,13 @@ from unittest import TestCase
 
 import torch
 
-from mario_rl.models import DQN, compute_dqn_loss, compute_td_targets, gather_action_q_values
+from mario_rl.models import (
+    DQN,
+    compute_dqn_loss,
+    compute_ppo_loss,
+    compute_td_targets,
+    gather_action_q_values,
+)
 
 
 class DQNLossTest(TestCase):
@@ -95,3 +101,36 @@ class DQNLossTest(TestCase):
         self.assertTrue(
             any(not torch.equal(old, new) for old, new in zip(before, model.parameters()))
         )
+
+
+class PPOLossTest(TestCase):
+    """Validate clipped PPO objective helpers."""
+
+    def test_clipped_ppo_loss_matches_fixed_tensor_values(self):
+        logits = torch.zeros(2, 2)
+        actions = torch.tensor([0, 1])
+        old_log_probabilities = torch.log(torch.tensor([0.5, 0.5]))
+        values = torch.tensor([0.25, -0.25])
+        returns = torch.tensor([1.25, -1.25])
+        advantages = torch.tensor([1.0, -1.0])
+
+        loss = compute_ppo_loss(
+            logits,
+            values,
+            actions,
+            old_log_probabilities,
+            returns,
+            advantages,
+            value_loss_coefficient=0.5,
+            entropy_coefficient=0.01,
+            normalize_advantages=False,
+        )
+
+        expected_entropy = torch.log(torch.tensor(2.0))
+        expected_total = torch.tensor(0.5) - 0.01 * expected_entropy
+        self.assertTrue(torch.allclose(torch.tensor(0.0), loss.policy))
+        self.assertTrue(torch.allclose(torch.tensor(1.0), loss.value))
+        self.assertTrue(torch.allclose(expected_entropy, loss.entropy))
+        self.assertTrue(torch.allclose(expected_total, loss.total))
+        self.assertTrue(torch.isfinite(loss.approximate_kl))
+        self.assertTrue(torch.isfinite(loss.clip_fraction))

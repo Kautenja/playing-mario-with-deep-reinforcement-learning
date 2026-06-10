@@ -12,8 +12,10 @@ from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.models import (
     DQN,
     DuelingDQN,
+    RecurrentActorCritic,
     build_model,
     normalize_observation,
+    reset_recurrent_state,
 )
 
 
@@ -104,6 +106,61 @@ class DQNModelTest(TestCase):
 
         self.assertEqual((3, 7), tuple(y.shape))
         self.assertTrue(torch.isfinite(y).all())
+
+    def test_recurrent_actor_critic_forward_shape_without_task_conditioning(self):
+        model = RecurrentActorCritic(
+            input_channels=4,
+            num_actions=7,
+            input_shape=(4, 84, 84),
+            hidden_size=64,
+            recurrent_hidden_size=32,
+        )
+        x = torch.zeros(2, 4, 84, 84, dtype=torch.uint8)
+        hidden = model.initial_state(batch_size=2)
+
+        with torch.no_grad():
+            output = model(x, hidden)
+
+        self.assertEqual((2, 7), tuple(output.policy_logits.shape))
+        self.assertEqual((2,), tuple(output.value.shape))
+        self.assertEqual((1, 2, 32), tuple(output.hidden_state.shape))
+        self.assertTrue(torch.isfinite(output.policy_logits).all())
+        self.assertTrue(torch.isfinite(output.value).all())
+
+    def test_recurrent_actor_critic_forward_shape_with_task_conditioning(self):
+        encoder = TaskFeatureEncoder()
+        model = RecurrentActorCritic(
+            input_channels=4,
+            num_actions=7,
+            input_shape=(4, 84, 84),
+            hidden_size=64,
+            recurrent_hidden_size=32,
+            task_feature_size=encoder.feature_size,
+            task_embedding_size=8,
+        )
+        x = torch.zeros(3, 2, 4, 84, 84, dtype=torch.uint8)
+        features = torch.stack(
+            [
+                encoder.encode_env_id("SuperMarioBros-1-1-v0").to_tensor(),
+                encoder.encode_env_id("SuperMarioBros3-1-1-v0").to_tensor(),
+            ]
+        )
+
+        with torch.no_grad():
+            output = model(x, task_features=features)
+
+        self.assertEqual((3, 2, 7), tuple(output.policy_logits.shape))
+        self.assertEqual((3, 2), tuple(output.value.shape))
+        self.assertEqual((1, 2, 32), tuple(output.hidden_state.shape))
+
+    def test_recurrent_hidden_state_reset_masks_completed_episodes(self):
+        hidden = torch.arange(12, dtype=torch.float32).reshape(1, 3, 4)
+
+        reset = reset_recurrent_state(hidden, torch.tensor([False, True, False]))
+
+        self.assertTrue(torch.equal(hidden[:, 0], reset[:, 0]))
+        self.assertTrue(torch.equal(torch.zeros(1, 4), reset[:, 1]))
+        self.assertTrue(torch.equal(hidden[:, 2], reset[:, 2]))
 
     def test_active_model_imports_do_not_load_keras_or_tensorflow(self):
         self.assertNotIn("keras", sys.modules)

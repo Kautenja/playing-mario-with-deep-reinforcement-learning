@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from mario_rl.tests.fakes import fake_env_factory, tiny_training_config
+from mario_rl.tests.fakes import fake_env_factory, tiny_ppo_config, tiny_training_config
 from mario_rl.train import run
 
 
@@ -52,3 +52,21 @@ class TrainCliTest(TestCase):
                 list(tensorboard_dir.iterdir()),
             )
             self.assertIn("fake_lightning", Path(payload["resolved_config"]).read_text())
+
+    def test_train_run_selects_ppo_and_writes_smoke_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            self.assertEqual("train", payload["command"])
+            self.assertEqual("ppo", payload["algorithm"])
+            self.assertEqual(config.train.max_steps * config.ppo.rollout_steps, payload["env_frames"])
+            self.assertTrue(Path(payload["checkpoint"]).is_file())
+            self.assertTrue(Path(payload["metrics_json"]).is_file())
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            self.assertEqual("ppo", structured_metrics["algorithm"])
+            self.assertIn("global", structured_metrics)
+            self.assertIn("fake_ppo_lightning", Path(payload["resolved_config"]).read_text())

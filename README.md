@@ -118,12 +118,32 @@ Benchmark mode measures a bounded random environment rollout plus the same mini
 optimization pass so later specs can compare environment stepping and optimizer
 throughput against the saved summary.
 
+## Recurrent Actor-Critic Smoke Training
+
+The recommended path for all-game policy training is the recurrent
+actor-critic trainer selected with `train.algorithm: ppo` and
+`model.architecture: recurrent_actor_critic`. It uses the same task metadata,
+reward transform, and metrics artifacts as DQN, but trains an on-policy
+policy/value model with task conditioning, GRU memory, generalized advantage
+estimation, clipped PPO losses, entropy regularization, and gradient clipping.
+
+```shell
+./main.sh train --config smb_ppo_fast_dev --train.accelerator cpu
+tensorboard --logdir runs/smb_ppo_fast_dev/logs/tensorboard
+```
+
+The packaged `smb_ppo_fast_dev` config is intentionally tiny: it runs a short
+CPU rollout against the local editable Mario environment and writes the usual
+resolved config, checkpoint, TensorBoard logs, `train-metrics.csv`, and
+structured `train-metrics.json` artifacts. Use this path as the starting point
+for multi-game task suites and native NES action-space experiments.
+
 ## Lightning DQN Smoke Training
 
-The active training path uses PyTorch Lightning, native PyTorch DQN modules,
-uniform replay, and the packaged config tree. Smoke runs write a resolved
-config, Lightning CSV and TensorBoard logs, train metrics, and a checkpoint under
-`runs/<experiment_name>/`.
+DQN remains available as a compact off-policy baseline using PyTorch Lightning,
+native PyTorch DQN modules, uniform replay, and the packaged config tree. Smoke
+runs write a resolved config, Lightning CSV and TensorBoard logs, train metrics,
+and a checkpoint under `runs/<experiment_name>/`.
 
 ```shell
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu

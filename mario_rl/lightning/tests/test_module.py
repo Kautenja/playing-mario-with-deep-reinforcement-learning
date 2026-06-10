@@ -14,9 +14,14 @@ from lightning.pytorch import LightningModule, Trainer
 
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
-from mario_rl.lightning import DQNLightningModule, trainer_accelerator
+from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
 from mario_rl.rewards import RewardTransformConfig
-from mario_rl.tests.fakes import FakeMarioEnv, fake_env_factory, tiny_training_config
+from mario_rl.tests.fakes import (
+    FakeMarioEnv,
+    fake_env_factory,
+    tiny_ppo_config,
+    tiny_training_config,
+)
 
 
 class LightningModuleTest(TestCase):
@@ -238,6 +243,48 @@ class LightningModuleTest(TestCase):
 
             self.assertFalse(config.task_suite.enabled)
             self.assertEqual([config.env.id], seen_env_ids)
+
+
+class PPOLightningModuleTest(TestCase):
+    """Validate recurrent actor-critic PPO integration."""
+
+    def test_fake_env_ppo_run_optimizes_and_logs_finite_state(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            self.assertEqual(config.train.max_steps * config.ppo.rollout_steps, module.env_frames)
+            self.assertGreaterEqual(module.training_updates, 1)
+            self.assertTrue(math.isfinite(module.last_loss))
+            self.assertTrue(math.isfinite(module.last_policy_loss))
+            self.assertTrue(math.isfinite(module.last_value_loss))
+            self.assertGreaterEqual(module.episodes, 1)
+            self.assertIn("train/ppo_policy_loss", trainer.callback_metrics)
+            self.assertIn("train/clear_rate", trainer.callback_metrics)
+
+    def test_ppo_recurrent_state_is_zeroed_after_terminal_step(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(config, ppo=replace(config.ppo, rollout_steps=4))
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            module._ensure_env()
+            rollout = module._collect_rollout()
+
+            self.assertTrue(rollout.terminated[-1, 0])
+            self.assertIsNotNone(module._hidden_state)
+            self.assertTrue(torch.equal(module._hidden_state, torch.zeros_like(module._hidden_state)))
 
 
 class LightningDeviceSelectionTest(TestCase):

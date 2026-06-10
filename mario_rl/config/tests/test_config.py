@@ -13,6 +13,7 @@ from mario_rl.config import (
     EvalConfig,
     MarioRLConfig,
     ModelConfig,
+    PPOConfig,
     ReplayConfig,
     RewardTransformConfig,
     TaskSuiteConfig,
@@ -37,6 +38,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIsInstance(config.trainer, TrainerConfig)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIsInstance(config.reward_transform, RewardTransformConfig)
+        self.assertIsInstance(config.ppo, PPOConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
         self.assertEqual("runs", config.save_dir)
 
@@ -84,6 +86,8 @@ class ConfigSchemaTest(TestCase):
             "architecture",
             "input_channels",
             "hidden_size",
+            "recurrent_hidden_size",
+            "task_embedding_size",
             "optimizer",
             "learning_rate",
             "discount_factor",
@@ -98,6 +102,7 @@ class ConfigSchemaTest(TestCase):
 
         train_fields = TrainConfig.__dataclass_fields__
         for name in (
+            "algorithm",
             "max_frames",
             "max_steps",
             "fast_dev_run",
@@ -109,6 +114,20 @@ class ConfigSchemaTest(TestCase):
             self.assertIn(name, train_fields)
 
         self.assertIn("checkpoint", EvalConfig.__dataclass_fields__)
+
+        ppo_fields = PPOConfig.__dataclass_fields__
+        for name in (
+            "rollout_steps",
+            "minibatch_size",
+            "epochs",
+            "gae_lambda",
+            "clip_range",
+            "value_loss_coefficient",
+            "entropy_coefficient",
+            "normalize_advantages",
+            "max_grad_norm",
+        ):
+            self.assertIn(name, ppo_fields)
 
         task_suite_fields = TaskSuiteConfig.__dataclass_fields__
         for name in (
@@ -131,6 +150,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_macbook_gate", names)
         self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
         self.assertIn("smb_dqn_task_suite_fast_dev", names)
+        self.assertIn("smb_ppo_fast_dev", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
 
@@ -160,6 +180,12 @@ class ConfigSchemaTest(TestCase):
             {"smb1": 1.0, "smb3": 1.0},
             task_suite.task_suite.family_weights,
         )
+
+        actor_critic = load("smb_ppo_fast_dev")
+        self.assertEqual("ppo", actor_critic.train.algorithm)
+        self.assertEqual("recurrent_actor_critic", actor_critic.model.architecture)
+        self.assertTrue(actor_critic.model.task_conditioning)
+        self.assertEqual(8, actor_critic.ppo.rollout_steps)
 
         from_path = load(path)
         self.assertEqual(config, from_path)
@@ -230,6 +256,10 @@ class ConfigCliTest(TestCase):
                 "progress=1,death=-0.5",
                 "--reward_transform.missing_component_policy",
                 "error",
+                "--train.algorithm",
+                "ppo",
+                "--ppo.rollout_steps",
+                "4",
             ]
         )
 
@@ -244,6 +274,8 @@ class ConfigCliTest(TestCase):
             config.reward_transform.component_weights,
         )
         self.assertEqual("error", config.reward_transform.missing_component_policy)
+        self.assertEqual("ppo", config.train.algorithm)
+        self.assertEqual(4, config.ppo.rollout_steps)
 
         with NamedTemporaryFile("w", suffix=".yaml") as config_file:
             config_file.write(
