@@ -6,9 +6,9 @@ Using Deep-Q style agents to play Super Mario Bros.
 
 ## Installation
 
-Python 3.13 or 3.14 is required. The modern package surface is `mario_rl`.
-Legacy Keras/TensorFlow code remains in the repository for reference, but it is
-not part of the default runtime install path.
+Python 3.13 or 3.14 is required. The supported package surface is `mario_rl`.
+The old Keras/TensorFlow `src/` tree is deprecated, reference-only, and
+excluded from the runtime install path.
 
 ### Umbrella Editable Checkout
 
@@ -104,6 +104,8 @@ MARIO_RL_RUN_CUDA_SMOKE=1 ./main.sh train --config smb_dqn_fast_dev --train.acce
 
 The play command defaults to the smoke checkpoint path for the selected config.
 Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
+Training shows Lightning progress by default. Pass
+`--trainer.enable_progress_bar false` for quiet/headless runs.
 
 ## Modern Environments
 
@@ -123,8 +125,10 @@ shape `(4, 84, 84)` and `uint8` dtype. `make_env` accepts `right_only`,
 `simple`, and `complex` action-set names, explicit preprocessing keyword
 arguments, or a `MarioEnvConfig` object.
 
-## Legacy Scripts
+## Deprecated `src` Tree
 
-The original `python . -m train`, `python . -m random`, and `python . -m play`
-entrypoints still live under `src/`. They use the old Gym/Keras assumptions and
-will be ported by the later PyTorch and Gymnasium migration specs.
+The original Gym/Keras implementation under `src/` is retained only as
+historical reference while the PyTorch migration settles. It is not installed,
+tested, or supported as a runtime API. Use `mario_rl`, `python -m mario_rl.*`,
+or the `./main.sh` commands above for all active training, evaluation, and
+random-rollout workflows.

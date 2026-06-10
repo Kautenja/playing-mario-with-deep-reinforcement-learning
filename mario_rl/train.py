@@ -49,7 +49,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         limit_train_batches=int(config.train.max_steps),
         logger=logger,
         enable_checkpointing=False,
-        enable_progress_bar=False,
+        enable_progress_bar=bool(config.trainer.enable_progress_bar),
         log_every_n_steps=max(1, min(int(config.train.log_interval), int(config.train.max_steps))),
     )
     trainer.fit(module, ckpt_path=config.train.checkpoint_path)

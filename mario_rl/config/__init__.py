@@ -24,6 +24,7 @@ class TrainerConfig:
     precision: str = "32-true"
     deterministic: bool = True
     seed: int | None = 123
+    enable_progress_bar: bool = True
 
 
 @dataclass(frozen=True)

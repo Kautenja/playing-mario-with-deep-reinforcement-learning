@@ -7,7 +7,7 @@ trainer:
   deterministic: true
   seed: 123
 env:
-  id: SuperMarioBros-v0
+  id: SuperMarioBros1-1-v0
   render_mode: rgb_array
   action_set: simple
   seed: 123
