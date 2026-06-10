@@ -44,7 +44,7 @@ model:
   double_dqn: true
   target_update_frequency: 128
   compile: false
-  num_actions: 7
+  num_actions: auto
 epsilon:
   start: 1.0
   final: 0.1

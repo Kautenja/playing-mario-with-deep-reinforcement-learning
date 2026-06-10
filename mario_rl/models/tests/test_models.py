@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from unittest import TestCase
 
 import torch
 
-from mario_rl.config import load
+from mario_rl.config import load, resolve_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.models import (
     DQN,
@@ -54,7 +55,19 @@ class DQNModelTest(TestCase):
             y = model(x)
 
         self.assertIsInstance(model, DuelingDQN)
-        self.assertEqual((2, config.model.num_actions), tuple(y.shape))
+        self.assertEqual((2, resolve_model_num_actions(config)), tuple(y.shape))
+
+    def test_model_factory_auto_sizes_native_nes_action_head(self):
+        config = load("smb_dqn_fast_dev")
+        config = replace(config, env=replace(config.env, action_set="nes"))
+        model = build_model(config)
+        x = torch.zeros(2, *config.replay.state_shape, dtype=torch.uint8)
+
+        with torch.no_grad():
+            y = model(x)
+
+        self.assertEqual(256, model.num_actions)
+        self.assertEqual((2, 256), tuple(y.shape))
 
     def test_dqn_task_conditioning_preserves_pixel_only_call_path(self):
         encoder = TaskFeatureEncoder()

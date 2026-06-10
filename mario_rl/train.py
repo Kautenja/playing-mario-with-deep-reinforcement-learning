@@ -5,7 +5,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import replace
 
-from .config import MarioRLConfig, cli
+from .config import MarioRLConfig, action_space_summary, cli, with_resolved_model_num_actions
 
 
 def run(config: MarioRLConfig, *, env_factory=None) -> int:
@@ -22,6 +22,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         write_train_metrics,
     )
 
+    config = with_resolved_model_num_actions(config)
     paths = experiment_paths(config)
     if config.env.video_enabled and config.env.video_dir is None:
         config = replace(
@@ -32,6 +33,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 video_dir=str(paths.videos),
             ),
         )
+        config = with_resolved_model_num_actions(config)
     write_resolved_config(config, paths.resolved_config)
     if config.trainer.seed is not None:
         seed_everything(config.trainer.seed, workers=True)
@@ -57,11 +59,14 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     trainer.save_checkpoint(str(paths.checkpoint))
 
     metrics = module.metrics_summary()
+    action_summary = action_space_summary(config)
+    metrics.update(action_summary)
     write_train_metrics(paths.train_metrics, metrics)
     print(
         json.dumps(
             {
                 "command": "train",
+                **action_summary,
                 "checkpoint": str(paths.checkpoint),
                 "experiment_dir": str(paths.root),
                 "metrics": str(paths.train_metrics),

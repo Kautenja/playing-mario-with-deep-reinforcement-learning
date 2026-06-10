@@ -76,6 +76,8 @@ class PerformanceSample:
     config: str
     experiment_name: str
     env_id: str
+    action_set: str
+    action_count: int
     train_seconds: float
     eval_seconds: float
     total_seconds: float
@@ -604,6 +606,8 @@ def make_performance_sample(
         config=config,
         experiment_name=experiment_name,
         env_id=env_id,
+        action_set=str(train_payload.get("action_set", "unknown")),
+        action_count=int(train_payload.get("action_count", 0)),
         train_seconds=float(train_result.elapsed_seconds),
         eval_seconds=float(eval_result.elapsed_seconds),
         total_seconds=float(train_result.elapsed_seconds + eval_result.elapsed_seconds),
@@ -721,6 +725,7 @@ def format_device_summary(summary: dict[str, Any]) -> str:
         f"env_fps={performance['env_fps']:.2f}",
         f"optimizer_steps_per_sec={performance['optimizer_steps_per_second']:.2f}",
         f"env={performance['env_id']}",
+        f"actions={performance['action_set']}:{performance['action_count']}",
         f"summary={summary['summary_path']}",
     ]
     if "random_steps_per_second" in performance:

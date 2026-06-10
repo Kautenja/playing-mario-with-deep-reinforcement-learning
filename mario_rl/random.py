@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from .config import MarioRLConfig, cli
+from .config import MarioRLConfig, action_space_summary, cli
 
 
 def run(config: MarioRLConfig) -> int:
@@ -12,6 +12,7 @@ def run(config: MarioRLConfig) -> int:
     from mario_rl.envs import make_env
 
     env = make_env(config=config.env.to_mario_env_config())
+    action_summary = action_space_summary(config, env=env)
     total_reward = 0.0
     steps = 0
     try:
@@ -24,7 +25,17 @@ def run(config: MarioRLConfig) -> int:
                 break
     finally:
         env.close()
-    print(json.dumps({"command": "random", "steps": steps, "reward": total_reward}))
+    print(
+        json.dumps(
+            {
+                "command": "random",
+                **action_summary,
+                "steps": steps,
+                "reward": total_reward,
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 

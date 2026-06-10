@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import csv
 import json
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -24,10 +25,17 @@ class TrainCliTest(TestCase):
 
             payload = json.loads(output.getvalue().splitlines()[-1])
             self.assertEqual("train", payload["command"])
+            self.assertEqual("simple", payload["action_set"])
+            self.assertEqual(7, payload["action_count"])
+            self.assertFalse(payload["native_action_space"])
             self.assertGreaterEqual(payload["global_step"], 1)
             self.assertEqual(config.train.max_steps, payload["env_frames"])
             self.assertTrue(Path(payload["checkpoint"]).is_file())
             self.assertTrue(Path(payload["metrics"]).is_file())
+            with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
+                metrics = list(csv.DictReader(stream))[-1]
+            self.assertEqual("simple", metrics["action_set"])
+            self.assertEqual("7", metrics["action_count"])
             self.assertTrue(Path(payload["resolved_config"]).is_file())
             tensorboard_dir = Path(payload["tensorboard"])
             self.assertTrue(tensorboard_dir.is_dir())

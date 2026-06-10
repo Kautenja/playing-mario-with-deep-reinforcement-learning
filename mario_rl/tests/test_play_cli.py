@@ -28,6 +28,9 @@ class PlayCliTest(TestCase):
 
             payload = json.loads(output.getvalue().splitlines()[-1])
             self.assertEqual("play", payload["command"])
+            self.assertEqual("simple", payload["action_set"])
+            self.assertEqual(7, payload["action_count"])
+            self.assertFalse(payload["native_action_space"])
             self.assertEqual(1, payload["episode_count"])
             self.assertLessEqual(payload["total_steps"], config.eval.max_steps)
             self.assertTrue(Path(payload["checkpoint"]).is_file())
@@ -35,3 +38,5 @@ class PlayCliTest(TestCase):
             self.assertTrue(metrics_path.is_file())
             metrics = json.loads(metrics_path.read_text())
             self.assertEqual(1, metrics["episode_count"])
+            self.assertEqual("simple", metrics["action_set"])
+            self.assertEqual(7, metrics["action_count"])

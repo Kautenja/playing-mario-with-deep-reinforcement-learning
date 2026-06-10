@@ -1,5 +1,13 @@
 """Modern Gymnasium environment tools for Mario RL experiments."""
-from .actions import ACTION_SETS, get_action_set
+from .actions import (
+    ACTION_SETS,
+    NATIVE_ACTION_COUNT,
+    NATIVE_ACTION_SET,
+    ResolvedActionSet,
+    action_set_summary,
+    get_action_set,
+    resolve_action_set,
+)
 from .config import MarioEnvConfig
 from .factory import make_env
 from .tasks import (
@@ -37,18 +45,23 @@ __all__ = [
     "MarioEnvConfig",
     "MarioTask",
     "MaxFrameskipEnv",
+    "NATIVE_ACTION_COUNT",
+    "NATIVE_ACTION_SET",
     "OpenCVRecordVideoEnv",
+    "ResolvedActionSet",
     "TaskFeatureEncoder",
     "TaskFeatures",
     "TaskSuite",
     "TaskSuiteConfig",
     "UNKNOWN_TASK_VALUE",
+    "action_set_summary",
     "available_env_ids",
     "available_tasks",
     "choose_stage_env_id",
     "encode_task_features",
     "get_action_set",
     "make_env",
+    "resolve_action_set",
     "smb3_stage_matrix",
     "task_feature_size",
     "task_for_env_id",

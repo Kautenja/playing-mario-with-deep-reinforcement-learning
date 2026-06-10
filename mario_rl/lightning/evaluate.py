@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from mario_rl.config import MarioRLConfig
+from mario_rl.config import MarioRLConfig, action_space_summary, with_resolved_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.lightning.artifacts import checkpoint_path, experiment_paths, write_json
 from mario_rl.lightning.module import DQNLightningModule
@@ -26,6 +26,7 @@ def evaluate_checkpoint(
     env_factory: EnvFactory | None = None,
 ) -> dict[str, Any]:
     """Load a Lightning checkpoint and run bounded evaluation episodes."""
+    config = with_resolved_model_num_actions(config)
     paths = experiment_paths(config)
     ckpt_path = Path(checkpoint).expanduser() if checkpoint else checkpoint_path(config, paths)
     module = DQNLightningModule.load_from_checkpoint(
@@ -102,6 +103,7 @@ def evaluate_checkpoint(
         env.close()
 
     payload = {
+        **action_space_summary(config),
         "checkpoint": str(ckpt_path),
         "episodes": episode_metrics,
         "episode_count": len(episode_metrics),

@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile
 from unittest import TestCase
 
 from mario_rl.config import (
+    AUTO_NUM_ACTIONS,
     EnvConfig,
     EvalConfig,
     MarioRLConfig,
@@ -21,6 +22,8 @@ from mario_rl.config import (
     load,
     main,
     parse_cli_config,
+    resolve_model_num_actions,
+    with_resolved_model_num_actions,
 )
 
 
@@ -75,6 +78,7 @@ class ConfigSchemaTest(TestCase):
             "double_dqn",
             "target_update_frequency",
             "compile",
+            "num_actions",
             "task_conditioning",
             "task_feature_size",
         ):
@@ -127,6 +131,8 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
+        self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
+        self.assertEqual(7, resolve_model_num_actions(config))
 
         conditioned = load("smb_dqn_task_conditioned_fast_dev")
         self.assertTrue(conditioned.model.task_conditioning)
@@ -142,6 +148,36 @@ class ConfigSchemaTest(TestCase):
 
         from_path = load(path)
         self.assertEqual(config, from_path)
+
+    def test_model_num_actions_auto_resolves_from_action_set(self):
+        config = parse_cli_config(
+            [
+                "--config",
+                "smb_dqn_fast_dev",
+                "--env.action_set",
+                "nes",
+            ]
+        )
+
+        resolved = with_resolved_model_num_actions(config)
+
+        self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
+        self.assertEqual(256, resolved.model.num_actions)
+
+    def test_fixed_model_num_actions_must_match_action_set(self):
+        config = parse_cli_config(
+            [
+                "--config",
+                "smb_dqn_fast_dev",
+                "--env.action_set",
+                "nes",
+                "--model.num_actions",
+                "7",
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "model.num_actions=7"):
+            with_resolved_model_num_actions(config)
 
 
 class ConfigCliTest(TestCase):
