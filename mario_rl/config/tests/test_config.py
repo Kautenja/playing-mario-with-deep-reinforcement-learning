@@ -94,6 +94,7 @@ class ConfigSchemaTest(TestCase):
         names = available_configs()
 
         self.assertIn("smb_dqn_fast_dev", names)
+        self.assertIn("smb_dqn_macbook_gate", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
 

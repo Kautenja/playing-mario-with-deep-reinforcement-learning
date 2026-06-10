@@ -78,6 +78,46 @@ Nested overrides use `--section.field value` syntax. Bare positional
 `KEY=VALUE` overrides are intentionally rejected so experiment configuration is
 always explicit.
 
+## MacBook Trainability Gate
+
+`verify-macbook` is the local laptop gate for the modern PyTorch path. It runs
+the fast unit subset, then a bounded real Super Mario Bros. training job, then
+evaluates the checkpoint it just produced:
+
+```shell
+./main.sh verify-macbook
+```
+
+The default gate uses `smb_dqn_macbook_gate`, a small real-environment config
+with 40x40 frame stacks, eight training steps, one eight-step evaluation
+episode, deterministic seeds, no rendering, and no video output. The command
+always verifies CPU. In `--device auto` mode it also runs the MPS gate when
+PyTorch reports Apple Silicon MPS availability, otherwise it prints a clear
+skip. A targeted MPS check can be run directly:
+
+```shell
+./main.sh verify-macbook --device mps
+```
+
+Each device run writes `macbook-gate-summary.json` under the experiment
+directory with wall time, environment frames per second, optimizer steps per
+second, peak memory when available, Python/PyTorch versions, the selected
+environment ID, artifact paths, and performance-budget warnings. The initial
+budget is intentionally conservative and warning-based: train under 180 seconds,
+eval under 90 seconds, total under 300 seconds, at least 0.25 environment FPS,
+and at least 0.02 optimizer steps per second. Use `--strict-budget` to make
+these warnings fail the gate.
+
+For repeatable profiling without the unit/eval stages, run the benchmark mode:
+
+```shell
+./main.sh verify-macbook --benchmark-only --device cpu
+```
+
+Benchmark mode measures a bounded random environment rollout plus the same mini
+optimization pass so later specs can compare environment stepping and optimizer
+throughput against the saved summary.
+
 ## Lightning DQN Smoke Training
 
 The active training path uses PyTorch Lightning, native PyTorch DQN modules,
