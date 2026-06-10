@@ -41,9 +41,9 @@ python -m pip check
 python -m unittest discover .
 ```
 
-The runtime dependency set targets `gym-super-mario-bros` 9.x and `nes-py` 9.x.
-The umbrella checkout is the preferred development path because it keeps the
-native emulator and Mario wrapper pinned to matching local submodules.
+The runtime dependency set targets `gym-super-mario-bros` 9.1.x and `nes-py`
+9.x. The umbrella checkout is the preferred development path because it keeps
+the native emulator and Mario wrapper pinned to matching local submodules.
 
 ## Tests
 
@@ -148,6 +148,31 @@ Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
 Training shows Lightning progress by default. Pass
 `--trainer.enable_progress_bar false` for quiet/headless runs.
 
+## Task Conditioning
+
+`mario_rl.tasks` and `mario_rl.envs` expose the `gym-super-mario-bros` 9.1
+task metadata surface, including `MarioTask`, `available_tasks`,
+`task_for_env_id`, and `smb3_stage_matrix`. `TaskFeatureEncoder` converts a
+registered or custom environment ID into one dense `float32` feature vector:
+
+- one-hot `game_family`, canonical `task_id`, and `rom_mode` vocabularies;
+- normalized `world` and `stage` numeric fields plus present/absent flags;
+- binary `single_stage` and `validated` flags.
+
+Alias IDs such as `SuperMarioBros1-1-v0` encode to the canonical task ID
+`SuperMarioBros-1-1-v0`. Unknown custom IDs use the explicit `<unknown>`
+categorical bucket with zeroed numeric fields, so feature encoding does not
+require constructing a ROM-backed environment.
+
+Task conditioning is disabled by default to preserve existing smoke behavior
+and pixel-only checkpoints. Use the opt-in config when training a conditioned
+DQN:
+
+```shell
+./main.sh train --config smb_dqn_task_conditioned_fast_dev
+./main.sh play --config smb_dqn_task_conditioned_fast_dev
+```
+
 ## Modern Environments
 
 The Gymnasium environment surface lives under `mario_rl.envs`:
@@ -169,7 +194,7 @@ arguments, or a `MarioEnvConfig` object.
 The default single-stage config uses the canonical
 `SuperMarioBros-1-1-v0` ID from the 9.x environment surface. The
 separator-free alias `SuperMarioBros1-1-v0` is still accepted by
-`gym-super-mario-bros` 9.0.0 for compatibility, and Mario RL re-exports task
+`gym-super-mario-bros` 9.1.0 for compatibility, and Mario RL re-exports task
 metadata helpers for curriculum or smoke selection:
 
 ```python
