@@ -7,6 +7,8 @@ from typing import Any
 import torch
 from torch import nn
 
+from mario_rl.config import AUTO_NUM_ACTIONS, resolve_model_num_actions
+
 
 DEFAULT_INPUT_SHAPE = (4, 84, 84)
 
@@ -146,7 +148,14 @@ def build_model(
     input_shape = input_shape or getattr(replay_config, "state_shape", DEFAULT_INPUT_SHAPE)
     input_channels = int(input_channels or getattr(model_config, "input_channels", input_shape[0]))
     input_shape = _canonical_input_shape(input_shape, input_channels)
-    num_actions = int(num_actions or getattr(model_config, "num_actions", 7))
+    if num_actions is None:
+        raw_num_actions = getattr(model_config, "num_actions", 7)
+        if raw_num_actions == AUTO_NUM_ACTIONS:
+            num_actions = resolve_model_num_actions(config)
+        else:
+            num_actions = int(raw_num_actions)
+    else:
+        num_actions = int(num_actions)
     hidden_size = int(hidden_size or getattr(model_config, "hidden_size", 512))
     task_conditioning = bool(getattr(model_config, "task_conditioning", False))
     resolved_task_feature_size = _resolve_task_feature_size(

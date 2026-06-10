@@ -44,7 +44,7 @@ model:
   double_dqn: true
   target_update_frequency: 128
   compile: false
-  num_actions: 7
+  num_actions: auto
   task_conditioning: true
   task_feature_size: 0
 epsilon:

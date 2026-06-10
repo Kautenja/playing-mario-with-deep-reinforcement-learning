@@ -38,7 +38,14 @@ class FakeCommandRunner:
         if module == "unittest":
             return CommandResult(command, 0, "OK\n", "", 0.25)
         if module == "mario_rl.random":
-            payload = {"command": "random", "steps": 16, "reward": 0.0}
+            payload = {
+                "command": "random",
+                "action_set": "simple",
+                "action_count": 7,
+                "native_action_space": False,
+                "steps": 16,
+                "reward": 0.0,
+            }
             return CommandResult(command, 0, json.dumps(payload) + "\n", "", 0.5)
         if module == "mario_rl.train":
             payload = self._write_train_payload(command)
@@ -62,14 +69,18 @@ class FakeCommandRunner:
         event = tensorboard / "events.out.tfevents.fake"
         checkpoint.write_bytes(b"ckpt")
         metrics.write_text(
-            "global_step,env_frames,episodes,episode_reward,epsilon,loss,learning_rate\n"
-            "7,32,1,0.0,0.1,0.25,0.00025\n",
+            "action_set,action_count,native_action_space,global_step,env_frames,"
+            "episodes,episode_reward,epsilon,loss,learning_rate\n"
+            "simple,7,False,7,32,1,0.0,0.1,0.25,0.00025\n",
             encoding="utf-8",
         )
         resolved.write_text("env:\n  id: SuperMarioBros-1-1-v0\n", encoding="utf-8")
         event.write_text("event", encoding="utf-8")
         return {
             "command": "train",
+            "action_set": "simple",
+            "action_count": 7,
+            "native_action_space": False,
             "checkpoint": str(checkpoint),
             "experiment_dir": str(root),
             "metrics": str(metrics),
@@ -85,6 +96,9 @@ class FakeCommandRunner:
         root = save_dir / experiment
         metrics = root / "eval-metrics.json"
         payload = {
+            "action_set": "simple",
+            "action_count": 7,
+            "native_action_space": False,
             "checkpoint": str(root / "checkpoints" / "macbook-gate.ckpt"),
             "episode_count": 1,
             "episodes": [{"episode": 0, "reward": 1.0, "steps": 4}],
@@ -193,6 +207,8 @@ class VerifyMacbookArtifactAndMetricsTest(TestCase):
             config="smb_dqn_macbook_gate",
             experiment_name="slow",
             env_id="SuperMarioBros-1-1-v0",
+            action_set="simple",
+            action_count=7,
             train_seconds=10.0,
             eval_seconds=2.0,
             total_seconds=12.0,
@@ -251,6 +267,8 @@ class VerifyMacbookConfigAndSummaryTest(TestCase):
                 "env_fps": 16.0,
                 "optimizer_steps_per_second": 3.5,
                 "env_id": "SuperMarioBros-1-1-v0",
+                "action_set": "simple",
+                "action_count": 7,
             },
         }
 
@@ -259,6 +277,7 @@ class VerifyMacbookConfigAndSummaryTest(TestCase):
         self.assertIn("gate cpu", text)
         self.assertIn("env_fps=16.00", text)
         self.assertIn("optimizer_steps_per_sec=3.50", text)
+        self.assertIn("actions=simple:7", text)
 
 
 def _arg_value(command: tuple[str, ...], flag: str, default: str | None = None) -> str:

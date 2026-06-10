@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from lightning.pytorch import LightningModule
 
-from mario_rl.config import MarioRLConfig, to_dict
+from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder, TaskSuite
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
@@ -31,32 +31,36 @@ class DQNLightningModule(LightningModule):
         env_factory: EnvFactory | None = None,
     ) -> None:
         super().__init__()
-        self.config = config
+        self.config = with_resolved_model_num_actions(config)
         self._env_factory = env_factory
         self.automatic_optimization = False
-        self.save_hyperparameters({"config": to_dict(config)})
+        self.save_hyperparameters({"config": to_dict(self.config)})
 
-        self.q_network = build_model(config)
+        self.q_network = build_model(self.config)
         self.target_q_network = copy.deepcopy(self.q_network)
         self.target_q_network.load_state_dict(self.q_network.state_dict())
         self.target_q_network.eval()
         for parameter in self.target_q_network.parameters():
             parameter.requires_grad_(False)
 
-        seed = config.trainer.seed if config.trainer.seed is not None else config.env.seed
-        self.replay: UniformReplayBuffer = build_replay_buffer(config, seed=seed)
+        seed = (
+            self.config.trainer.seed
+            if self.config.trainer.seed is not None
+            else self.config.env.seed
+        )
+        self.replay: UniformReplayBuffer = build_replay_buffer(self.config, seed=seed)
         self.epsilon_schedule = LinearEpsilonSchedule(
-            start=config.epsilon.start,
-            final=config.epsilon.final,
-            decay_frames=config.epsilon.decay_frames,
+            start=self.config.epsilon.start,
+            final=self.config.epsilon.final,
+            decay_frames=self.config.epsilon.decay_frames,
         )
         self.action_selector = EpsilonGreedyActionSelector(
-            num_actions=config.model.num_actions,
+            num_actions=self.config.model.num_actions,
             seed=seed,
         )
         self.task_suite = (
-            TaskSuite(config.task_suite)
-            if bool(getattr(config.task_suite, "enabled", False))
+            TaskSuite(self.config.task_suite)
+            if bool(getattr(self.config.task_suite, "enabled", False))
             else None
         )
         self.task_encoder = None

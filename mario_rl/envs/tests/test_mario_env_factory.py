@@ -6,10 +6,14 @@ from unittest import TestCase
 import numpy as np
 
 from mario_rl.envs import (
+    ACTION_SETS,
     MarioEnvConfig,
+    NATIVE_ACTION_COUNT,
     available_env_ids,
     choose_stage_env_id,
+    get_action_set,
     make_env,
+    resolve_action_set,
     task_for_env_id,
 )
 
@@ -47,6 +51,31 @@ def _first_rollout(seed=123, env_id="SuperMarioBros-1-1-v0", actions=(0, 1, 0)):
 class MarioEnvFactoryTest(TestCase):
     """Validate the public modern Mario factory."""
 
+    def test_action_set_resolution_covers_supported_names_and_aliases(self):
+        self.assertEqual(
+            {"nes", "right", "right_only", "simple", "complex"},
+            set(ACTION_SETS),
+        )
+        self.assertIsNone(get_action_set("nes"))
+
+        expected_counts = {
+            "nes": NATIVE_ACTION_COUNT,
+            "right": 5,
+            "right_only": 5,
+            "simple": 7,
+            "complex": 12,
+        }
+        for name, expected_count in expected_counts.items():
+            with self.subTest(name=name):
+                resolved = resolve_action_set(name)
+                self.assertEqual(expected_count, resolved.num_actions)
+                self.assertEqual(name == "nes", resolved.native)
+
+        right = resolve_action_set("right")
+        right_only = resolve_action_set("right_only")
+        self.assertEqual("right_only", right.name)
+        self.assertEqual(right_only.actions, right.actions)
+
     def test_factory_creates_preprocessed_gymnasium_env(self):
         env = make_env(
             "SuperMarioBros-1-1-v0",
@@ -70,6 +99,49 @@ class MarioEnvFactoryTest(TestCase):
             self.assertEqual(7, env.action_space.n)
         finally:
             env.close()
+
+    def test_factory_can_keep_native_nes_action_space(self):
+        env = make_env(
+            "SuperMarioBros-1-1-v0",
+            render_mode="rgb_array",
+            seed=123,
+            action_set="nes",
+            preprocess=False,
+            record_statistics=False,
+        )
+
+        try:
+            obs, info = env.reset(seed=123)
+            self.assertEqual((240, 256, 3), obs.shape)
+            self.assertIsInstance(info, dict)
+            self.assertEqual(NATIVE_ACTION_COUNT, env.action_space.n)
+            self.assertEqual("nes", env.mario_rl_action_set)
+            self.assertEqual(NATIVE_ACTION_COUNT, env.mario_rl_action_count)
+        finally:
+            env.close()
+
+    def test_factory_creates_constrained_action_space_counts(self):
+        for action_set, expected_count in (
+            ("right", 5),
+            ("right_only", 5),
+            ("simple", 7),
+            ("complex", 12),
+        ):
+            with self.subTest(action_set=action_set):
+                env = make_env(
+                    "SuperMarioBros-1-1-v0",
+                    render_mode="rgb_array",
+                    seed=123,
+                    action_set=action_set,
+                    preprocess=False,
+                    record_statistics=False,
+                )
+                try:
+                    self.assertEqual(expected_count, env.action_space.n)
+                    self.assertEqual(resolve_action_set(action_set).name, env.mario_rl_action_set)
+                    self.assertEqual(expected_count, env.mario_rl_action_count)
+                finally:
+                    env.close()
 
     def test_config_object_can_create_unpreprocessed_base_env_alias(self):
         config = MarioEnvConfig(
@@ -124,7 +196,12 @@ class MarioEnvFactoryTest(TestCase):
         self.assertEqual(1, stage)
 
     def test_factory_creates_representative_9x_game_family_envs(self):
-        for env_id in ("SuperMarioBros2USA-v0", "SuperMarioBros3-1-1-v0"):
+        for env_id in (
+            "SuperMarioBros-1-1-v0",
+            "SuperMarioBros2-1-1-v0",
+            "SuperMarioBros2USA-1-1-v0",
+            "SuperMarioBros3-1-1-v0",
+        ):
             with self.subTest(env_id=env_id):
                 env = make_env(
                     env_id,

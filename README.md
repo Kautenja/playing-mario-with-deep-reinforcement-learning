@@ -206,9 +206,14 @@ env.close()
 ```
 
 The default preprocessing output is a channel-first grayscale frame stack with
-shape `(4, 84, 84)` and `uint8` dtype. `make_env` accepts `right_only`,
-`simple`, and `complex` action-set names, explicit preprocessing keyword
-arguments, or a `MarioEnvConfig` object.
+shape `(4, 84, 84)` and `uint8` dtype. `make_env` accepts `nes`, `right`,
+`right_only`, `simple`, and `complex` action-set names, explicit preprocessing
+keyword arguments, or a `MarioEnvConfig` object. The packaged configs keep
+`action_set: simple` as the default smoke-training policy because it is small
+and fast for local iteration; universal all-game training may prefer `nes` for
+the full 256-button NES action space or `complex` for a 12-action directional
+subset. Packaged configs use `model.num_actions: auto`, so training artifacts
+record the concrete action count resolved from the configured action set.
 
 The default single-stage config uses the canonical
 `SuperMarioBros-1-1-v0` ID from the 9.x environment surface. The

@@ -5,7 +5,7 @@ import gymnasium as gym
 import gym_super_mario_bros
 from nes_py.wrappers import JoypadSpace
 
-from .actions import get_action_set
+from .actions import resolve_action_set
 from .config import UNSET, MarioEnvConfig, coerce_config
 from .wrappers import (
     ClipRewardEnv,
@@ -71,7 +71,9 @@ def make_env(
         raise ValueError("video recording requires render_mode='rgb_array'")
 
     env = gym_super_mario_bros.make(cfg.env_id, render_mode=cfg.render_mode)
-    env = JoypadSpace(env, get_action_set(cfg.action_set))
+    resolved_action_set = resolve_action_set(cfg.action_set, env=env)
+    if not resolved_action_set.native:
+        env = JoypadSpace(env, resolved_action_set.actions)
 
     if cfg.seed is not None:
         env = DefaultSeedEnv(env, cfg.seed)
@@ -111,6 +113,9 @@ def make_env(
             name_prefix=cfg.video_name_prefix,
         )
 
+    env.mario_rl_action_set = resolved_action_set.name
+    env.mario_rl_action_count = resolved_action_set.num_actions
+    env.mario_rl_native_action_space = resolved_action_set.native
     return env
 
 

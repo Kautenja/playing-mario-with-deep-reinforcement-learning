@@ -84,6 +84,9 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
     """Write one stable CSV row with final smoke-training metrics."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
+        "action_set",
+        "action_count",
+        "native_action_space",
         "global_step",
         "env_frames",
         "episodes",

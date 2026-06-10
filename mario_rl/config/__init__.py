@@ -17,6 +17,9 @@ except ImportError:  # pragma: no cover - local test fallback.
     _ArgumentParser = argparse.ArgumentParser
 
 
+AUTO_NUM_ACTIONS = "auto"
+
+
 @dataclass(frozen=True)
 class TrainerConfig:
     """Lightning trainer and device placement settings."""
@@ -103,7 +106,7 @@ class ModelConfig:
     double_dqn: bool = True
     target_update_frequency: int = 10_000
     compile: bool = False
-    num_actions: int = 7
+    num_actions: int | str = AUTO_NUM_ACTIONS
     task_conditioning: bool = False
     task_feature_size: int = 0
 
@@ -317,7 +320,10 @@ def apply_overrides(config: MarioRLConfig, overrides: Mapping[str, Any]) -> Mari
         if not hasattr(section, field_name):
             raise ValueError(f"unknown override field {path!r}")
         current = getattr(section, field_name)
-        value = _coerce_cli_value(raw_value, current)
+        if path == "model.num_actions":
+            value = _coerce_num_actions_config_value(raw_value)
+        else:
+            value = _coerce_cli_value(raw_value, current)
         result = replace(result, **{section_name: replace(section, **{field_name: value})})
     return result
 
@@ -325,6 +331,39 @@ def apply_overrides(config: MarioRLConfig, overrides: Mapping[str, Any]) -> Mari
 def to_dict(config: MarioRLConfig) -> dict[str, Any]:
     """Return a JSON/YAML-friendly dictionary for a typed config."""
     return asdict(config)
+
+
+def action_space_summary(config: MarioRLConfig, *, env=None) -> dict[str, int | str | bool]:
+    """Return resolved action-space metadata for a config or constructed env."""
+    from mario_rl.envs.actions import action_set_summary as _action_set_summary
+
+    return _action_set_summary(config.env.action_set, env=env)
+
+
+def resolve_model_num_actions(config: MarioRLConfig, *, env=None) -> int:
+    """Return a concrete model action count, validating fixed config values."""
+    summary = action_space_summary(config, env=env)
+    action_count = int(summary["action_count"])
+    requested = getattr(config.model, "num_actions", AUTO_NUM_ACTIONS)
+    if _is_auto_num_actions(requested):
+        return action_count
+
+    fixed = _coerce_num_actions_config_value(requested)
+    if fixed != action_count:
+        action_set = summary["action_set"]
+        raise ValueError(
+            f"model.num_actions={fixed} does not match env.action_set "
+            f"{action_set!r} ({action_count} actions)"
+        )
+    return fixed
+
+
+def with_resolved_model_num_actions(config: MarioRLConfig, *, env=None) -> MarioRLConfig:
+    """Return ``config`` with automatic ``model.num_actions`` resolved to an int."""
+    num_actions = resolve_model_num_actions(config, env=env)
+    if config.model.num_actions == num_actions:
+        return config
+    return replace(config, model=replace(config.model, num_actions=num_actions))
 
 
 def _override_paths() -> tuple[str, ...]:
@@ -407,7 +446,13 @@ def _section_from_mapping(section_type, data: Mapping[str, Any]):
     values = {}
     for field in fields(defaults):
         if field.name in data:
-            values[field.name] = _coerce_loaded_value(data[field.name], getattr(defaults, field.name))
+            if section_type is ModelConfig and field.name == "num_actions":
+                values[field.name] = _coerce_num_actions_config_value(data[field.name])
+            else:
+                values[field.name] = _coerce_loaded_value(
+                    data[field.name],
+                    getattr(defaults, field.name),
+                )
     return section_type(**values)
 
 
@@ -469,6 +514,27 @@ def _coerce_sequence_items(values: Sequence[Any], current: tuple[Any, ...]) -> l
     return list(values)
 
 
+def _is_auto_num_actions(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().lower() == AUTO_NUM_ACTIONS
+
+
+def _coerce_num_actions_config_value(value: Any) -> int | str:
+    if _is_auto_num_actions(value):
+        return AUTO_NUM_ACTIONS
+    if isinstance(value, bool):
+        raise TypeError("model.num_actions must be a positive integer or 'auto'")
+    if isinstance(value, int):
+        if value <= 0:
+            raise ValueError("model.num_actions must be > 0")
+        return value
+    if isinstance(value, str):
+        parsed = int(value)
+        if parsed <= 0:
+            raise ValueError("model.num_actions must be > 0")
+        return parsed
+    raise TypeError("model.num_actions must be a positive integer or 'auto'")
+
+
 def _namespace_values(namespace) -> dict[str, Any]:
     if hasattr(namespace, "as_dict"):
         return namespace.as_dict()
@@ -509,6 +575,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 __all__ = [
+    "AUTO_NUM_ACTIONS",
     "EnvConfig",
     "EpsilonConfig",
     "EvalConfig",
@@ -519,6 +586,7 @@ __all__ = [
     "TrainConfig",
     "TrainerConfig",
     "apply_overrides",
+    "action_space_summary",
     "available_configs",
     "build_parser",
     "cli",
@@ -527,5 +595,7 @@ __all__ = [
     "load",
     "main",
     "parse_cli_config",
+    "resolve_model_num_actions",
     "to_dict",
+    "with_resolved_model_num_actions",
 ]
