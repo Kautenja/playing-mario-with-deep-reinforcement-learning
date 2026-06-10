@@ -97,11 +97,13 @@ class ReplayConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """DQN model and optimizer settings."""
+    """Model and optimizer settings for DQN and actor-critic paths."""
 
     architecture: str = "dqn"
     input_channels: int = 4
     hidden_size: int = 512
+    recurrent_hidden_size: int = 256
+    task_embedding_size: int = 32
     optimizer: str = "adam"
     learning_rate: float = 0.00025
     discount_factor: float = 0.99
@@ -111,6 +113,21 @@ class ModelConfig:
     num_actions: int | str = AUTO_NUM_ACTIONS
     task_conditioning: bool = False
     task_feature_size: int = 0
+
+
+@dataclass(frozen=True)
+class PPOConfig:
+    """Rollout and PPO optimization settings for recurrent actor-critic."""
+
+    rollout_steps: int = 32
+    minibatch_size: int = 16
+    epochs: int = 2
+    gae_lambda: float = 0.95
+    clip_range: float = 0.2
+    value_loss_coefficient: float = 0.5
+    entropy_coefficient: float = 0.01
+    normalize_advantages: bool = True
+    max_grad_norm: float | None = 0.5
 
 
 @dataclass(frozen=True)
@@ -126,6 +143,7 @@ class EpsilonConfig:
 class TrainConfig:
     """Training loop limits, logging, checkpoint, and artifact names."""
 
+    algorithm: str = "dqn"
     max_frames: int = 1_000_000
     max_steps: int = 250_000
     fast_dev_run: bool = False
@@ -163,6 +181,7 @@ class MarioRLConfig:
     reward_transform: RewardTransformConfig = field(default_factory=RewardTransformConfig)
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
+    ppo: PPOConfig = PPOConfig()
     epsilon: EpsilonConfig = EpsilonConfig()
     train: TrainConfig = TrainConfig()
     eval: EvalConfig = EvalConfig()
@@ -177,6 +196,7 @@ _SECTIONS = {
     "reward_transform": RewardTransformConfig,
     "replay": ReplayConfig,
     "model": ModelConfig,
+    "ppo": PPOConfig,
     "epsilon": EpsilonConfig,
     "train": TrainConfig,
     "eval": EvalConfig,

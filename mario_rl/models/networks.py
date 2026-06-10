@@ -1,7 +1,8 @@
-"""PyTorch DQN network definitions and factories."""
+"""PyTorch model definitions and factories."""
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import torch
@@ -11,6 +12,15 @@ from mario_rl.config import AUTO_NUM_ACTIONS, resolve_model_num_actions
 
 
 DEFAULT_INPUT_SHAPE = (4, 84, 84)
+
+
+@dataclass(frozen=True)
+class ActorCriticOutput:
+    """Policy/value/recurrent outputs for one actor-critic forward pass."""
+
+    policy_logits: torch.Tensor
+    value: torch.Tensor
+    hidden_state: torch.Tensor
 
 
 def normalize_observation(observation: torch.Tensor, scale: float = 255.0) -> torch.Tensor:
@@ -131,6 +141,167 @@ class DuelingDQN(nn.Module):
         return value + advantage - advantage.mean(dim=1, keepdim=True)
 
 
+class RecurrentActorCritic(nn.Module):
+    """Convolutional recurrent actor-critic for channel-first Mario frames."""
+
+    def __init__(
+        self,
+        *,
+        input_channels: int = 4,
+        num_actions: int = 7,
+        input_shape: Sequence[int] = DEFAULT_INPUT_SHAPE,
+        hidden_size: int = 512,
+        recurrent_hidden_size: int = 256,
+        task_feature_size: int = 0,
+        task_embedding_size: int = 32,
+        normalize_input: bool = True,
+        input_scale: float = 255.0,
+    ) -> None:
+        super().__init__()
+        input_shape = _canonical_input_shape(input_shape, input_channels)
+        self.input_shape = input_shape
+        self.num_actions = int(num_actions)
+        self.task_feature_size = int(task_feature_size)
+        self.task_embedding_size = int(task_embedding_size)
+        self.recurrent_hidden_size = int(recurrent_hidden_size)
+        self.normalize_input = bool(normalize_input)
+        self.input_scale = float(input_scale)
+
+        self.features = _nature_cnn_features(input_shape[0])
+        visual_size = _feature_size(self.features, input_shape)
+        if self.task_feature_size > 0:
+            self.task_embedding = nn.Sequential(
+                nn.Linear(self.task_feature_size, self.task_embedding_size),
+                nn.Tanh(),
+            )
+            recurrent_input_size = visual_size + self.task_embedding_size
+        else:
+            self.task_embedding = None
+            recurrent_input_size = visual_size
+
+        self.visual_projection = nn.Sequential(
+            nn.Linear(recurrent_input_size, int(hidden_size)),
+            nn.ReLU(),
+        )
+        self.memory = nn.GRU(int(hidden_size), self.recurrent_hidden_size)
+        self.policy_head = nn.Linear(self.recurrent_hidden_size, self.num_actions)
+        self.value_head = nn.Linear(self.recurrent_hidden_size, 1)
+
+    def initial_state(
+        self,
+        batch_size: int = 1,
+        *,
+        device: torch.device | str | None = None,
+    ) -> torch.Tensor:
+        """Return a zeroed recurrent hidden state for ``batch_size`` actors."""
+        return torch.zeros(
+            1,
+            int(batch_size),
+            self.recurrent_hidden_size,
+            dtype=torch.float32,
+            device=device,
+        )
+
+    def forward(
+        self,
+        observation: torch.Tensor,
+        hidden_state: torch.Tensor | None = None,
+        task_features: torch.Tensor | None = None,
+    ) -> ActorCriticOutput:
+        """Return policy logits, values, and next recurrent state."""
+        sequence, single_step = self._prepare_observation_sequence(observation)
+        steps, batch_size = sequence.shape[:2]
+        flat_observation = sequence.reshape(steps * batch_size, *sequence.shape[2:])
+        x = self._prepare_observation(flat_observation)
+        visual = torch.flatten(self.features(x), start_dim=1)
+        task_embedding = self._task_embedding(
+            task_features,
+            steps=steps,
+            batch_size=batch_size,
+            device=visual.device,
+        )
+        if task_embedding is not None:
+            visual = torch.cat((visual, task_embedding), dim=1)
+        projected = self.visual_projection(visual).reshape(steps, batch_size, -1)
+        if hidden_state is None:
+            hidden_state = self.initial_state(batch_size, device=projected.device)
+        else:
+            hidden_state = hidden_state.to(device=projected.device, dtype=torch.float32)
+        memory_output, next_hidden = self.memory(projected, hidden_state)
+        logits = self.policy_head(memory_output)
+        value = self.value_head(memory_output).squeeze(-1)
+        if single_step:
+            logits = logits.squeeze(0)
+            value = value.squeeze(0)
+        return ActorCriticOutput(
+            policy_logits=logits,
+            value=value,
+            hidden_state=next_hidden,
+        )
+
+    def reset_recurrent_state(
+        self,
+        hidden_state: torch.Tensor,
+        dones: torch.Tensor,
+    ) -> torch.Tensor:
+        """Zero recurrent state entries whose actors just ended an episode."""
+        return reset_recurrent_state(hidden_state, dones)
+
+    def _prepare_observation(self, observation: torch.Tensor) -> torch.Tensor:
+        if self.normalize_input:
+            return normalize_observation(observation, self.input_scale)
+        return observation.to(dtype=torch.float32)
+
+    def _prepare_observation_sequence(
+        self,
+        observation: torch.Tensor,
+    ) -> tuple[torch.Tensor, bool]:
+        tensor = torch.as_tensor(observation)
+        if tensor.ndim == 4:
+            return tensor.unsqueeze(0), True
+        if tensor.ndim == 5:
+            return tensor, False
+        raise ValueError(
+            "observation must have shape (batch, channels, height, width) or "
+            f"(steps, batch, channels, height, width), got {tuple(tensor.shape)}"
+        )
+
+    def _task_embedding(
+        self,
+        task_features: torch.Tensor | None,
+        *,
+        steps: int,
+        batch_size: int,
+        device: torch.device,
+    ) -> torch.Tensor | None:
+        if self.task_embedding is None:
+            return None
+        task_tensor = _prepare_sequence_task_features(
+            task_features,
+            steps=steps,
+            batch_size=batch_size,
+            feature_size=self.task_feature_size,
+            device=device,
+        )
+        return self.task_embedding(task_tensor.reshape(steps * batch_size, -1))
+
+
+def reset_recurrent_state(
+    hidden_state: torch.Tensor,
+    dones: torch.Tensor,
+) -> torch.Tensor:
+    """Return ``hidden_state`` with actor columns zeroed where ``dones`` is true."""
+    if hidden_state.ndim != 3:
+        raise ValueError(
+            f"hidden_state must have shape (layers, batch, hidden), got {tuple(hidden_state.shape)}"
+        )
+    mask = torch.as_tensor(dones, dtype=torch.bool, device=hidden_state.device).view(-1)
+    if mask.shape[0] != hidden_state.shape[1]:
+        raise ValueError("dones batch dimension must match hidden_state")
+    keep = (~mask).to(dtype=hidden_state.dtype).view(1, -1, 1)
+    return hidden_state * keep
+
+
 def build_model(
     config: Any = None,
     *,
@@ -141,7 +312,7 @@ def build_model(
     hidden_size: int | None = None,
     task_feature_size: int | None = None,
 ) -> nn.Module:
-    """Build a DQN module from a typed config or explicit keyword values."""
+    """Build a model module from a typed config or explicit keyword values."""
     model_config = getattr(config, "model", config)
     replay_config = getattr(config, "replay", None)
     architecture = architecture or getattr(model_config, "architecture", "dqn")
@@ -163,6 +334,8 @@ def build_model(
         task_feature_size=task_feature_size,
         task_conditioning=task_conditioning,
     )
+    recurrent_hidden_size = int(getattr(model_config, "recurrent_hidden_size", 256))
+    task_embedding_size = int(getattr(model_config, "task_embedding_size", 32))
     kwargs = {
         "input_channels": input_channels,
         "num_actions": num_actions,
@@ -175,6 +348,17 @@ def build_model(
         return DQN(**kwargs)
     if normalized in {"dueling", "dueling_dqn", "dueling_deep_q"}:
         return DuelingDQN(**kwargs)
+    if normalized in {
+        "actor_critic",
+        "recurrent_actor_critic",
+        "ppo",
+        "ppo_actor_critic",
+    }:
+        return RecurrentActorCritic(
+            **kwargs,
+            recurrent_hidden_size=recurrent_hidden_size,
+            task_embedding_size=task_embedding_size,
+        )
     raise ValueError(f"unsupported model architecture: {architecture!r}")
 
 
@@ -253,6 +437,51 @@ def _prepare_task_features(
         raise ValueError(
             "task_features batch dimension "
             f"{tensor.shape[0]} does not match observations {batch_size}"
+        )
+    return tensor
+
+
+def _prepare_sequence_task_features(
+    task_features: torch.Tensor | None,
+    *,
+    steps: int,
+    batch_size: int,
+    feature_size: int,
+    device: torch.device,
+) -> torch.Tensor:
+    if task_features is None:
+        return torch.zeros(
+            steps,
+            batch_size,
+            feature_size,
+            dtype=torch.float32,
+            device=device,
+        )
+    tensor = torch.as_tensor(task_features, dtype=torch.float32, device=device)
+    if tensor.ndim == 1:
+        tensor = tensor.view(1, 1, feature_size).expand(steps, batch_size, -1)
+    elif tensor.ndim == 2:
+        if tensor.shape == (batch_size, feature_size):
+            tensor = tensor.unsqueeze(0).expand(steps, -1, -1)
+        elif tensor.shape == (steps * batch_size, feature_size):
+            tensor = tensor.view(steps, batch_size, feature_size)
+        elif tensor.shape == (1, feature_size):
+            tensor = tensor.view(1, 1, feature_size).expand(steps, batch_size, -1)
+        else:
+            raise ValueError(
+                "task_features must have shape (features,), (batch, features), "
+                "(steps * batch, features), or (steps, batch, features)"
+            )
+    elif tensor.ndim == 3:
+        if tensor.shape != (steps, batch_size, feature_size):
+            raise ValueError(
+                f"expected task feature shape {(steps, batch_size, feature_size)}, "
+                f"got {tuple(tensor.shape)}"
+            )
+    else:
+        raise ValueError(
+            "task_features must have shape (features,), (batch, features), "
+            "(steps * batch, features), or (steps, batch, features)"
         )
     return tensor
 

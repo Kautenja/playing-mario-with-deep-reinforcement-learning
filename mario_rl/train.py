@@ -10,12 +10,13 @@ from .rewards import reward_transform_summary
 
 
 def run(config: MarioRLConfig, *, env_factory=None) -> int:
-    """Run a bounded Lightning DQN training job and write smoke artifacts."""
+    """Run a bounded Lightning training job and write smoke artifacts."""
     from lightning.pytorch import Trainer, seed_everything
     from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 
     from mario_rl.lightning import (
         DQNLightningModule,
+        PPOLightningModule,
         experiment_paths,
         trainer_accelerator,
         trainer_devices,
@@ -40,7 +41,13 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     if config.trainer.seed is not None:
         seed_everything(config.trainer.seed, workers=True)
 
-    module = DQNLightningModule(config, env_factory=env_factory)
+    algorithm = _normalized_algorithm(config)
+    if algorithm == "dqn":
+        module = DQNLightningModule(config, env_factory=env_factory)
+    elif algorithm == "ppo":
+        module = PPOLightningModule(config, env_factory=env_factory)
+    else:
+        raise ValueError(f"unsupported training algorithm: {config.train.algorithm!r}")
     csv_logger = CSVLogger(save_dir=str(paths.logs), name="lightning")
     tensorboard_logger = TensorBoardLogger(save_dir=str(paths.logs), name="tensorboard")
     trainer = Trainer(
@@ -67,6 +74,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     metrics.update(reward_summary)
     metrics_payload = {
         "command": "train",
+        "algorithm": algorithm,
         **action_summary,
         **reward_summary,
         "lightning": {
@@ -79,6 +87,17 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         },
         **module.metrics_payload(include_active=True),
     }
+    if algorithm == "ppo":
+        metrics_payload["ppo"] = {
+            "policy_loss": metrics.get("ppo_policy_loss"),
+            "value_loss": metrics.get("ppo_value_loss"),
+            "entropy": metrics.get("ppo_entropy"),
+            "approximate_kl": metrics.get("ppo_approximate_kl"),
+            "clip_fraction": metrics.get("ppo_clip_fraction"),
+            "rollout_steps": config.ppo.rollout_steps,
+            "minibatch_size": config.ppo.minibatch_size,
+            "epochs": config.ppo.epochs,
+        }
     metrics["metrics_payload"] = metrics_payload
     write_train_metrics(paths.train_metrics, metrics)
     write_json(paths.train_metrics_json, metrics_payload)
@@ -86,6 +105,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         json.dumps(
             {
                 "command": "train",
+                "algorithm": algorithm,
                 **action_summary,
                 **reward_summary,
                 "checkpoint": str(paths.checkpoint),
@@ -105,11 +125,20 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     return 0
 
 
+def _normalized_algorithm(config: MarioRLConfig) -> str:
+    value = str(getattr(config.train, "algorithm", "dqn")).strip().lower()
+    if value in {"dqn", "deep_q", "deep_q_network"}:
+        return "dqn"
+    if value in {"ppo", "actor_critic", "recurrent_actor_critic"}:
+        return "ppo"
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse training config and execute the training command."""
     return cli(
         argv,
-        description="Train a Mario DQN experiment from a typed config.",
+        description="Train a Mario RL experiment from a typed config.",
         runner=run,
     )
 

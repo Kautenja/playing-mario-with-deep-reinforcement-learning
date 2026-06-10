@@ -104,3 +104,35 @@ def tiny_training_config(save_dir: str | Path) -> MarioRLConfig:
         ),
         eval=replace(config.eval, episodes=1, max_steps=4, checkpoint=None),
     )
+
+
+def tiny_ppo_config(save_dir: str | Path) -> MarioRLConfig:
+    """Return a fast CPU config that exercises recurrent PPO without ROMs."""
+    config = tiny_training_config(save_dir)
+    return replace(
+        config,
+        experiment_name="fake_ppo_lightning",
+        model=replace(
+            config.model,
+            architecture="recurrent_actor_critic",
+            hidden_size=64,
+            recurrent_hidden_size=32,
+            task_conditioning=True,
+            task_feature_size=0,
+            num_actions=7,
+        ),
+        ppo=replace(
+            config.ppo,
+            rollout_steps=4,
+            minibatch_size=2,
+            epochs=1,
+            max_grad_norm=0.5,
+        ),
+        train=replace(
+            config.train,
+            algorithm="ppo",
+            max_frames=8,
+            max_steps=2,
+            checkpoint_name="fake-ppo.ckpt",
+        ),
+    )
