@@ -13,6 +13,7 @@ from lightning.pytorch import LightningModule
 from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder, TaskSuite
 from mario_rl.lightning.data import build_step_dataloader
+from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
 from mario_rl.rewards import RewardTransformer
@@ -51,6 +52,7 @@ class DQNLightningModule(LightningModule):
         )
         self.replay: UniformReplayBuffer = build_replay_buffer(self.config, seed=seed)
         self.reward_transformer = RewardTransformer(self.config.reward_transform)
+        self.metrics = MarioMetricsAccumulator(default_task_id=self.config.env.id)
         self.epsilon_schedule = LinearEpsilonSchedule(
             start=self.config.epsilon.start,
             final=self.config.epsilon.final,
@@ -131,6 +133,37 @@ class DQNLightningModule(LightningModule):
         )
         self.log("train/epsilon", epsilon, on_step=True, prog_bar=False)
         self.log("train/env_frames", float(self.env_frames), on_step=True, prog_bar=False)
+        mario_summary = self.metrics.global_summary(include_active=True)
+        self.log(
+            "train/clear_rate",
+            float(mario_summary.clear_rate or 0.0),
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/death_rate",
+            float(mario_summary.death_rate or 0.0),
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/truncation_count",
+            float(mario_summary.truncation_count),
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/max_progress",
+            float(mario_summary.max_progress or 0.0),
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/final_progress_mean",
+            float(mario_summary.final_progress_mean or 0.0),
+            on_step=True,
+            prog_bar=False,
+        )
         if lr is not None:
             self.log("train/learning_rate", lr, on_step=True, prog_bar=False)
 
@@ -189,8 +222,10 @@ class DQNLightningModule(LightningModule):
             self._active_task_env_id = None
             self._last_state = None
 
-    def metrics_summary(self) -> dict[str, float | int]:
+    def metrics_summary(self) -> dict[str, Any]:
         """Return stable final metrics for command-level artifact writing."""
+        metrics_payload = self.metrics_payload(include_active=True)
+        global_metrics = metrics_payload["global"]
         return {
             "global_step": int(self.global_step),
             "env_frames": int(self.env_frames),
@@ -203,7 +238,30 @@ class DQNLightningModule(LightningModule):
             "epsilon": float(self.epsilon_schedule.value()),
             "loss": float(self.last_loss),
             "learning_rate": float(self.config.model.learning_rate),
+            "metric_episode_count": int(global_metrics["episode_count"]),
+            "metric_completed_episode_count": int(
+                global_metrics["completed_episode_count"]
+            ),
+            "metric_step_count": int(global_metrics["step_count"]),
+            "metric_frame_count": int(global_metrics["frame_count"]),
+            "episode_return_total": float(global_metrics["episode_return_total"]),
+            "transformed_return_total": float(
+                global_metrics["transformed_return_total"]
+            ),
+            "clear_count": int(global_metrics["clear_count"]),
+            "clear_rate": float(global_metrics["clear_rate"] or 0.0),
+            "death_count": int(global_metrics["death_count"]),
+            "death_rate": float(global_metrics["death_rate"] or 0.0),
+            "timeout_count": int(global_metrics["timeout_count"]),
+            "truncation_count": int(global_metrics["truncation_count"]),
+            "max_progress": float(global_metrics["max_progress"] or 0.0),
+            "final_progress_mean": float(global_metrics["final_progress_mean"] or 0.0),
+            "metrics_payload": metrics_payload,
         }
+
+    def metrics_payload(self, *, include_active: bool = False) -> dict[str, Any]:
+        """Return the structured Mario metrics payload for artifacts."""
+        return self.metrics.to_payload(include_active=include_active)
 
     def _ensure_env(self) -> None:
         if self.env is not None and self._last_state is not None:
@@ -228,7 +286,11 @@ class DQNLightningModule(LightningModule):
             self._active_task_env_id = env_id
             self._set_task_features_for_env_id(env_id)
         assert self.env is not None
-        state, _ = self.env.reset(seed=self.config.env.seed)
+        state, reset_info = self.env.reset(seed=self.config.env.seed)
+        self.metrics.start_episode(
+            reset_info if isinstance(reset_info, dict) else None,
+            fallback_env_id=env_id,
+        )
         self._last_state = self._coerce_state(state)
         self.episode_reward = 0.0
         self.episode_env_reward = 0.0
@@ -283,7 +345,17 @@ class DQNLightningModule(LightningModule):
             next_task_features=self._task_features,
         )
 
+        info_map = info if isinstance(info, dict) else None
         frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
+        self.metrics.observe_step(
+            reward=float(reward),
+            transformed=transformed,
+            terminated=bool(terminated),
+            truncated=bool(truncated),
+            info=info_map,
+            fallback_env_id=self._active_task_env_id,
+            frame_count=max(frames, 1),
+        )
         self.env_frames += max(frames, 1)
         self.epsilon_schedule.current_step = self.env_frames
         self.episode_reward += transformed.training_reward
@@ -295,6 +367,10 @@ class DQNLightningModule(LightningModule):
             self.episode_clipped_reward += transformed.clipped_reward
 
         if terminated or truncated:
+            self.metrics.finish_episode(
+                terminated=bool(terminated),
+                truncated=bool(truncated),
+            )
             self.episodes += 1
             self._reset_active_episode()
         else:

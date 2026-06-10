@@ -32,10 +32,18 @@ class TrainCliTest(TestCase):
             self.assertEqual(config.train.max_steps, payload["env_frames"])
             self.assertTrue(Path(payload["checkpoint"]).is_file())
             self.assertTrue(Path(payload["metrics"]).is_file())
+            self.assertTrue(Path(payload["metrics_json"]).is_file())
             with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
                 metrics = list(csv.DictReader(stream))[-1]
             self.assertEqual("simple", metrics["action_set"])
             self.assertEqual("7", metrics["action_count"])
+            self.assertIn("metric_episode_count", metrics)
+            self.assertIn("clear_rate", metrics)
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            self.assertEqual("train", structured_metrics["command"])
+            self.assertIn("global", structured_metrics)
+            self.assertIn("by_task", structured_metrics)
+            self.assertGreaterEqual(structured_metrics["global"]["step_count"], 1)
             self.assertTrue(Path(payload["resolved_config"]).is_file())
             tensorboard_dir = Path(payload["tensorboard"])
             self.assertTrue(tensorboard_dir.is_dir())

@@ -148,6 +148,28 @@ Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
 Training shows Lightning progress by default. Pass
 `--trainer.enable_progress_bar false` for quiet/headless runs.
 
+## Task Metrics Artifacts
+
+Training writes the existing one-row `train-metrics.csv` summary plus a
+structured `train-metrics.json` artifact. Evaluation/play writes
+`eval-metrics.json` using the same accumulator. The JSON payloads include a
+`global` summary, `by_game_family` summaries, `by_task` summaries, per-episode
+records, and missing-info counters for optional fields that were absent from
+Gymnasium `info`.
+
+Emitted task fields are `task_id`, `game_family`, `world`, and `stage`.
+Episode records include `episode_return`, `transformed_return`, `raw_return`,
+`unclipped_return`, `clipped_return`, `clear`, `death`, `timeout`,
+`terminated`, `truncated`, `max_progress`, `final_progress`, and
+`reward_component_sums`. Aggregate records include episode/step/frame counts,
+return totals and means, clear/death/timeout/truncation counts and rates, max
+and final-progress summaries, reward component sums, and
+`missing_info_counts`.
+
+Lightning logs the key scalar metrics with stable `train/*` names, including
+`train/clear_rate`, `train/death_rate`, `train/truncation_count`,
+`train/max_progress`, and `train/final_progress_mean`.
+
 ## Reward Transforms
 
 `gym-super-mario-bros` 9.x exposes shaped per-step reward diagnostics in

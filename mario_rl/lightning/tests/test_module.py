@@ -58,6 +58,13 @@ class LightningModuleTest(TestCase):
             self.assertGreaterEqual(module.training_updates, 1)
             self.assertTrue(math.isfinite(module.last_loss))
             self.assertGreaterEqual(len(module.replay), config.replay.warmup)
+            self.assertIn("train/clear_rate", trainer.callback_metrics)
+            self.assertIn("train/death_rate", trainer.callback_metrics)
+            self.assertIn("train/max_progress", trainer.callback_metrics)
+            self.assertGreaterEqual(
+                module.metrics.global_summary(include_active=True).step_count,
+                1,
+            )
 
     def test_component_reward_transform_trains_with_fake_reward_components(self):
         with TemporaryDirectory() as tmpdir:
