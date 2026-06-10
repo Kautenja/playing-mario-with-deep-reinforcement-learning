@@ -82,11 +82,12 @@ always explicit.
 
 The active training path uses PyTorch Lightning, native PyTorch DQN modules,
 uniform replay, and the packaged config tree. Smoke runs write a resolved
-config, Lightning CSV logs, train metrics, and a checkpoint under
+config, Lightning CSV and TensorBoard logs, train metrics, and a checkpoint under
 `runs/<experiment_name>/`.
 
 ```shell
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+tensorboard --logdir runs/smb_dqn_fast_dev/logs/tensorboard
 ./main.sh play --config smb_dqn_fast_dev --eval.episodes 1 --eval.max_steps 32
 ```
 

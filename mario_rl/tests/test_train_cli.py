@@ -29,4 +29,10 @@ class TrainCliTest(TestCase):
             self.assertTrue(Path(payload["checkpoint"]).is_file())
             self.assertTrue(Path(payload["metrics"]).is_file())
             self.assertTrue(Path(payload["resolved_config"]).is_file())
+            tensorboard_dir = Path(payload["tensorboard"])
+            self.assertTrue(tensorboard_dir.is_dir())
+            self.assertTrue(
+                list(tensorboard_dir.glob("events.out.tfevents.*")),
+                list(tensorboard_dir.iterdir()),
+            )
             self.assertIn("fake_lightning", Path(payload["resolved_config"]).read_text())
