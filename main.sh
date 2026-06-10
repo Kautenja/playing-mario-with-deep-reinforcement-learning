@@ -1,34 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${PYTHON:-}" ]]; then
+    python_bin="$PYTHON"
+elif [[ -x ".venv/bin/python" ]]; then
+    python_bin=".venv/bin/python"
+else
+    python_bin="python3"
+fi
+
 command="${1:-}"
 
 case "$command" in
     unittest)
         shift
-        python3 -m unittest discover . "$@"
+        "$python_bin" -m unittest discover . "$@"
         ;;
     config)
         shift
-        python3 -m mario_rl.config "$@"
+        "$python_bin" -m mario_rl.config "$@"
         ;;
     train)
         shift
-        python3 -m mario_rl.train "$@"
+        "$python_bin" -m mario_rl.train "$@"
         ;;
     play)
         shift
-        python3 -m mario_rl.play "$@"
+        "$python_bin" -m mario_rl.play "$@"
         ;;
     random)
         shift
-        python3 -m mario_rl.random "$@"
+        "$python_bin" -m mario_rl.random "$@"
+        ;;
+    verify-macbook)
+        shift
+        "$python_bin" -m mario_rl.verify_macbook "$@"
         ;;
     help|--help|-h)
-        python3 -m mario_rl
+        "$python_bin" -m mario_rl
         ;;
     "")
-        python3 -m mario_rl
+        "$python_bin" -m mario_rl
         ;;
     *)
         echo "unknown command: $command" >&2
