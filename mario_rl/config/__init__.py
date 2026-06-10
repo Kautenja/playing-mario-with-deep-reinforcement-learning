@@ -102,6 +102,8 @@ class ModelConfig:
     target_update_frequency: int = 10_000
     compile: bool = False
     num_actions: int = 7
+    task_conditioning: bool = False
+    task_feature_size: int = 0
 
 
 @dataclass(frozen=True)

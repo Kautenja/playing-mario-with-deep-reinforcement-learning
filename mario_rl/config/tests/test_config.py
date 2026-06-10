@@ -73,6 +73,8 @@ class ConfigSchemaTest(TestCase):
             "double_dqn",
             "target_update_frequency",
             "compile",
+            "task_conditioning",
+            "task_feature_size",
         ):
             self.assertIn(name, model_fields)
 
@@ -95,6 +97,7 @@ class ConfigSchemaTest(TestCase):
 
         self.assertIn("smb_dqn_fast_dev", names)
         self.assertIn("smb_dqn_macbook_gate", names)
+        self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
 
@@ -107,6 +110,10 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
+
+        conditioned = load("smb_dqn_task_conditioned_fast_dev")
+        self.assertTrue(conditioned.model.task_conditioning)
+        self.assertEqual(0, conditioned.model.task_feature_size)
 
         from_path = load(path)
         self.assertEqual(config, from_path)

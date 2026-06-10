@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from mario_rl.config import MarioRLConfig
+from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.lightning.artifacts import checkpoint_path, experiment_paths, write_json
 from mario_rl.lightning.module import DQNLightningModule
 from mario_rl.schedules import EpsilonGreedyActionSelector
@@ -52,6 +53,16 @@ def evaluate_checkpoint(
         num_actions=config.model.num_actions,
         seed=config.trainer.seed if config.trainer.seed is not None else config.env.seed,
     )
+    task_features = None
+    task_feature_size = int(getattr(module.q_network, "task_feature_size", 0))
+    if task_feature_size > 0:
+        encoder = TaskFeatureEncoder()
+        if encoder.feature_size != task_feature_size:
+            raise ValueError(
+                "checkpoint task feature size "
+                f"{task_feature_size} does not match encoder size {encoder.feature_size}"
+            )
+        task_features = encoder.encode_env_id(config.env.id).to_tensor().unsqueeze(0)
     episode_metrics = []
     env = env_factory(config)
     try:
@@ -64,7 +75,10 @@ def evaluate_checkpoint(
             while steps < int(config.eval.max_steps):
                 state_array = np.asarray(state, dtype=np.dtype(config.replay.sample_dtype))
                 with torch.no_grad():
-                    q_values = module.q_network(torch.as_tensor(state_array).unsqueeze(0))
+                    q_values = module.q_network(
+                        torch.as_tensor(state_array).unsqueeze(0),
+                        task_features,
+                    )
                 action = selector.select(
                     q_values.squeeze(0).cpu(),
                     epsilon=0.0,

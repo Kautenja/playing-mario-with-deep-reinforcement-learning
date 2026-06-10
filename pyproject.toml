@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "gymnasium>=1.3.0,<2.0.0",
-    "gym-super-mario-bros>=9.0.0,<10.0.0",
+    "gym-super-mario-bros>=9.1.0,<10.0.0",
     "nes-py>=9.0.0,<10.0.0",
     "torch>=2.12.0",
     "lightning>=2.6.5",

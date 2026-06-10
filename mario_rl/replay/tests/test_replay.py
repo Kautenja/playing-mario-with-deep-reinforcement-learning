@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from mario_rl.config import MarioRLConfig
+from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
 
 
@@ -56,6 +57,34 @@ class ReplayBufferTest(TestCase):
         self.assertEqual(torch.bool, batch.terminated.dtype)
         self.assertEqual(torch.bool, batch.truncated.dtype)
 
+    def test_task_features_survive_push_sample_and_to_torch(self):
+        encoder = TaskFeatureEncoder()
+        features = encoder.encode_env_id("SuperMarioBros-1-1-v0").vector
+        replay = UniformReplayBuffer(
+            capacity=2,
+            state_shape=(4, 8, 8),
+            task_feature_shape=(encoder.feature_size,),
+            seed=123,
+        )
+
+        replay.push(
+            self._state(1),
+            2,
+            1.5,
+            False,
+            True,
+            self._state(2),
+            task_features=features,
+            next_task_features=features,
+        )
+        batch = replay.sample(1)
+        torch_batch = batch.to_torch(device=torch.device("cpu"))
+
+        self.assertEqual((1, encoder.feature_size), batch.task_features.shape)
+        self.assertTrue(np.array_equal(features, batch.task_features[0]))
+        self.assertEqual(torch.float32, torch_batch.task_features.dtype)
+        self.assertEqual((1, encoder.feature_size), tuple(torch_batch.task_features.shape))
+
     def test_empty_sample_is_rejected(self):
         replay = UniformReplayBuffer(capacity=2, state_shape=(4, 8, 8), seed=123)
 
@@ -73,3 +102,13 @@ class ReplayBufferTest(TestCase):
         prioritized = replace(config, replay=replace(config.replay, prioritized=True))
         with self.assertRaises(NotImplementedError):
             build_replay_buffer(prioritized)
+
+        conditioned = replace(
+            config,
+            model=replace(config.model, task_conditioning=True, task_feature_size=0),
+        )
+        conditioned_replay = build_replay_buffer(conditioned, seed=123)
+        self.assertEqual(
+            (TaskFeatureEncoder().feature_size,),
+            conditioned_replay.task_feature_shape,
+        )

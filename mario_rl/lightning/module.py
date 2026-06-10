@@ -10,6 +10,7 @@ import torch
 from lightning.pytorch import LightningModule
 
 from mario_rl.config import MarioRLConfig, to_dict
+from mario_rl.envs import TaskFeatureEncoder
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
@@ -52,6 +53,9 @@ class DQNLightningModule(LightningModule):
             num_actions=config.model.num_actions,
             seed=seed,
         )
+        self.task_encoder = None
+        self._task_features: np.ndarray | None = None
+        self._configure_task_features()
 
         self.env = None
         self._last_state: np.ndarray | None = None
@@ -162,7 +166,10 @@ class DQNLightningModule(LightningModule):
             device=self.device,
         ).unsqueeze(0)
         with torch.no_grad():
-            q_values = self.q_network(state_tensor).squeeze(0).detach().cpu()
+            q_values = self.q_network(
+                state_tensor,
+                self._task_feature_tensor(batch_size=1),
+            ).squeeze(0).detach().cpu()
         action = self.action_selector.select(q_values, epsilon=epsilon)
 
         next_state, reward, terminated, truncated, info = self.env.step(action)
@@ -174,6 +181,8 @@ class DQNLightningModule(LightningModule):
             bool(terminated),
             bool(truncated),
             next_state,
+            task_features=self._task_features,
+            next_task_features=self._task_features,
         )
 
         frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
@@ -200,12 +209,12 @@ class DQNLightningModule(LightningModule):
             as_tensors=True,
         )
         optimizer = self.optimizers()
-        q_values = self.q_network(batch.state)
+        q_values = self.q_network(batch.state, batch.task_features)
         with torch.no_grad():
-            target_next_q = self.target_q_network(batch.next_state)
+            target_next_q = self.target_q_network(batch.next_state, batch.next_task_features)
             online_next_q = None
             if self.config.model.double_dqn:
-                online_next_q = self.q_network(batch.next_state)
+                online_next_q = self.q_network(batch.next_state, batch.next_task_features)
             targets = compute_td_targets(
                 batch.reward,
                 batch.terminated,
@@ -224,6 +233,30 @@ class DQNLightningModule(LightningModule):
         if self.training_updates % int(self.config.model.target_update_frequency) == 0:
             self.target_q_network.load_state_dict(self.q_network.state_dict())
         return loss
+
+    def _configure_task_features(self) -> None:
+        feature_size = int(getattr(self.q_network, "task_feature_size", 0))
+        if feature_size <= 0:
+            return
+        self.task_encoder = TaskFeatureEncoder()
+        if self.task_encoder.feature_size != feature_size:
+            raise ValueError(
+                "configured task feature size "
+                f"{feature_size} does not match encoder size {self.task_encoder.feature_size}"
+            )
+        self._task_features = self.task_encoder.encode_env_id(self.config.env.id).vector
+
+    def _task_feature_tensor(self, *, batch_size: int) -> torch.Tensor | None:
+        if self._task_features is None:
+            return None
+        tensor = torch.as_tensor(
+            self._task_features,
+            dtype=torch.float32,
+            device=self.device,
+        ).unsqueeze(0)
+        if batch_size != 1:
+            tensor = tensor.expand(batch_size, -1)
+        return tensor
 
     def _coerce_state(self, state) -> np.ndarray:
         array = np.asarray(state, dtype=np.dtype(self.config.replay.sample_dtype))

@@ -4,10 +4,17 @@ from .config import MarioEnvConfig
 from .factory import make_env
 from .tasks import (
     MarioTask,
+    TaskFeatureEncoder,
+    TaskFeatures,
+    UNKNOWN_TASK_VALUE,
     available_env_ids,
     available_tasks,
     choose_stage_env_id,
+    encode_task_features,
+    smb3_stage_matrix,
+    task_feature_size,
     task_for_env_id,
+    task_for_env_id_or_none,
 )
 from .wrappers import (
     ClipRewardEnv,
@@ -29,10 +36,17 @@ __all__ = [
     "MarioTask",
     "MaxFrameskipEnv",
     "OpenCVRecordVideoEnv",
+    "TaskFeatureEncoder",
+    "TaskFeatures",
+    "UNKNOWN_TASK_VALUE",
     "available_env_ids",
     "available_tasks",
     "choose_stage_env_id",
+    "encode_task_features",
     "get_action_set",
     "make_env",
+    "smb3_stage_matrix",
+    "task_feature_size",
     "task_for_env_id",
+    "task_for_env_id_or_none",
 ]
