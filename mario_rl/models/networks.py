@@ -1,13 +1,14 @@
 """PyTorch model definitions and factories."""
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 import torch
 from torch import nn
 
+from mario_rl.auxiliary import auxiliary_output_sizes
 from mario_rl.config import AUTO_NUM_ACTIONS, resolve_model_num_actions
 
 
@@ -21,6 +22,7 @@ class ActorCriticOutput:
     policy_logits: torch.Tensor
     value: torch.Tensor
     hidden_state: torch.Tensor
+    auxiliary: dict[str, torch.Tensor] = field(default_factory=dict)
 
 
 def normalize_observation(observation: torch.Tensor, scale: float = 255.0) -> torch.Tensor:
@@ -154,6 +156,8 @@ class RecurrentActorCritic(nn.Module):
         recurrent_hidden_size: int = 256,
         task_feature_size: int = 0,
         task_embedding_size: int = 32,
+        auxiliary_outputs: Mapping[str, int] | None = None,
+        auxiliary_hidden_size: int = 64,
         normalize_input: bool = True,
         input_scale: float = 255.0,
     ) -> None:
@@ -164,6 +168,13 @@ class RecurrentActorCritic(nn.Module):
         self.task_feature_size = int(task_feature_size)
         self.task_embedding_size = int(task_embedding_size)
         self.recurrent_hidden_size = int(recurrent_hidden_size)
+        self.auxiliary_outputs = {
+            str(name): int(width) for name, width in dict(auxiliary_outputs or {}).items()
+        }
+        self._auxiliary_head_keys = {
+            name: f"auxiliary__{name}" for name in self.auxiliary_outputs
+        }
+        self.auxiliary_hidden_size = int(auxiliary_hidden_size)
         self.normalize_input = bool(normalize_input)
         self.input_scale = float(input_scale)
 
@@ -186,6 +197,16 @@ class RecurrentActorCritic(nn.Module):
         self.memory = nn.GRU(int(hidden_size), self.recurrent_hidden_size)
         self.policy_head = nn.Linear(self.recurrent_hidden_size, self.num_actions)
         self.value_head = nn.Linear(self.recurrent_hidden_size, 1)
+        self.auxiliary_heads = nn.ModuleDict(
+            {
+                self._auxiliary_head_keys[name]: nn.Sequential(
+                    nn.Linear(self.recurrent_hidden_size, self.auxiliary_hidden_size),
+                    nn.ReLU(),
+                    nn.Linear(self.auxiliary_hidden_size, output_size),
+                )
+                for name, output_size in self.auxiliary_outputs.items()
+            }
+        )
 
     def initial_state(
         self,
@@ -230,13 +251,19 @@ class RecurrentActorCritic(nn.Module):
         memory_output, next_hidden = self.memory(projected, hidden_state)
         logits = self.policy_head(memory_output)
         value = self.value_head(memory_output).squeeze(-1)
+        auxiliary = self._auxiliary_outputs(memory_output)
         if single_step:
             logits = logits.squeeze(0)
             value = value.squeeze(0)
+            auxiliary = {
+                name: prediction.squeeze(0)
+                for name, prediction in auxiliary.items()
+            }
         return ActorCriticOutput(
             policy_logits=logits,
             value=value,
             hidden_state=next_hidden,
+            auxiliary=auxiliary,
         )
 
     def reset_recurrent_state(
@@ -284,6 +311,25 @@ class RecurrentActorCritic(nn.Module):
             device=device,
         )
         return self.task_embedding(task_tensor.reshape(steps * batch_size, -1))
+
+    def _auxiliary_outputs(
+        self,
+        memory_output: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        if not self.auxiliary_heads:
+            return {}
+        steps, batch_size = memory_output.shape[:2]
+        flat_memory = memory_output.reshape(steps * batch_size, -1)
+        outputs = {}
+        for name, output_size in self.auxiliary_outputs.items():
+            head = self.auxiliary_heads[self._auxiliary_head_keys[name]]
+            prediction = head(flat_memory)
+            output_size = int(output_size)
+            prediction = prediction.reshape(steps, batch_size, output_size)
+            if output_size == 1:
+                prediction = prediction.squeeze(-1)
+            outputs[name] = prediction
+        return outputs
 
 
 def reset_recurrent_state(
@@ -336,6 +382,9 @@ def build_model(
     )
     recurrent_hidden_size = int(getattr(model_config, "recurrent_hidden_size", 256))
     task_embedding_size = int(getattr(model_config, "task_embedding_size", 32))
+    auxiliary_config = getattr(config, "auxiliary", None)
+    auxiliary_outputs = auxiliary_output_sizes(auxiliary_config) if auxiliary_config else {}
+    auxiliary_hidden_size = int(getattr(auxiliary_config, "head_hidden_size", 64))
     kwargs = {
         "input_channels": input_channels,
         "num_actions": num_actions,
@@ -358,6 +407,8 @@ def build_model(
             **kwargs,
             recurrent_hidden_size=recurrent_hidden_size,
             task_embedding_size=task_embedding_size,
+            auxiliary_outputs=auxiliary_outputs,
+            auxiliary_hidden_size=auxiliary_hidden_size,
         )
     raise ValueError(f"unsupported model architecture: {architecture!r}")
 

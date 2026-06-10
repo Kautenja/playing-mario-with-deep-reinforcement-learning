@@ -140,6 +140,29 @@ resolved config, checkpoint, TensorBoard logs, `train-metrics.csv`, and
 structured `train-metrics.json` artifacts. Use this path as the starting point
 for multi-game task suites and native NES action-space experiments.
 
+## Auxiliary Losses
+
+Auxiliary losses are optional supervised heads on the recurrent actor-critic
+GRU state. They are disabled by default and should be enabled only when the
+environment `info` stream provides the corresponding labels. The supported
+targets are `progress_delta`, `progress_normalized`, `clear`, `death`,
+`transformed_reward`, `reward_total_unclipped`, `reward_total_clipped`, and
+`game_family`. Missing labels are masked per target, so unavailable fields do
+not contribute to the loss.
+
+Use the packaged smoke config to verify the path:
+
+```shell
+./main.sh train --config smb_ppo_auxiliary_fast_dev --trainer.enable_progress_bar false
+```
+
+Per-target weights live under `auxiliary.weights`; omitted enabled targets use
+weight `1.0`. Training logs `train/auxiliary_loss`,
+`train/auxiliary_<target>_loss`, and `train/auxiliary_<target>_valid`. A low
+valid count means the environment did not provide enough labels for that head,
+not that the prediction is good. Keep weights small at first because the
+auxiliary total is added directly to the PPO policy/value objective.
+
 ## Lightning DQN Smoke Training
 
 DQN remains available as a compact off-policy baseline using PyTorch Lightning,

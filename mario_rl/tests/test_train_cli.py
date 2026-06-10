@@ -5,10 +5,12 @@ import io
 import csv
 import json
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.tests.fakes import fake_env_factory, tiny_ppo_config, tiny_training_config
 from mario_rl.train import run
 
@@ -56,6 +58,15 @@ class TrainCliTest(TestCase):
     def test_train_run_selects_ppo_and_writes_smoke_artifacts(self):
         with TemporaryDirectory() as tmpdir:
             config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                auxiliary=AuxiliaryLossConfig(
+                    enabled=True,
+                    targets=("progress_delta", "clear", "game_family"),
+                    weights={"game_family": 0.5},
+                    head_hidden_size=16,
+                ),
+            )
             output = io.StringIO()
             with redirect_stdout(output):
                 self.assertEqual(0, run(config, env_factory=fake_env_factory))
@@ -66,7 +77,16 @@ class TrainCliTest(TestCase):
             self.assertEqual(config.train.max_steps * config.ppo.rollout_steps, payload["env_frames"])
             self.assertTrue(Path(payload["checkpoint"]).is_file())
             self.assertTrue(Path(payload["metrics_json"]).is_file())
+            with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
+                metrics = list(csv.DictReader(stream))[-1]
+            self.assertIn("ppo_policy_loss", metrics)
+            self.assertIn("auxiliary_loss", metrics)
+            self.assertIn("game_family", metrics["auxiliary_losses_json"])
             structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
             self.assertEqual("ppo", structured_metrics["algorithm"])
+            self.assertIn("ppo", structured_metrics)
+            self.assertIn("auxiliary", structured_metrics)
+            self.assertTrue(structured_metrics["auxiliary"]["enabled"])
+            self.assertIn("game_family", structured_metrics["auxiliary"]["losses"])
             self.assertIn("global", structured_metrics)
             self.assertIn("fake_ppo_lightning", Path(payload["resolved_config"]).read_text())

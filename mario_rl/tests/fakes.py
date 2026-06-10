@@ -21,8 +21,16 @@ class FakeMarioEnv(gym.Env):
         dtype=np.uint8,
     )
 
-    def __init__(self, episode_length: int = 4) -> None:
+    def __init__(
+        self,
+        episode_length: int = 4,
+        *,
+        env_id: str = "FakeMario-v0",
+        game_family: str = "unknown",
+    ) -> None:
         self.episode_length = int(episode_length)
+        self.env_id = str(env_id)
+        self.game_family = str(game_family)
         self.step_count = 0
 
     def reset(self, *, seed=None, options=None):
@@ -30,7 +38,13 @@ class FakeMarioEnv(gym.Env):
         self.action_space.seed(seed)
         self.observation_space.seed(seed)
         self.step_count = 0
-        return self._obs(0), {"seed": seed, "options": options}
+        return self._obs(0), {
+            "env_id": self.env_id,
+            "game_family": self.game_family,
+            "seed": seed,
+            "task_id": self.env_id,
+            "options": options,
+        }
 
     def step(self, action):
         self.step_count += 1
@@ -38,6 +52,7 @@ class FakeMarioEnv(gym.Env):
         terminated = self.step_count >= self.episode_length
         truncated = False
         clipped_reward = max(-15.0, min(15.0, reward))
+        progress = float(self.step_count)
         return (
             self._obs(self.step_count),
             reward,
@@ -46,6 +61,13 @@ class FakeMarioEnv(gym.Env):
             {
                 "frames_skipped": 1,
                 "fake_step": self.step_count,
+                "clear": bool(terminated),
+                "death": False,
+                "env_id": self.env_id,
+                "game_family": self.game_family,
+                "progress": progress,
+                "progress_max": max(progress, 1.0),
+                "task_id": self.env_id,
                 "reward_components": {
                     "progress": reward,
                     "death": 0.0,
@@ -61,7 +83,22 @@ class FakeMarioEnv(gym.Env):
 
 def fake_env_factory(_config: MarioRLConfig) -> FakeMarioEnv:
     """Create the fake env used by training and evaluation tests."""
-    return FakeMarioEnv()
+    return FakeMarioEnv(
+        env_id=_config.env.id,
+        game_family=_fake_game_family(_config.env.id),
+    )
+
+
+def _fake_game_family(env_id: str) -> str:
+    if "Bros3" in env_id:
+        return "smb3"
+    if "Bros2" in env_id:
+        return "smb2_usa"
+    if "LostLevels" in env_id:
+        return "lost_levels"
+    if "SuperMarioBros" in env_id:
+        return "smb1"
+    return "unknown"
 
 
 def tiny_training_config(save_dir: str | Path) -> MarioRLConfig:

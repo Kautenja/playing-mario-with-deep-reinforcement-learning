@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from lightning.pytorch import LightningModule, Trainer
 
+from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
@@ -285,6 +286,51 @@ class PPOLightningModuleTest(TestCase):
             self.assertTrue(rollout.terminated[-1, 0])
             self.assertIsNotNone(module._hidden_state)
             self.assertTrue(torch.equal(module._hidden_state, torch.zeros_like(module._hidden_state)))
+
+    def test_fake_env_ppo_run_trains_with_auxiliary_losses(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                auxiliary=AuxiliaryLossConfig(
+                    enabled=True,
+                    targets=(
+                        "progress_delta",
+                        "clear",
+                        "death",
+                        "transformed_reward",
+                        "game_family",
+                    ),
+                    weights={
+                        "progress_delta": 0.1,
+                        "clear": 0.25,
+                        "death": 0.25,
+                        "transformed_reward": 0.1,
+                        "game_family": 0.5,
+                    },
+                    head_hidden_size=16,
+                ),
+            )
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            self.assertGreaterEqual(module.training_updates, 1)
+            self.assertTrue(math.isfinite(module.last_auxiliary_loss))
+            self.assertGreater(module.last_auxiliary_valid_counts["progress_delta"], 0)
+            self.assertGreater(module.last_auxiliary_valid_counts["game_family"], 0)
+            self.assertIn("train/auxiliary_loss", trainer.callback_metrics)
+            self.assertIn("train/auxiliary_game_family_loss", trainer.callback_metrics)
 
 
 class LightningDeviceSelectionTest(TestCase):

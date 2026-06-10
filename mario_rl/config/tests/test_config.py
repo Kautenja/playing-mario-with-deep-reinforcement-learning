@@ -9,6 +9,7 @@ from unittest import TestCase
 
 from mario_rl.config import (
     AUTO_NUM_ACTIONS,
+    AuxiliaryLossConfig,
     EnvConfig,
     EvalConfig,
     EvaluationMatrixConfig,
@@ -39,6 +40,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIsInstance(config.trainer, TrainerConfig)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIsInstance(config.reward_transform, RewardTransformConfig)
+        self.assertIsInstance(config.auxiliary, AuxiliaryLossConfig)
         self.assertIsInstance(config.evaluation_matrix, EvaluationMatrixConfig)
         self.assertIsInstance(config.ppo, PPOConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
@@ -79,9 +81,13 @@ class ConfigSchemaTest(TestCase):
             "mode",
             "missing_total_policy",
             "component_weights",
-            "missing_component_policy",
+                "missing_component_policy",
         ):
             self.assertIn(name, reward_transform_fields)
+
+        auxiliary_fields = AuxiliaryLossConfig.__dataclass_fields__
+        for name in ("enabled", "targets", "weights", "head_hidden_size"):
+            self.assertIn(name, auxiliary_fields)
 
         model_fields = ModelConfig.__dataclass_fields__
         for name in (
@@ -174,6 +180,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
         self.assertIn("smb_dqn_task_suite_fast_dev", names)
         self.assertIn("smb_dqn_eval_matrix_fast_dev", names)
+        self.assertIn("smb_ppo_auxiliary_fast_dev", names)
         self.assertIn("smb_ppo_fast_dev", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
@@ -219,6 +226,20 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("recurrent_actor_critic", actor_critic.model.architecture)
         self.assertTrue(actor_critic.model.task_conditioning)
         self.assertEqual(8, actor_critic.ppo.rollout_steps)
+
+        auxiliary = load("smb_ppo_auxiliary_fast_dev")
+        self.assertTrue(auxiliary.auxiliary.enabled)
+        self.assertEqual(
+            (
+                "progress_delta",
+                "clear",
+                "death",
+                "transformed_reward",
+                "game_family",
+            ),
+            auxiliary.auxiliary.targets,
+        )
+        self.assertEqual(0.5, auxiliary.auxiliary.weights["game_family"])
 
         from_path = load(path)
         self.assertEqual(config, from_path)
@@ -295,6 +316,12 @@ class ConfigCliTest(TestCase):
                 "progress=1,death=-0.5",
                 "--reward_transform.missing_component_policy",
                 "error",
+                "--auxiliary.enabled",
+                "true",
+                "--auxiliary.targets",
+                "clear,death,game_family",
+                "--auxiliary.weights",
+                "clear=0.25,game_family=2",
                 "--train.algorithm",
                 "ppo",
                 "--ppo.rollout_steps",
@@ -316,6 +343,12 @@ class ConfigCliTest(TestCase):
             config.reward_transform.component_weights,
         )
         self.assertEqual("error", config.reward_transform.missing_component_policy)
+        self.assertTrue(config.auxiliary.enabled)
+        self.assertEqual(("clear", "death", "game_family"), config.auxiliary.targets)
+        self.assertEqual(
+            {"clear": 0.25, "game_family": 2.0},
+            config.auxiliary.weights,
+        )
         self.assertEqual("ppo", config.train.algorithm)
         self.assertEqual(4, config.ppo.rollout_steps)
 

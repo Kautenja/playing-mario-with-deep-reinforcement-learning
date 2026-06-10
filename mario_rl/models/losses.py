@@ -7,6 +7,8 @@ import torch
 from torch.distributions import Categorical
 from torch.nn import functional as F
 
+from mario_rl.auxiliary import auxiliary_target_kind
+
 
 @dataclass(frozen=True)
 class PPOLoss:
@@ -18,6 +20,16 @@ class PPOLoss:
     entropy: torch.Tensor
     approximate_kl: torch.Tensor
     clip_fraction: torch.Tensor
+
+
+@dataclass(frozen=True)
+class AuxiliaryLoss:
+    """Masked auxiliary loss terms for logging and PPO composition."""
+
+    total: torch.Tensor
+    terms: dict[str, torch.Tensor]
+    weighted_terms: dict[str, torch.Tensor]
+    valid_counts: dict[str, torch.Tensor]
 
 
 def gather_action_q_values(q_values: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -135,3 +147,88 @@ def compute_ppo_loss(
         approximate_kl=approximate_kl,
         clip_fraction=clip_fraction,
     )
+
+
+def compute_auxiliary_loss(
+    predictions: dict[str, torch.Tensor],
+    targets: dict[str, torch.Tensor] | None,
+    masks: dict[str, torch.Tensor] | None,
+    *,
+    weights: dict[str, float],
+) -> AuxiliaryLoss:
+    """Return weighted masked auxiliary losses for configured targets."""
+    terms: dict[str, torch.Tensor] = {}
+    weighted_terms: dict[str, torch.Tensor] = {}
+    valid_counts: dict[str, torch.Tensor] = {}
+    total: torch.Tensor | None = None
+
+    for name, weight in weights.items():
+        if name not in predictions:
+            raise KeyError(f"missing auxiliary prediction for {name!r}")
+        prediction = predictions[name]
+        target = (targets or {}).get(name)
+        mask = (masks or {}).get(name)
+        if target is None or mask is None:
+            term = prediction.sum() * 0.0
+            count = torch.zeros((), dtype=torch.float32, device=prediction.device)
+        else:
+            term, count = _masked_auxiliary_term(
+                name,
+                prediction,
+                target,
+                mask,
+            )
+        weighted = term * float(weight)
+        terms[name] = term
+        weighted_terms[name] = weighted
+        valid_counts[name] = count
+        total = weighted if total is None else total + weighted
+
+    if total is None:
+        device = _prediction_device(predictions)
+        total = torch.zeros((), dtype=torch.float32, device=device)
+    return AuxiliaryLoss(
+        total=total,
+        terms=terms,
+        weighted_terms=weighted_terms,
+        valid_counts=valid_counts,
+    )
+
+
+def _masked_auxiliary_term(
+    name: str,
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    mask: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    device = prediction.device
+    mask = mask.to(device=device, dtype=torch.bool).view(-1)
+    count = mask.to(dtype=torch.float32).sum()
+    if not bool(mask.any()):
+        return prediction.sum() * 0.0, count
+
+    kind = auxiliary_target_kind(name)
+    if kind == "classification":
+        logits = prediction.reshape(mask.shape[0], -1)
+        target_values = target.to(device=device, dtype=torch.long).view(-1)
+        return F.cross_entropy(logits[mask], target_values[mask]), count
+
+    target_values = target.to(device=device, dtype=torch.float32).view(-1)
+    predicted_values = prediction.to(dtype=torch.float32).view(-1)
+    if kind == "binary":
+        return (
+            F.binary_cross_entropy_with_logits(
+                predicted_values[mask],
+                target_values[mask],
+            ),
+            count,
+        )
+    if kind == "regression":
+        return F.smooth_l1_loss(predicted_values[mask], target_values[mask]), count
+    raise AssertionError(f"unhandled auxiliary target kind {kind!r}")
+
+
+def _prediction_device(predictions: dict[str, torch.Tensor]) -> torch.device:
+    for prediction in predictions.values():
+        return prediction.device
+    return torch.device("cpu")

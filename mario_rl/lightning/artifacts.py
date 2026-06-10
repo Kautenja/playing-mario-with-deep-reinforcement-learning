@@ -107,6 +107,14 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "episode_clipped_reward",
         "epsilon",
         "loss",
+        "ppo_policy_loss",
+        "ppo_value_loss",
+        "ppo_entropy",
+        "ppo_approximate_kl",
+        "ppo_clip_fraction",
+        "auxiliary_loss",
+        "auxiliary_losses_json",
+        "auxiliary_valid_counts_json",
         "learning_rate",
         "metric_episode_count",
         "metric_completed_episode_count",
@@ -133,6 +141,16 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "missing_info_counts_json",
     ]
     row = {**structured_fields, **metrics}
+    if isinstance(row.get("auxiliary_losses"), dict):
+        row["auxiliary_losses_json"] = json.dumps(
+            row["auxiliary_losses"],
+            sort_keys=True,
+        )
+    if isinstance(row.get("auxiliary_valid_counts"), dict):
+        row["auxiliary_valid_counts_json"] = json.dumps(
+            row["auxiliary_valid_counts"],
+            sort_keys=True,
+        )
     row = {name: _csv_value(row.get(name, "")) for name in fieldnames}
     with path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)

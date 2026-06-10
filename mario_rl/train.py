@@ -89,6 +89,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     }
     if algorithm == "ppo":
         metrics_payload["ppo"] = {
+            "total_loss": metrics.get("loss"),
             "policy_loss": metrics.get("ppo_policy_loss"),
             "value_loss": metrics.get("ppo_value_loss"),
             "entropy": metrics.get("ppo_entropy"),
@@ -97,6 +98,13 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
             "rollout_steps": config.ppo.rollout_steps,
             "minibatch_size": config.ppo.minibatch_size,
             "epochs": config.ppo.epochs,
+        }
+        metrics_payload["auxiliary"] = {
+            "enabled": bool(config.auxiliary.enabled),
+            "targets": list(config.auxiliary.targets),
+            "loss": metrics.get("auxiliary_loss", 0.0),
+            "losses": dict(metrics.get("auxiliary_losses", {})),
+            "valid_counts": dict(metrics.get("auxiliary_valid_counts", {})),
         }
     metrics["metrics_payload"] = metrics_payload
     write_train_metrics(paths.train_metrics, metrics)
