@@ -2,6 +2,13 @@
 from .actions import ACTION_SETS, get_action_set
 from .config import MarioEnvConfig
 from .factory import make_env
+from .tasks import (
+    MarioTask,
+    available_env_ids,
+    available_tasks,
+    choose_stage_env_id,
+    task_for_env_id,
+)
 from .wrappers import (
     ClipRewardEnv,
     DefaultSeedEnv,
@@ -19,8 +26,13 @@ __all__ = [
     "DownsampleObservationEnv",
     "FrameStackEnv",
     "MarioEnvConfig",
+    "MarioTask",
     "MaxFrameskipEnv",
     "OpenCVRecordVideoEnv",
+    "available_env_ids",
+    "available_tasks",
+    "choose_stage_env_id",
     "get_action_set",
     "make_env",
+    "task_for_env_id",
 ]

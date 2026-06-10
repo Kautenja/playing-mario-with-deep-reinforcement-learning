@@ -41,9 +41,9 @@ python -m pip check
 python -m unittest discover .
 ```
 
-At the last dependency refresh, PyPI exposed `gym-super-mario-bros` 7.4.0 and
-`nes-py` 8.2.1, while the umbrella checkout carried compatible 8.0.0 and 9.0.0
-development releases. The dependency ranges accept both paths.
+The runtime dependency set targets `gym-super-mario-bros` 9.x and `nes-py` 9.x.
+The umbrella checkout is the preferred development path because it keeps the
+native emulator and Mario wrapper pinned to matching local submodules.
 
 ## Tests
 
@@ -114,7 +114,7 @@ The Gymnasium environment surface lives under `mario_rl.envs`:
 ```python
 from mario_rl.envs import make_env
 
-env = make_env("SuperMarioBros1-1-v0", render_mode="rgb_array", seed=123)
+env = make_env("SuperMarioBros-1-1-v0", render_mode="rgb_array", seed=123)
 obs, info = env.reset(seed=123)
 obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 env.close()
@@ -124,6 +124,25 @@ The default preprocessing output is a channel-first grayscale frame stack with
 shape `(4, 84, 84)` and `uint8` dtype. `make_env` accepts `right_only`,
 `simple`, and `complex` action-set names, explicit preprocessing keyword
 arguments, or a `MarioEnvConfig` object.
+
+The default single-stage config uses the canonical
+`SuperMarioBros-1-1-v0` ID from the 9.x environment surface. The
+separator-free alias `SuperMarioBros1-1-v0` is still accepted by
+`gym-super-mario-bros` 9.0.0 for compatibility, and Mario RL re-exports task
+metadata helpers for curriculum or smoke selection:
+
+```python
+from mario_rl.envs import available_env_ids, choose_stage_env_id
+
+env_ids = available_env_ids(game_family="smb1", single_stage=True)
+env_id = choose_stage_env_id(seed=123)
+```
+
+The old `SuperMarioBrosRandomStages-*` IDs were removed upstream in
+`gym-super-mario-bros` 9.0.0. Use `choose_stage_env_id` for seeded stage
+selection, or pass any registered 9.x ID directly, including
+`SuperMarioBros2USA-v0`, `SuperMarioBros2USA-<world>-<stage>-v0`,
+`SuperMarioBros3-v0`, and `SuperMarioBros3-1-1-v0`.
 
 ## Deprecated `src` Tree
 

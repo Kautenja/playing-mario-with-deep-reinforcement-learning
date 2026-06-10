@@ -11,7 +11,7 @@ import numpy as np
 class MarioEnvConfig:
     """Configuration for :func:`mario_rl.envs.make_env`."""
 
-    env_id: str = "SuperMarioBros1-1-v0"
+    env_id: str = "SuperMarioBros-1-1-v0"
     render_mode: str | None = None
     seed: int | None = None
     action_set: str | tuple[tuple[str, ...], ...] = "simple"
