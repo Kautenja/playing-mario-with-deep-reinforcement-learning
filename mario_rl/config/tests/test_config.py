@@ -14,6 +14,7 @@ from mario_rl.config import (
     EnvConfig,
     EvalConfig,
     EvaluationMatrixConfig,
+    ExplorationConfig,
     MarioRLConfig,
     ModelConfig,
     PPOConfig,
@@ -44,6 +45,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIsInstance(config.trainer, TrainerConfig)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIsInstance(config.reward_transform, RewardTransformConfig)
+        self.assertIsInstance(config.exploration, ExplorationConfig)
         self.assertIsInstance(config.auxiliary, AuxiliaryLossConfig)
         self.assertIsInstance(config.evaluation_matrix, EvaluationMatrixConfig)
         self.assertIsInstance(config.ppo, PPOConfig)
@@ -97,6 +99,24 @@ class ConfigSchemaTest(TestCase):
         auxiliary_fields = AuxiliaryLossConfig.__dataclass_fields__
         for name in ("enabled", "targets", "weights", "head_hidden_size"):
             self.assertIn(name, auxiliary_fields)
+
+        exploration_fields = ExplorationConfig.__dataclass_fields__
+        for name in (
+            "enabled",
+            "method",
+            "intrinsic_reward_scale",
+            "predictor_learning_rate",
+            "normalize_observations",
+            "normalize_intrinsic_rewards",
+            "intrinsic_reward_clip",
+            "warmup_steps",
+            "warmup_reward_scale",
+            "log_intrinsic_rewards",
+            "rnd_embedding_size",
+            "rnd_hidden_size",
+            "observation_source",
+        ):
+            self.assertIn(name, exploration_fields)
 
         model_fields = ModelConfig.__dataclass_fields__
         for name in (
@@ -213,6 +233,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_eval_matrix_fast_dev", names)
         self.assertIn("smb_ppo_auxiliary_fast_dev", names)
         self.assertIn("smb_ppo_fast_dev", names)
+        self.assertIn("smb_ppo_rnd_fast_dev", names)
         self.assertIn("smb_ppo_rgb_fast_dev", names)
         self.assertIn("smb_ppo_rgb_high_fidelity", names)
         self.assertIn("smb_dqn_cpu", names)
@@ -260,6 +281,7 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("ppo", actor_critic.train.algorithm)
         self.assertEqual("recurrent_actor_critic", actor_critic.model.architecture)
         self.assertTrue(actor_critic.model.task_conditioning)
+        self.assertFalse(actor_critic.exploration.enabled)
         self.assertEqual(8, actor_critic.ppo.rollout_steps)
         self.assertTrue(actor_critic.task_suite.enabled)
         self.assertEqual("adaptive", actor_critic.task_suite.mode)
@@ -281,6 +303,13 @@ class ConfigSchemaTest(TestCase):
             auxiliary.auxiliary.targets,
         )
         self.assertEqual(0.5, auxiliary.auxiliary.weights["game_family"])
+
+        rnd = load("smb_ppo_rnd_fast_dev")
+        self.assertTrue(rnd.exploration.enabled)
+        self.assertEqual("rnd", rnd.exploration.method)
+        self.assertEqual("next_observation", rnd.exploration.observation_source)
+        self.assertEqual(0.05, rnd.exploration.intrinsic_reward_scale)
+        self.assertEqual(1.0, rnd.exploration.intrinsic_reward_clip)
 
         from_path = load(path)
         self.assertEqual(config, from_path)
@@ -444,6 +473,12 @@ class ConfigCliTest(TestCase):
                 "clear,death,game_family",
                 "--auxiliary.weights",
                 "clear=0.25,game_family=2",
+                "--exploration.enabled",
+                "true",
+                "--exploration.intrinsic_reward_scale",
+                "0.1",
+                "--exploration.intrinsic_reward_clip",
+                "0.75",
                 "--train.algorithm",
                 "ppo",
                 "--ppo.rollout_steps",
@@ -475,6 +510,9 @@ class ConfigCliTest(TestCase):
             {"clear": 0.25, "game_family": 2.0},
             config.auxiliary.weights,
         )
+        self.assertTrue(config.exploration.enabled)
+        self.assertEqual(0.1, config.exploration.intrinsic_reward_scale)
+        self.assertEqual(0.75, config.exploration.intrinsic_reward_clip)
         self.assertEqual("ppo", config.train.algorithm)
         self.assertEqual(4, config.ppo.rollout_steps)
 

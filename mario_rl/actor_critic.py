@@ -24,6 +24,8 @@ class RolloutBatch:
     task_features: torch.Tensor | None = None
     env_reward: torch.Tensor | None = None
     raw_reward: torch.Tensor | None = None
+    transformed_reward: torch.Tensor | None = None
+    intrinsic_reward: torch.Tensor | None = None
     unclipped_reward: torch.Tensor | None = None
     clipped_reward: torch.Tensor | None = None
     frames_skipped: torch.Tensor | None = None
@@ -86,6 +88,8 @@ class RolloutStorage:
         )
         self.env_rewards = np.empty(shape, dtype=np.float32)
         self.raw_rewards = np.empty(shape, dtype=np.float32)
+        self.transformed_rewards = np.empty(shape, dtype=np.float32)
+        self.intrinsic_rewards = np.empty(shape, dtype=np.float32)
         self.unclipped_rewards = np.empty(shape, dtype=np.float32)
         self.clipped_rewards = np.empty(shape, dtype=np.float32)
         self.frames_skipped = np.ones(shape, dtype=np.int32)
@@ -126,6 +130,8 @@ class RolloutStorage:
         task_features: np.ndarray | None = None,
         env_reward: float | np.ndarray | None = None,
         raw_reward: float | np.ndarray | None = None,
+        transformed_reward: float | np.ndarray | None = None,
+        intrinsic_reward: float | np.ndarray | None = None,
         unclipped_reward: float | np.ndarray | None = None,
         clipped_reward: float | np.ndarray | None = None,
         frames_skipped: int | np.ndarray = 1,
@@ -153,6 +159,16 @@ class RolloutStorage:
             raise ValueError("task_features require task_feature_shape")
         self.env_rewards[index] = _float_row(env_reward, self.num_envs, default=reward)
         self.raw_rewards[index] = _float_row(raw_reward, self.num_envs, default=reward)
+        self.transformed_rewards[index] = _float_row(
+            transformed_reward,
+            self.num_envs,
+            default=reward,
+        )
+        self.intrinsic_rewards[index] = _float_row(
+            intrinsic_reward,
+            self.num_envs,
+            default=0.0,
+        )
         self.unclipped_rewards[index] = _float_row(unclipped_reward, self.num_envs)
         self.clipped_rewards[index] = _float_row(clipped_reward, self.num_envs)
         self.frames_skipped[index] = np.asarray(frames_skipped, dtype=np.int32).reshape(
@@ -235,6 +251,14 @@ class RolloutStorage:
                 ),
                 env_reward=_tensor(self.env_rewards.reshape(total)[batch_indices], device=device),
                 raw_reward=_tensor(self.raw_rewards.reshape(total)[batch_indices], device=device),
+                transformed_reward=_tensor(
+                    self.transformed_rewards.reshape(total)[batch_indices],
+                    device=device,
+                ),
+                intrinsic_reward=_tensor(
+                    self.intrinsic_rewards.reshape(total)[batch_indices],
+                    device=device,
+                ),
                 unclipped_reward=_tensor(
                     self.unclipped_rewards.reshape(total)[batch_indices],
                     device=device,
@@ -348,7 +372,10 @@ def _float_row(
         value = default
     if value is None:
         return np.full(num_envs, np.nan, dtype=np.float32)
-    return np.asarray(value, dtype=np.float32).reshape(num_envs)
+    array = np.asarray(value, dtype=np.float32)
+    if array.shape == ():
+        return np.full(num_envs, float(array), dtype=np.float32)
+    return array.reshape(num_envs)
 
 
 def _bool_row(value, num_envs: int) -> np.ndarray:

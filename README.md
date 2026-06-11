@@ -183,6 +183,25 @@ two-environment gate is stable on the target laptop. Use this path as the
 starting point for multi-game task suites and native NES action-space
 experiments.
 
+## Curiosity Exploration
+
+Random Network Distillation is available as an opt-in PPO exploration bonus
+under the `exploration` config section. It uses the next channel-first pixel
+observation returned by `env.step(...)` as its only input, trains a predictor
+network toward a frozen target network, and adds the scaled intrinsic reward to
+the transformed PPO training reward. RAM, `info`, task IDs, reward components,
+progress labels, and auxiliary targets are not inputs to the curiosity reward.
+
+The default RND settings are disabled. When enabled, intrinsic rewards are
+clipped and scaled before entering GAE, with optional warmup scaling and
+observation/reward normalization controls. Training artifacts keep environment
+reward, transformed reward, intrinsic reward, and total PPO training reward
+separate in CSV, JSON, TensorBoard, and Lightning CSV logs.
+
+```shell
+./main.sh train --config smb_ppo_rnd_fast_dev --trainer.enable_progress_bar false
+```
+
 ## Snapshot Curriculum
 
 The snapshot curriculum uses the public `nes-py` opaque snapshot API:

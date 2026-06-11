@@ -12,6 +12,7 @@ from .config import (
     pixel_observation_summary,
     with_resolved_model_num_actions,
 )
+from .exploration import exploration_summary
 from .rewards import reward_transform_summary
 
 
@@ -77,14 +78,27 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     action_summary = action_space_summary(config)
     pixel_summary = pixel_observation_summary(config)
     reward_summary = reward_transform_summary(config.reward_transform)
+    exploration = exploration_summary(config)
     metrics.update(action_summary)
     metrics.update(reward_summary)
+    metrics.update(exploration)
     metrics_payload = {
         "command": "train",
         "algorithm": algorithm,
         **action_summary,
         "pixel_observation": pixel_summary,
         **reward_summary,
+        "exploration": {
+            **exploration,
+            "intrinsic_reward_total": metrics.get("intrinsic_reward_total", 0.0),
+            "intrinsic_reward_mean": metrics.get("intrinsic_reward_mean", 0.0),
+            "rnd_raw_error_mean": metrics.get("rnd_raw_error_mean", 0.0),
+            "rnd_loss": metrics.get("rnd_loss", 0.0),
+            "rnd_predictor_grad_norm": metrics.get(
+                "rnd_predictor_grad_norm",
+                0.0,
+            ),
+        },
         "lightning": {
             "global_step": metrics["global_step"],
             "env_frames": metrics["env_frames"],
@@ -154,6 +168,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "global_step": metrics["global_step"],
                 "clear_rate": metrics["clear_rate"],
                 "death_rate": metrics["death_rate"],
+                "exploration": exploration,
             },
             sort_keys=True,
         )

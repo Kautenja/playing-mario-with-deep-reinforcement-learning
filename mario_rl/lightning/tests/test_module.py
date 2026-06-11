@@ -16,6 +16,7 @@ from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.config import SnapshotCurriculumConfig, load
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
+from mario_rl.exploration import ExplorationConfig
 from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
 from mario_rl.rewards import RewardTransformConfig
 from mario_rl.tests.fakes import (
@@ -512,6 +513,57 @@ class PPOLightningModuleTest(TestCase):
             self.assertGreater(module.last_auxiliary_valid_counts["game_family"], 0)
             self.assertIn("train/auxiliary_loss", trainer.callback_metrics)
             self.assertIn("train/auxiliary_game_family_loss", trainer.callback_metrics)
+
+    def test_fake_env_ppo_run_trains_rnd_predictor_only(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                exploration=ExplorationConfig(
+                    enabled=True,
+                    intrinsic_reward_scale=0.05,
+                    rnd_embedding_size=16,
+                    rnd_hidden_size=32,
+                ),
+            )
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            self.assertIsNotNone(module.rnd)
+            assert module.rnd is not None
+            target_before = {
+                name: parameter.detach().clone()
+                for name, parameter in module.rnd.target.named_parameters()
+            }
+            predictor_before = {
+                name: parameter.detach().clone()
+                for name, parameter in module.rnd.predictor.named_parameters()
+            }
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            self.assertGreater(module.last_intrinsic_reward_mean, 0.0)
+            self.assertGreater(module.last_rnd_loss, 0.0)
+            self.assertGreater(module.last_rnd_predictor_grad_norm, 0.0)
+            self.assertIn("train/intrinsic_reward_mean", trainer.callback_metrics)
+            self.assertIn("train/rnd_loss", trainer.callback_metrics)
+            for name, parameter in module.rnd.target.named_parameters():
+                self.assertTrue(torch.equal(target_before[name], parameter.detach()))
+                self.assertFalse(parameter.requires_grad)
+            self.assertTrue(
+                any(
+                    not torch.equal(predictor_before[name], parameter.detach())
+                    for name, parameter in module.rnd.predictor.named_parameters()
+                )
+            )
 
 
 class LightningDeviceSelectionTest(TestCase):

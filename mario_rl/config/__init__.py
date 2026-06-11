@@ -12,6 +12,7 @@ from typing import Any
 from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.evaluation_matrix import EvaluationMatrixConfig
 from mario_rl.envs.tasks import TaskSuiteConfig
+from mario_rl.exploration import ExplorationConfig
 from mario_rl.rewards import RewardTransformConfig
 
 try:  # pragma: no cover - exercised when optional dependency is installed.
@@ -261,6 +262,7 @@ class MarioRLConfig:
     env: EnvConfig = EnvConfig()
     task_suite: TaskSuiteConfig = field(default_factory=TaskSuiteConfig)
     reward_transform: RewardTransformConfig = field(default_factory=RewardTransformConfig)
+    exploration: ExplorationConfig = field(default_factory=ExplorationConfig)
     auxiliary: AuxiliaryLossConfig = field(default_factory=AuxiliaryLossConfig)
     evaluation_matrix: EvaluationMatrixConfig = field(default_factory=EvaluationMatrixConfig)
     replay: ReplayConfig = ReplayConfig()
@@ -279,6 +281,7 @@ _SECTIONS = {
     "env": EnvConfig,
     "task_suite": TaskSuiteConfig,
     "reward_transform": RewardTransformConfig,
+    "exploration": ExplorationConfig,
     "auxiliary": AuxiliaryLossConfig,
     "evaluation_matrix": EvaluationMatrixConfig,
     "replay": ReplayConfig,
@@ -852,6 +855,7 @@ __all__ = [
     "EpsilonConfig",
     "EvalConfig",
     "EvaluationMatrixConfig",
+    "ExplorationConfig",
     "MarioRLConfig",
     "ModelConfig",
     "PIXEL_OBSERVATION_PROFILES",

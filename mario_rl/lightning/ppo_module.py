@@ -18,6 +18,7 @@ from mario_rl.auxiliary import (
 )
 from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
 from mario_rl.envs import TaskFeatureEncoder, build_task_sampler
+from mario_rl.exploration import RandomNetworkDistillation
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import (
@@ -57,6 +58,20 @@ class PPOLightningModule(LightningModule):
                 "PPOLightningModule requires model.architecture='recurrent_actor_critic'"
             )
         self.policy = policy
+        self.rnd: RandomNetworkDistillation | None = None
+        if bool(self.config.exploration.enabled):
+            self.rnd = RandomNetworkDistillation(
+                input_shape=tuple(self.config.replay.state_shape),
+                embedding_size=int(self.config.exploration.rnd_embedding_size),
+                hidden_size=int(self.config.exploration.rnd_hidden_size),
+                normalize_observations=bool(
+                    self.config.exploration.normalize_observations
+                ),
+                normalize_intrinsic_rewards=bool(
+                    self.config.exploration.normalize_intrinsic_rewards
+                ),
+                intrinsic_reward_clip=self.config.exploration.intrinsic_reward_clip,
+            )
 
         self.reward_transformer = RewardTransformer(self.config.reward_transform)
         self.metrics = MarioMetricsAccumulator(default_task_id=self.config.env.id)
@@ -91,11 +106,15 @@ class PPOLightningModule(LightningModule):
         self.env_frames = 0
         self.episodes = 0
         self._slot_episode_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_transformed_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_intrinsic_reward = [0.0 for _ in range(self.num_envs)]
         self._slot_episode_env_reward = [0.0 for _ in range(self.num_envs)]
         self._slot_episode_raw_reward = [0.0 for _ in range(self.num_envs)]
         self._slot_episode_unclipped_reward = [0.0 for _ in range(self.num_envs)]
         self._slot_episode_clipped_reward = [0.0 for _ in range(self.num_envs)]
         self.episode_reward = 0.0
+        self.episode_transformed_reward = 0.0
+        self.episode_intrinsic_reward = 0.0
         self.episode_env_reward = 0.0
         self.episode_raw_reward = 0.0
         self.episode_unclipped_reward = 0.0
@@ -113,6 +132,11 @@ class PPOLightningModule(LightningModule):
         self.last_auxiliary_valid_counts = {
             target: 0.0 for target in self._auxiliary_target_names
         }
+        self.last_intrinsic_reward_total = 0.0
+        self.last_intrinsic_reward_mean = 0.0
+        self.last_rnd_raw_error_mean = 0.0
+        self.last_rnd_loss = 0.0
+        self.last_rnd_predictor_grad_norm = 0.0
         self.training_updates = 0
 
     def train_dataloader(self):
@@ -121,7 +145,14 @@ class PPOLightningModule(LightningModule):
 
     def configure_optimizers(self):
         """Create the configured optimizer for the actor-critic policy."""
-        return make_optimizer(self.policy, self.config)
+        policy_optimizer = make_optimizer(self.policy, self.config)
+        if self.rnd is None:
+            return policy_optimizer
+        rnd_optimizer = torch.optim.Adam(
+            self.rnd.predictor.parameters(),
+            lr=float(self.config.exploration.predictor_learning_rate),
+        )
+        return [policy_optimizer, rnd_optimizer]
 
     def training_step(self, _batch, _batch_idx):
         """Collect one rollout and optimize the actor-critic policy with PPO."""
@@ -172,6 +203,37 @@ class PPOLightningModule(LightningModule):
             on_step=True,
             prog_bar=False,
         )
+        if bool(self.config.exploration.log_intrinsic_rewards):
+            self.log(
+                "train/intrinsic_reward_total",
+                self.last_intrinsic_reward_total,
+                on_step=True,
+                prog_bar=False,
+            )
+            self.log(
+                "train/intrinsic_reward_mean",
+                self.last_intrinsic_reward_mean,
+                on_step=True,
+                prog_bar=False,
+            )
+            self.log(
+                "train/rnd_raw_error_mean",
+                self.last_rnd_raw_error_mean,
+                on_step=True,
+                prog_bar=False,
+            )
+            self.log(
+                "train/rnd_loss",
+                self.last_rnd_loss,
+                on_step=True,
+                prog_bar=False,
+            )
+            self.log(
+                "train/rnd_predictor_grad_norm",
+                self.last_rnd_predictor_grad_norm,
+                on_step=True,
+                prog_bar=False,
+            )
         self.log(
             "train/auxiliary_loss",
             losses["auxiliary"],
@@ -192,6 +254,18 @@ class PPOLightningModule(LightningModule):
                 prog_bar=False,
             )
         self.log("train/episode_reward", self.episode_reward, on_step=True, prog_bar=False)
+        self.log(
+            "train/episode_transformed_reward",
+            self.episode_transformed_reward,
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/episode_intrinsic_reward",
+            self.episode_intrinsic_reward,
+            on_step=True,
+            prog_bar=False,
+        )
         self.log(
             "train/episode_env_reward",
             self.episode_env_reward,
@@ -275,6 +349,8 @@ class PPOLightningModule(LightningModule):
             "episodes": int(self.episodes),
             "next_episode_index": int(self._next_episode_index),
             "episode_reward": float(self.episode_reward),
+            "episode_transformed_reward": float(self.episode_transformed_reward),
+            "episode_intrinsic_reward": float(self.episode_intrinsic_reward),
             "episode_env_reward": float(self.episode_env_reward),
             "episode_raw_reward": float(self.episode_raw_reward),
             "episode_unclipped_reward": float(self.episode_unclipped_reward),
@@ -288,6 +364,13 @@ class PPOLightningModule(LightningModule):
             "last_auxiliary_loss": float(self.last_auxiliary_loss),
             "last_auxiliary_losses": dict(self.last_auxiliary_losses),
             "last_auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
+            "last_intrinsic_reward_total": float(self.last_intrinsic_reward_total),
+            "last_intrinsic_reward_mean": float(self.last_intrinsic_reward_mean),
+            "last_rnd_raw_error_mean": float(self.last_rnd_raw_error_mean),
+            "last_rnd_loss": float(self.last_rnd_loss),
+            "last_rnd_predictor_grad_norm": float(
+                self.last_rnd_predictor_grad_norm
+            ),
             "training_updates": int(self.training_updates),
         }
         if self.task_suite is not None and hasattr(self.task_suite, "state_dict"):
@@ -308,6 +391,12 @@ class PPOLightningModule(LightningModule):
             state.get("next_episode_index", max(self._next_episode_index, self.episodes))
         )
         self.episode_reward = float(state.get("episode_reward", self.episode_reward))
+        self.episode_transformed_reward = float(
+            state.get("episode_transformed_reward", self.episode_transformed_reward)
+        )
+        self.episode_intrinsic_reward = float(
+            state.get("episode_intrinsic_reward", self.episode_intrinsic_reward)
+        )
         self.episode_env_reward = float(
             state.get("episode_env_reward", self.episode_env_reward)
         )
@@ -351,6 +440,22 @@ class PPOLightningModule(LightningModule):
                 if str(name) in self.last_auxiliary_valid_counts
             }
         )
+        self.last_intrinsic_reward_total = float(
+            state.get("last_intrinsic_reward_total", self.last_intrinsic_reward_total)
+        )
+        self.last_intrinsic_reward_mean = float(
+            state.get("last_intrinsic_reward_mean", self.last_intrinsic_reward_mean)
+        )
+        self.last_rnd_raw_error_mean = float(
+            state.get("last_rnd_raw_error_mean", self.last_rnd_raw_error_mean)
+        )
+        self.last_rnd_loss = float(state.get("last_rnd_loss", self.last_rnd_loss))
+        self.last_rnd_predictor_grad_norm = float(
+            state.get(
+                "last_rnd_predictor_grad_norm",
+                self.last_rnd_predictor_grad_norm,
+            )
+        )
         self.training_updates = int(state.get("training_updates", self.training_updates))
         if self.task_suite is not None and "mario_rl_task_suite_state" in checkpoint:
             self.task_suite.load_state_dict(checkpoint["mario_rl_task_suite_state"])
@@ -377,6 +482,8 @@ class PPOLightningModule(LightningModule):
             "episodes": int(self.episodes),
             "ppo_num_envs": int(self.num_envs),
             "episode_reward": float(self.episode_reward),
+            "episode_transformed_reward": float(self.episode_transformed_reward),
+            "episode_intrinsic_reward": float(self.episode_intrinsic_reward),
             "episode_env_reward": float(self.episode_env_reward),
             "episode_raw_reward": float(self.episode_raw_reward),
             "episode_unclipped_reward": float(self.episode_unclipped_reward),
@@ -408,6 +515,12 @@ class PPOLightningModule(LightningModule):
             "ppo_entropy": float(self.last_entropy),
             "ppo_approximate_kl": float(self.last_approximate_kl),
             "ppo_clip_fraction": float(self.last_clip_fraction),
+            "exploration_enabled": bool(self.config.exploration.enabled),
+            "intrinsic_reward_total": float(self.last_intrinsic_reward_total),
+            "intrinsic_reward_mean": float(self.last_intrinsic_reward_mean),
+            "rnd_raw_error_mean": float(self.last_rnd_raw_error_mean),
+            "rnd_loss": float(self.last_rnd_loss),
+            "rnd_predictor_grad_norm": float(self.last_rnd_predictor_grad_norm),
             "auxiliary_loss": float(self.last_auxiliary_loss),
             "auxiliary_losses": dict(self.last_auxiliary_losses),
             "auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
@@ -505,6 +618,8 @@ class PPOLightningModule(LightningModule):
         )
         self._last_states[slot] = self._coerce_state(state)
         self._slot_episode_reward[slot] = 0.0
+        self._slot_episode_transformed_reward[slot] = 0.0
+        self._slot_episode_intrinsic_reward[slot] = 0.0
         self._slot_episode_env_reward[slot] = 0.0
         self._slot_episode_raw_reward[slot] = 0.0
         self._slot_episode_unclipped_reward[slot] = 0.0
@@ -551,6 +666,8 @@ class PPOLightningModule(LightningModule):
             log_probabilities = log_probability.detach().cpu().numpy().astype(np.float32)
             values = value.detach().cpu().numpy().astype(np.float32)
             rewards = np.zeros(self.num_envs, dtype=np.float32)
+            transformed_rewards = np.zeros(self.num_envs, dtype=np.float32)
+            intrinsic_rewards = np.zeros(self.num_envs, dtype=np.float32)
             env_rewards = np.zeros(self.num_envs, dtype=np.float32)
             raw_rewards = np.zeros(self.num_envs, dtype=np.float32)
             unclipped_rewards = np.full(self.num_envs, np.nan, dtype=np.float32)
@@ -566,6 +683,7 @@ class PPOLightningModule(LightningModule):
                 name: np.zeros(self.num_envs, dtype=np.bool_)
                 for name in self._auxiliary_target_names
             }
+            next_states = []
 
             for slot in range(self.num_envs):
                 env = self.envs[slot]
@@ -590,7 +708,7 @@ class PPOLightningModule(LightningModule):
                     else 1
                 )
                 frames = max(frames, 1)
-                rewards[slot] = transformed.training_reward
+                transformed_rewards[slot] = transformed.training_reward
                 env_rewards[slot] = transformed.env_reward
                 raw_rewards[slot] = transformed.raw_reward
                 if transformed.unclipped_reward is not None:
@@ -616,7 +734,9 @@ class PPOLightningModule(LightningModule):
                     slot=slot,
                 )
                 self.env_frames += frames
-                self._slot_episode_reward[slot] += transformed.training_reward
+                self._slot_episode_transformed_reward[slot] += (
+                    transformed.training_reward
+                )
                 self._slot_episode_env_reward[slot] += transformed.env_reward
                 self._slot_episode_raw_reward[slot] += transformed.raw_reward
                 if transformed.unclipped_reward is not None:
@@ -626,11 +746,21 @@ class PPOLightningModule(LightningModule):
                 if transformed.clipped_reward is not None:
                     self._slot_episode_clipped_reward[slot] += transformed.clipped_reward
                 self._last_states[slot] = next_state
+                next_states.append(next_state)
                 self._maybe_capture_snapshot(
                     slot,
                     next_state,
                     info_map,
                     terminal=bool(terminated or truncated),
+                )
+
+            if next_states:
+                intrinsic_rewards = self._intrinsic_rewards(np.stack(next_states, axis=0))
+            rewards = transformed_rewards + intrinsic_rewards
+            for slot in range(self.num_envs):
+                self._slot_episode_reward[slot] += float(rewards[slot])
+                self._slot_episode_intrinsic_reward[slot] += float(
+                    intrinsic_rewards[slot]
                 )
 
             rollout.insert(
@@ -645,6 +775,8 @@ class PPOLightningModule(LightningModule):
                 task_features=self._task_features,
                 env_reward=env_rewards,
                 raw_reward=raw_rewards,
+                transformed_reward=transformed_rewards,
+                intrinsic_reward=intrinsic_rewards,
                 unclipped_reward=unclipped_rewards,
                 clipped_reward=clipped_rewards,
                 frames_skipped=frames_skipped,
@@ -691,7 +823,7 @@ class PPOLightningModule(LightningModule):
         return output.value.detach().cpu().numpy().reshape(self.num_envs)
 
     def _optimize_rollout(self, rollout: RolloutStorage) -> dict[str, torch.Tensor]:
-        optimizer = self.optimizers()
+        optimizer = self._policy_optimizer()
         totals = {
             "total": 0.0,
             "ppo_total": 0.0,
@@ -779,6 +911,66 @@ class PPOLightningModule(LightningModule):
             for name, total in totals.items()
         }
 
+    def _intrinsic_rewards(self, next_observations: np.ndarray) -> np.ndarray:
+        if self.rnd is None:
+            self.last_intrinsic_reward_total = 0.0
+            self.last_intrinsic_reward_mean = 0.0
+            self.last_rnd_raw_error_mean = 0.0
+            self.last_rnd_loss = 0.0
+            self.last_rnd_predictor_grad_norm = 0.0
+            return np.zeros(self.num_envs, dtype=np.float32)
+        reward = self.rnd(torch.as_tensor(next_observations, device=self.device))
+        scale = self._active_intrinsic_reward_scale()
+        scaled = reward.intrinsic_reward * scale
+        optimizer = self._rnd_optimizer()
+        if optimizer is not None:
+            optimizer.zero_grad()
+            self.manual_backward(reward.predictor_loss)
+            self.last_rnd_predictor_grad_norm = self._predictor_grad_norm()
+            optimizer.step()
+        else:
+            self.last_rnd_predictor_grad_norm = 0.0
+        intrinsic = scaled.detach().cpu().numpy().astype(np.float32).reshape(self.num_envs)
+        self.last_intrinsic_reward_total = float(np.sum(intrinsic))
+        self.last_intrinsic_reward_mean = float(np.mean(intrinsic))
+        self.last_rnd_raw_error_mean = float(
+            reward.raw_error.detach().mean().cpu().item()
+        )
+        self.last_rnd_loss = float(reward.predictor_loss.detach().cpu().item())
+        return intrinsic
+
+    def _active_intrinsic_reward_scale(self) -> float:
+        if self.env_frames < int(self.config.exploration.warmup_steps):
+            return float(self.config.exploration.warmup_reward_scale)
+        return float(self.config.exploration.intrinsic_reward_scale)
+
+    def _policy_optimizer(self):
+        optimizers = self.optimizers()
+        if isinstance(optimizers, (list, tuple)):
+            return optimizers[0]
+        return optimizers
+
+    def _rnd_optimizer(self):
+        if self.rnd is None:
+            return None
+        try:
+            optimizers = self.optimizers(use_pl_optimizer=False)
+        except RuntimeError:
+            return None
+        if isinstance(optimizers, (list, tuple)) and len(optimizers) > 1:
+            return optimizers[1]
+        return None
+
+    def _predictor_grad_norm(self) -> float:
+        if self.rnd is None:
+            return 0.0
+        total = 0.0
+        for parameter in self.rnd.predictor.parameters():
+            if parameter.grad is None:
+                continue
+            total += float(parameter.grad.detach().pow(2).sum().cpu().item())
+        return float(total ** 0.5)
+
     def _new_rollout_storage(self) -> RolloutStorage:
         task_feature_shape = None
         if int(self.policy.task_feature_size) > 0:
@@ -852,6 +1044,12 @@ class PPOLightningModule(LightningModule):
 
     def _sync_episode_totals(self) -> None:
         self.episode_reward = float(sum(self._slot_episode_reward))
+        self.episode_transformed_reward = float(
+            sum(self._slot_episode_transformed_reward)
+        )
+        self.episode_intrinsic_reward = float(
+            sum(self._slot_episode_intrinsic_reward)
+        )
         self.episode_env_reward = float(sum(self._slot_episode_env_reward))
         self.episode_raw_reward = float(sum(self._slot_episode_raw_reward))
         self.episode_unclipped_reward = float(

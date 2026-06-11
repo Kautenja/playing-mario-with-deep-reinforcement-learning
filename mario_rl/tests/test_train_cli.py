@@ -13,6 +13,7 @@ from unittest import TestCase
 from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.config import SnapshotCurriculumConfig
 from mario_rl.envs import TaskSuiteConfig
+from mario_rl.exploration import ExplorationConfig
 from mario_rl.tests.fakes import fake_env_factory, tiny_ppo_config, tiny_training_config
 from mario_rl.train import run
 
@@ -99,6 +100,47 @@ class TrainCliTest(TestCase):
             self.assertIn("game_family", structured_metrics["auxiliary"]["losses"])
             self.assertIn("global", structured_metrics)
             self.assertIn("fake_ppo_lightning", Path(payload["resolved_config"]).read_text())
+
+    def test_train_run_writes_rnd_exploration_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                exploration=ExplorationConfig(
+                    enabled=True,
+                    intrinsic_reward_scale=0.05,
+                    intrinsic_reward_clip=0.5,
+                    rnd_embedding_size=16,
+                    rnd_hidden_size=32,
+                ),
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            self.assertTrue(payload["exploration"]["exploration_enabled"])
+            self.assertEqual(
+                "next_observation",
+                payload["exploration"]["exploration_observation_source"],
+            )
+            with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
+                metrics = list(csv.DictReader(stream))[-1]
+            self.assertEqual("True", metrics["exploration_enabled"])
+            self.assertEqual("rnd", metrics["exploration_method"])
+            self.assertEqual("next_observation", metrics["exploration_observation_source"])
+            self.assertGreater(float(metrics["intrinsic_reward_mean"]), 0.0)
+            self.assertGreater(float(metrics["rnd_loss"]), 0.0)
+            self.assertGreater(float(metrics["rnd_predictor_grad_norm"]), 0.0)
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            exploration = structured_metrics["exploration"]
+            self.assertTrue(exploration["exploration_enabled"])
+            self.assertEqual(
+                "next_observation",
+                exploration["exploration_observation_source"],
+            )
+            self.assertGreater(exploration["intrinsic_reward_mean"], 0.0)
+            self.assertGreater(exploration["rnd_loss"], 0.0)
 
     def test_train_run_writes_adaptive_curriculum_artifacts(self):
         with TemporaryDirectory() as tmpdir:
