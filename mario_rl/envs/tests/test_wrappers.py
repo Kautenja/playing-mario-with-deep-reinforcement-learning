@@ -1,5 +1,6 @@
 """Gymnasium preprocessing wrapper contract tests."""
 from unittest import TestCase
+from unittest.mock import patch
 
 import gymnasium as gym
 import numpy as np
@@ -9,6 +10,8 @@ from mario_rl.envs.wrappers import (
     DownsampleObservationEnv,
     FrameStackEnv,
     MaxFrameskipEnv,
+    OpenCVLiveRenderEnv,
+    TrainingTimeoutEnv,
 )
 from mario_rl.rewards import RewardTransformConfig, RewardTransformer
 
@@ -42,6 +45,18 @@ class TinyImageEnv(gym.Env):
         return np.full(self.observation_space.shape, value, dtype=np.uint8)
 
 
+class RenderCountingEnv(TinyImageEnv):
+    """Tiny image env that counts explicit render calls."""
+
+    def __init__(self, steps):
+        super().__init__(steps)
+        self.render_calls = 0
+
+    def render(self):
+        self.render_calls += 1
+        return self._obs(self.index)
+
+
 class PreprocessingWrappersTest(TestCase):
     """Validate the modern wrappers against Gymnasium semantics."""
 
@@ -63,6 +78,73 @@ class PreprocessingWrappersTest(TestCase):
             self.assertEqual(np.uint8, obs.dtype)
             self.assertEqual(123, info["seed"])
             self.assertEqual((4, 4, 5), env.observation_space.shape)
+        finally:
+            env.close()
+
+    def test_opencv_live_render_env_shows_frames_after_reset_and_step(self):
+        base_env = RenderCountingEnv([(0.0, False, False, {})])
+        env = OpenCVLiveRenderEnv(base_env, window_name="test-window")
+
+        with (
+            patch("mario_rl.envs.wrappers.cv2.imshow") as imshow,
+            patch("mario_rl.envs.wrappers.cv2.waitKey") as wait_key,
+            patch("mario_rl.envs.wrappers.cv2.destroyWindow"),
+        ):
+            try:
+                env.reset(seed=123)
+                self.assertEqual(1, base_env.render_calls)
+                env.step(0)
+                self.assertEqual(2, base_env.render_calls)
+                self.assertEqual(2, imshow.call_count)
+                self.assertEqual(2, wait_key.call_count)
+            finally:
+                env.close()
+
+    def test_training_timeout_env_truncates_at_hard_step_limit(self):
+        env = TrainingTimeoutEnv(
+            TinyImageEnv([
+                (1.0, False, False, {"progress": 0}),
+                (1.0, False, False, {"progress": 1}),
+            ]),
+            max_episode_steps=2,
+            no_progress_timeout_steps=None,
+            stuck_penalty=0.0,
+        )
+
+        try:
+            env.reset(seed=123)
+            _, _, _, truncated, _ = env.step(0)
+            self.assertFalse(truncated)
+            _, _, terminated, truncated, info = env.step(0)
+            self.assertFalse(terminated)
+            self.assertTrue(truncated)
+            self.assertTrue(info["training_timeout"])
+            self.assertEqual("max_episode_steps", info["training_timeout_reason"])
+        finally:
+            env.close()
+
+    def test_training_timeout_env_truncates_when_progress_stalls(self):
+        env = TrainingTimeoutEnv(
+            TinyImageEnv([
+                (1.0, False, False, {"progress": 0}),
+                (1.0, False, False, {"progress": 0}),
+            ]),
+            max_episode_steps=None,
+            no_progress_timeout_steps=1,
+            stuck_penalty=0.25,
+        )
+
+        try:
+            env.reset(seed=123)
+            _, reward, _, truncated, info = env.step(0)
+            self.assertFalse(truncated)
+            self.assertEqual(1.0, reward)
+            self.assertEqual(0, info["no_progress_steps"])
+            _, reward, _, truncated, info = env.step(0)
+            self.assertTrue(truncated)
+            self.assertEqual(0.75, reward)
+            self.assertTrue(info["training_timeout"])
+            self.assertEqual("no_progress", info["training_timeout_reason"])
         finally:
             env.close()
 

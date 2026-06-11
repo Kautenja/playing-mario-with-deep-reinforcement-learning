@@ -41,7 +41,7 @@ class EnvConfig:
 
     id: str = "SuperMarioBros-1-1-v0"
     render_mode: str | None = None
-    action_set: str = "simple"
+    action_set: str = "complex"
     seed: int | None = 123
     image_size: tuple[int, int] = (84, 84)
     frame_stack: int | None = 4
@@ -52,6 +52,9 @@ class EnvConfig:
     channel_first: bool = True
     interpolation: str = "area"
     record_statistics: bool = True
+    max_episode_steps: int | None = 4000
+    no_progress_timeout_steps: int | None = 600
+    stuck_penalty: float = 0.01
     video_enabled: bool = False
     video_dir: str | None = None
     video_length: int = 0
@@ -76,6 +79,9 @@ class EnvConfig:
             frame_stack=self.frame_stack,
             clip_rewards=self.reward_clipping,
             record_statistics=self.record_statistics,
+            max_episode_steps=self.max_episode_steps,
+            no_progress_timeout_steps=self.no_progress_timeout_steps,
+            stuck_penalty=self.stuck_penalty,
             video_dir=self.video_dir if self.video_enabled else None,
             video_length=self.video_length,
             video_name_prefix=self.video_name_prefix,

@@ -13,7 +13,7 @@ from mario_rl.config import MarioRLConfig, load
 class FakeMarioEnv(gym.Env):
     """Deterministic channel-first image env with Gymnasium step semantics."""
 
-    action_space = gym.spaces.Discrete(7)
+    action_space = gym.spaces.Discrete(12)
     observation_space = gym.spaces.Box(
         low=0,
         high=255,
@@ -127,7 +127,6 @@ def tiny_training_config(save_dir: str | Path) -> MarioRLConfig:
             config.model,
             hidden_size=64,
             target_update_frequency=2,
-            num_actions=7,
         ),
         epsilon=replace(config.epsilon, decay_frames=8),
         train=replace(
@@ -156,7 +155,6 @@ def tiny_ppo_config(save_dir: str | Path) -> MarioRLConfig:
             recurrent_hidden_size=32,
             task_conditioning=True,
             task_feature_size=0,
-            num_actions=7,
         ),
         ppo=replace(
             config.ppo,

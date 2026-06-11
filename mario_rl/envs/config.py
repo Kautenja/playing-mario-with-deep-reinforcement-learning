@@ -14,7 +14,7 @@ class MarioEnvConfig:
     env_id: str = "SuperMarioBros-1-1-v0"
     render_mode: str | None = None
     seed: int | None = None
-    action_set: str | tuple[tuple[str, ...], ...] = "simple"
+    action_set: str | tuple[tuple[str, ...], ...] = "complex"
     preprocess: bool = True
     frame_skip: int | None = 4
     image_size: tuple[int, int] = (84, 84)
@@ -25,6 +25,9 @@ class MarioEnvConfig:
     frame_stack: int | None = 4
     clip_rewards: bool = False
     record_statistics: bool = True
+    max_episode_steps: int | None = 4000
+    no_progress_timeout_steps: int | None = 600
+    stuck_penalty: float = 0.01
     video_dir: str | Path | None = None
     video_episode_trigger: Callable[[int], bool] | None = None
     video_length: int = 0
