@@ -205,6 +205,22 @@ class PPOConfig:
 
 
 @dataclass(frozen=True)
+class ImitationConfig:
+    """Local demonstration dataset and behavior-cloning pretraining settings."""
+
+    data_dir: str = "data/imitation"
+    validation_split: float = 0.2
+    shuffle_seed: int = 123
+    batch_size: int = 8
+    max_epochs: int = 1
+    max_steps: int = 16
+    learning_rate: float | None = None
+    checkpoint_name: str = "imitation-pretrain.ckpt"
+    metrics_name: str = "imitation-metrics.json"
+    num_workers: int = 0
+
+
+@dataclass(frozen=True)
 class SnapshotCurriculumConfig:
     """Process-local emulator snapshot curriculum settings."""
 
@@ -272,6 +288,7 @@ class MarioRLConfig:
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
     ppo: PPOConfig = PPOConfig()
+    imitation: ImitationConfig = ImitationConfig()
     snapshot: SnapshotCurriculumConfig = SnapshotCurriculumConfig()
     epsilon: EpsilonConfig = EpsilonConfig()
     train: TrainConfig = TrainConfig()
@@ -291,6 +308,7 @@ _SECTIONS = {
     "replay": ReplayConfig,
     "model": ModelConfig,
     "ppo": PPOConfig,
+    "imitation": ImitationConfig,
     "snapshot": SnapshotCurriculumConfig,
     "epsilon": EpsilonConfig,
     "train": TrainConfig,
@@ -866,6 +884,7 @@ __all__ = [
     "EvalConfig",
     "EvaluationMatrixConfig",
     "ExplorationConfig",
+    "ImitationConfig",
     "MarioRLConfig",
     "ModelConfig",
     "PIXEL_OBSERVATION_PROFILES",

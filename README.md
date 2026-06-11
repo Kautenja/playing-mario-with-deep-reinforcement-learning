@@ -61,6 +61,7 @@ name or path:
 python -m mario_rl.config list
 python -m mario_rl.config path smb_dqn_fast_dev
 python -m mario_rl.train --config smb_dqn_fast_dev --train.accelerator cpu
+python -m mario_rl.imitation --config smb_ppo_imitation_fast_dev
 python -m mario_rl.train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/smb_dqn_fast_dev/checkpoints/fast-dev.ckpt
 python -m mario_rl.eval_matrix --config smb_dqn_eval_matrix_fast_dev
@@ -72,6 +73,7 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ```shell
 ./main.sh config list
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+./main.sh pretrain --config smb_ppo_imitation_fast_dev
 ./main.sh train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 ./main.sh play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
 ./main.sh eval-matrix --config smb_dqn_eval_matrix_fast_dev
@@ -81,6 +83,64 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 Nested overrides use `--section.field value` syntax. Bare positional
 `KEY=VALUE` overrides are intentionally rejected so experiment configuration is
 always explicit.
+
+## Imitation Pretraining
+
+Local demonstrations live under `data/imitation/`, which is ignored by git.
+Place one or more `.npz` segment files there, or point
+`imitation.data_dir` at another local directory. Do not commit demonstrations,
+videos, ROMs, or generated datasets.
+
+Each `.npz` file is a pixel-only episode or segment with these arrays:
+
+| Field | Shape | Notes |
+| --- | --- | --- |
+| `observations` | `(steps, channels, height, width)` | `uint8` channel-first stacked pixels matching `replay.state_shape`. |
+| `actions` | `(steps,)` | Integer labels in the configured action space. |
+| `terminated`, `truncated` | `(steps,)` | Boolean Gymnasium episode flags. |
+| `episode_boundaries` | `(steps,)` | Optional boolean boundary markers; required only when terminal flags are omitted. |
+
+The file must also contain a `metadata` JSON string field, or a same-stem
+`.json` sidecar, with:
+
+```json
+{
+  "env_id": "SuperMarioBros-1-1-v0",
+  "action_set": "complex",
+  "action_count": 12,
+  "macro_actions": false,
+  "macro_action_set": "conservative",
+  "pixel_profile": "grayscale_84",
+  "observation_shape": [4, 84, 84],
+  "image_size": [84, 84],
+  "frame_stack": 4,
+  "channel_first": true,
+  "source_notes": "optional human-readable provenance"
+}
+```
+
+The loader rejects mismatched action counts, action sets, macro-action settings,
+pixel profiles, channel counts, image sizes, and frame stacks. It also rejects
+RAM, `info`, reward fields, task features, object maps, and tile maps in
+demonstration files. Behavior cloning feeds only the pixel observation tensor to
+the recurrent PPO policy; task-conditioned policies receive zero task features
+during pretraining so no task metadata enters the imitation input.
+
+Run a pretrain job after adding local files:
+
+```shell
+./main.sh pretrain --config smb_ppo_imitation_fast_dev
+```
+
+The command writes `imitation-metrics.json` with cross-entropy loss, validation
+accuracy, dataset sizes, action histogram, and checkpoint path. Continue PPO
+training from the behavior-cloning checkpoint with:
+
+```shell
+./main.sh train --config smb_ppo_fast_dev \
+  --train.checkpoint_path runs/smb_ppo_imitation_fast_dev/checkpoints/imitation-pretrain.ckpt \
+  --trainer.enable_progress_bar false
+```
 
 ## Action Abstractions
 

@@ -71,7 +71,17 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         enable_progress_bar=bool(config.trainer.enable_progress_bar),
         log_every_n_steps=max(1, min(int(config.train.log_interval), int(config.train.max_steps))),
     )
-    trainer.fit(module, ckpt_path=config.train.checkpoint_path)
+    fit_checkpoint_path = config.train.checkpoint_path
+    if fit_checkpoint_path:
+        from mario_rl.imitation import (
+            is_imitation_checkpoint,
+            load_imitation_policy_weights,
+        )
+
+        if is_imitation_checkpoint(fit_checkpoint_path):
+            load_imitation_policy_weights(module, fit_checkpoint_path)
+            fit_checkpoint_path = None
+    trainer.fit(module, ckpt_path=fit_checkpoint_path)
     trainer.save_checkpoint(str(paths.checkpoint))
 
     metrics = module.metrics_summary()

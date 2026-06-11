@@ -14,6 +14,7 @@ class EntrypointTest(TestCase):
     def test_entrypoint_imports_do_not_start_legacy_frameworks_or_work(self):
         for module_name in (
             "mario_rl.train",
+            "mario_rl.imitation",
             "mario_rl.play",
             "mario_rl.eval_matrix",
             "mario_rl.random",
@@ -28,6 +29,7 @@ class EntrypointTest(TestCase):
         before_modules = set(sys.modules)
         for module_name in (
             "mario_rl.train",
+            "mario_rl.imitation",
             "mario_rl.play",
             "mario_rl.eval_matrix",
             "mario_rl.random",
@@ -49,7 +51,12 @@ class EntrypointTest(TestCase):
 
     def test_train_play_and_matrix_keep_runners_lazy_and_callable(self):
         before_modules = set(sys.modules)
-        for module_name in ("mario_rl.train", "mario_rl.play", "mario_rl.eval_matrix"):
+        for module_name in (
+            "mario_rl.train",
+            "mario_rl.imitation",
+            "mario_rl.play",
+            "mario_rl.eval_matrix",
+        ):
             module = importlib.import_module(module_name)
             with self.subTest(module_name=module_name):
                 self.assertTrue(callable(module.run))

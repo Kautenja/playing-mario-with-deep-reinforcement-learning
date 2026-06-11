@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "playing-mario-with-deep-reinforcement-learning"
-version = "6.0.0.dev0"
+version = "6.0.0.dev1"
 description = "Modern reinforcement learning experiments for Super Mario Bros."
 readme = "README.md"
 requires-python = ">=3.13"

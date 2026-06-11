@@ -2,6 +2,7 @@
 build/
 dummy/
 runs/
+data/imitation/
 
 # Ignores specific to different operating system files
 

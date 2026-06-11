@@ -1,0 +1,100 @@
+experiment_name: smb_ppo_imitation_fast_dev
+save_dir: runs
+trainer:
+  accelerator: cpu
+  devices: 1
+  precision: 32-true
+  deterministic: true
+  seed: 123
+env:
+  id: SuperMarioBros-1-1-v0
+  render_mode: rgb_array
+  action_set: complex
+  macro_actions: false
+  macro_action_set: conservative
+  seed: 123
+  pixel_profile: grayscale_84
+  image_size: [84, 84]
+  frame_stack: 4
+  reward_clipping: false
+  frame_skip: 4
+  preprocess: true
+  grayscale: true
+  channel_first: true
+  interpolation: area
+  record_statistics: true
+  max_episode_steps: 4000
+  no_progress_timeout_steps: 600
+  stuck_penalty: 0.01
+  video_enabled: false
+  video_dir: null
+  video_length: 0
+  video_name_prefix: mario-rl-imitation-fast-dev
+  max_smoke_steps: 32
+replay:
+  capacity: 1024
+  batch_size: 8
+  warmup: 8
+  prioritized: false
+  priority_alpha: 0.6
+  priority_beta: 0.4
+  sample_dtype: uint8
+  state_shape: [4, 84, 84]
+  store_reward_info: true
+model:
+  architecture: recurrent_actor_critic
+  input_channels: 4
+  hidden_size: 256
+  recurrent_hidden_size: 128
+  task_embedding_size: 32
+  optimizer: adam
+  learning_rate: 0.00025
+  discount_factor: 0.99
+  double_dqn: true
+  target_update_frequency: 128
+  compile: false
+  num_actions: auto
+  task_conditioning: true
+  task_feature_size: 0
+ppo:
+  num_envs: 2
+  rollout_steps: 8
+  minibatch_size: 4
+  epochs: 1
+  gae_lambda: 0.95
+  clip_range: 0.2
+  value_loss_coefficient: 0.5
+  entropy_coefficient: 0.01
+  normalize_advantages: true
+  max_grad_norm: 0.5
+imitation:
+  data_dir: data/imitation
+  validation_split: 0.25
+  shuffle_seed: 123
+  batch_size: 4
+  max_epochs: 1
+  max_steps: 4
+  learning_rate: null
+  checkpoint_name: imitation-pretrain.ckpt
+  metrics_name: imitation-metrics.json
+  num_workers: 0
+train:
+  algorithm: ppo
+  max_frames: 32
+  max_steps: 2
+  fast_dev_run: true
+  log_interval: 1
+  checkpoint_path: null
+  accelerator: cpu
+  devices: 1
+  output_dir_name: checkpoints
+  checkpoint_name: ppo-after-imitation.ckpt
+  resolved_config_name: resolved-config.yaml
+  metrics_name: train-metrics.csv
+eval:
+  checkpoint: null
+  episodes: 1
+  max_steps: 32
+  deterministic: true
+  metrics_name: eval-metrics.json
+  video_name: eval.mp4

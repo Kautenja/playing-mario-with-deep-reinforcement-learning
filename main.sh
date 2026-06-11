@@ -24,6 +24,10 @@ case "$command" in
         shift
         "$python_bin" -m mario_rl.train "$@"
         ;;
+    pretrain)
+        shift
+        "$python_bin" -m mario_rl.imitation "$@"
+        ;;
     play)
         shift
         "$python_bin" -m mario_rl.play "$@"
