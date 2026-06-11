@@ -196,7 +196,7 @@ class PygletKeyboardReader:
         }
         self.window = None
         self.pressed_keys: set[int] = set()
-        self.escape_pressed = False
+        self.finish_requested = False
         self.closed = False
         self.reset_latched = False
 
@@ -213,7 +213,7 @@ class PygletKeyboardReader:
         action_keys = tuple(sorted(key for key in self.pressed_keys if key in self.action_keys))
         return KeyInput(
             pressed_keys=action_keys,
-            quit=bool(self.escape_pressed or self.closed),
+            quit=bool(self.finish_requested or self.closed),
             reset=reset,
         )
 
@@ -240,9 +240,15 @@ class PygletKeyboardReader:
             self.window.event(self.on_close)
 
         self.pyglet.clock.tick()
-        self.window.clear()
-        self.window.switch_to()
-        self.window.dispatch_events()
+        window = self.window
+        if window is None:
+            return
+        window.clear()
+        window.switch_to()
+        window.dispatch_events()
+        window = self.window
+        if window is None:
+            return
         image = self.pyglet.image.ImageData(
             int(frame.shape[1]),
             int(frame.shape[0]),
@@ -250,8 +256,8 @@ class PygletKeyboardReader:
             frame.tobytes(),
             pitch=int(frame.shape[1]) * -3,
         )
-        image.blit(0, 0, width=self.window.width, height=self.window.height)
-        self.window.flip()
+        image.blit(0, 0, width=window.width, height=window.height)
+        window.flip()
 
     def on_key_press(self, symbol, _modifiers) -> None:
         self._handle_key_event(symbol, True)
@@ -269,7 +275,8 @@ class PygletKeyboardReader:
     def _handle_key_event(self, symbol, is_press: bool) -> None:
         symbol = self.KEY_MAP.get(symbol, symbol)
         if symbol == self.pyglet.window.key.ESCAPE:
-            self.escape_pressed = is_press
+            if is_press:
+                self.finish_requested = True
             return
         if symbol not in self.relevant_keys:
             return

@@ -14,6 +14,7 @@ import numpy as np
 from mario_rl.collect_demo import (
     DemoCollectionOptions,
     KeyInput,
+    PygletKeyboardReader,
     _command_for_key,
     _collection_step_duration,
     _keys_to_action,
@@ -123,3 +124,53 @@ class CollectDemoTest(TestCase):
 
         self.assertAlmostEqual(4.0 / 60.0, _collection_step_duration(config, 60.0))
         self.assertAlmostEqual(4.0 / 30.0, _collection_step_duration(config, 30.0))
+
+    def test_escape_finish_is_latched_until_sampled(self):
+        reader = PygletKeyboardReader(
+            window_name="test",
+            step_duration=0.0,
+            action_keys=set(),
+        )
+        try:
+            reader._handle_key_event(reader.pyglet.window.key.ESCAPE, True)
+            reader._handle_key_event(reader.pyglet.window.key.ESCAPE, False)
+
+            self.assertTrue(reader(None).quit)
+        finally:
+            reader.close()
+
+    def test_window_close_during_dispatch_exits_render_cleanly(self):
+        reader = PygletKeyboardReader(
+            window_name="test",
+            step_duration=0.0,
+            action_keys=set(),
+        )
+
+        class ClosingWindow:
+            width = 1
+            height = 1
+
+            def clear(self):
+                pass
+
+            def switch_to(self):
+                pass
+
+            def dispatch_events(self):
+                reader.on_close()
+
+            def flip(self):
+                raise AssertionError("closed windows must not be flipped")
+
+            def close(self):
+                pass
+
+        try:
+            reader.window = ClosingWindow()
+            reader._show(np.zeros((1, 1, 3), dtype=np.uint8))
+
+            self.assertTrue(reader.closed)
+            self.assertIsNone(reader.window)
+            self.assertTrue(reader(None).quit)
+        finally:
+            reader.close()
