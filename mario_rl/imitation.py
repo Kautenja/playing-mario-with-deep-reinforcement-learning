@@ -74,7 +74,14 @@ class ImitationDataset:
     @property
     def env_ids(self) -> tuple[str, ...]:
         """Return unique environment IDs declared by the loaded segments."""
-        return tuple(sorted({str(item["env_id"]) for item in self.metadata}))
+        env_ids: set[str] = set()
+        for item in self.metadata:
+            declared = item.get("env_ids")
+            if isinstance(declared, Sequence) and not isinstance(declared, (str, bytes)):
+                env_ids.update(str(env_id) for env_id in declared)
+            else:
+                env_ids.add(str(item["env_id"]))
+        return tuple(sorted(env_ids))
 
 
 class _TorchDatasetAdapter:

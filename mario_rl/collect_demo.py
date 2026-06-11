@@ -5,7 +5,7 @@ import argparse
 import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -62,27 +62,20 @@ def run(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if env_factory is None:
-        from dataclasses import replace
-
         from mario_rl.envs import make_env
 
-        env_config = replace(
-            config.env,
-            render_mode="rgb_array",
-            video_enabled=False,
-        )
-
         def env_factory(active_config: MarioRLConfig):
-            return make_env(config=env_config.to_mario_env_config())
+            return make_env(config=active_config.env.to_mario_env_config())
 
     observations: list[np.ndarray] = []
     actions: list[int] = []
     terminated_flags: list[bool] = []
     truncated_flags: list[bool] = []
     boundaries: list[bool] = []
+    step_env_ids: list[str] = []
 
-    env = env_factory(config)
-    keys_to_action = _keys_to_action(env, config.env.action_set)
+    task_sampler = _task_sampler(config)
+    keys_to_action = _keys_to_action_for_action_set(config.env.action_set)
     reader = key_reader or PygletKeyboardReader(
         window_name=options.window_name,
         step_duration=_collection_step_duration(config, options.fps),
@@ -98,17 +91,39 @@ def run(
     completed_episodes = 0
     total_steps = 0
     reset_seed = config.env.seed
+    env = None
+    active_env_id = None
     try:
-        obs, _info = env.reset(seed=reset_seed)
+        env, active_env_id, keys_to_action, obs = _reset_collection_episode(
+            config,
+            env_factory,
+            env,
+            active_env_id,
+            task_sampler=task_sampler,
+            episode_index=completed_episodes,
+            seed=reset_seed,
+        )
         while completed_episodes < int(options.episodes) and total_steps < int(options.max_steps):
+            assert env is not None
+            assert active_env_id is not None
             frame = _render_frame(env)
             key_input = _coerce_key_input(reader(frame))
             if key_input.quit:
                 break
             if key_input.reset:
-                obs, _info = env.reset(seed=reset_seed)
-                current_action = 0
                 completed_episodes += 1
+                if completed_episodes >= int(options.episodes):
+                    break
+                env, active_env_id, keys_to_action, obs = _reset_collection_episode(
+                    config,
+                    env_factory,
+                    env,
+                    active_env_id,
+                    task_sampler=task_sampler,
+                    episode_index=completed_episodes,
+                    seed=reset_seed,
+                )
+                current_action = 0
                 continue
 
             if key_input.pressed_keys in keys_to_action:
@@ -118,6 +133,7 @@ def run(
 
             observations.append(np.asarray(obs, dtype=np.uint8))
             actions.append(int(current_action))
+            step_env_ids.append(str(active_env_id))
             obs, _reward, terminated, truncated, _info = env.step(current_action)
             terminated = bool(terminated)
             truncated = bool(truncated)
@@ -130,12 +146,21 @@ def run(
                 completed_episodes += 1
                 current_action = 0
                 if completed_episodes < int(options.episodes):
-                    obs, _info = env.reset(seed=reset_seed)
+                    env, active_env_id, keys_to_action, obs = _reset_collection_episode(
+                        config,
+                        env_factory,
+                        env,
+                        active_env_id,
+                        task_sampler=task_sampler,
+                        episode_index=completed_episodes,
+                        seed=reset_seed,
+                    )
     finally:
         close = getattr(reader, "close", None)
         if callable(close):
             close()
-        env.close()
+        if env is not None:
+            env.close()
 
     if not actions:
         raise RuntimeError("no demonstration steps were collected")
@@ -146,7 +171,14 @@ def run(
     terminated_array = np.asarray(terminated_flags, dtype=np.bool_)
     truncated_array = np.asarray(truncated_flags, dtype=np.bool_)
     boundary_array = np.asarray(boundaries, dtype=np.bool_)
-    metadata = _metadata(config, action_summary, observation_array, options)
+    metadata = _metadata(
+        config,
+        action_summary,
+        observation_array,
+        options,
+        env_ids=step_env_ids,
+        task_sampler=task_sampler,
+    )
     path = output_dir / _demo_filename(config)
     np.savez(
         path,
@@ -162,6 +194,7 @@ def run(
         "output": str(path),
         "steps": int(action_array.shape[0]),
         "episodes": int(completed_episodes),
+        "env_ids": list(metadata["env_ids"]),
         **action_summary,
         "observation_shape": list(observation_array.shape[1:]),
         "metadata": metadata,
@@ -358,6 +391,54 @@ def _collection_step_duration(config: MarioRLConfig, native_fps: float) -> float
     return _collection_frame_skip(config) / fps
 
 
+def _task_sampler(config: MarioRLConfig):
+    if not bool(getattr(config.task_suite, "enabled", False)):
+        return None
+    from mario_rl.envs import build_task_sampler
+
+    return build_task_sampler(config.task_suite)
+
+
+def _collection_config_for_env_id(config: MarioRLConfig, env_id: str) -> MarioRLConfig:
+    return replace(
+        config,
+        env=replace(
+            config.env,
+            id=str(env_id),
+            render_mode="rgb_array",
+            video_enabled=False,
+        ),
+    )
+
+
+def _env_id_for_episode(config: MarioRLConfig, task_sampler, episode_index: int) -> str:
+    if task_sampler is None:
+        return str(config.env.id)
+    task = task_sampler.task_for_episode(int(episode_index))
+    return str(task.env_id)
+
+
+def _reset_collection_episode(
+    config: MarioRLConfig,
+    env_factory,
+    env,
+    active_env_id: str | None,
+    *,
+    task_sampler,
+    episode_index: int,
+    seed: int | None,
+):
+    env_id = _env_id_for_episode(config, task_sampler, episode_index)
+    if env is not None and str(active_env_id) != env_id:
+        env.close()
+        env = None
+    if env is None:
+        env = env_factory(_collection_config_for_env_id(config, env_id))
+    keys_to_action = _keys_to_action(env, config.env.action_set)
+    obs, _info = env.reset(seed=seed)
+    return env, env_id, keys_to_action, obs
+
+
 NES_PY_BUTTON_KEYS = {
     "right": ord("d"),
     "left": ord("a"),
@@ -472,9 +553,14 @@ def _metadata(
     action_summary: dict[str, Any],
     observations: np.ndarray,
     options: DemoCollectionOptions,
+    *,
+    env_ids: Sequence[str],
+    task_sampler,
 ) -> dict[str, Any]:
-    return {
-        "env_id": config.env.id,
+    unique_env_ids = tuple(dict.fromkeys(str(env_id) for env_id in env_ids))
+    metadata = {
+        "env_id": unique_env_ids[0] if len(unique_env_ids) == 1 else "mixed",
+        "env_ids": list(unique_env_ids),
         "action_set": action_summary["action_set"],
         "action_count": int(action_summary["action_count"]),
         "macro_actions": bool(action_summary["macro_actions_enabled"]),
@@ -487,6 +573,9 @@ def _metadata(
         "channel_first": bool(config.env.channel_first),
         "source_notes": str(options.source_notes),
     }
+    if task_sampler is not None:
+        metadata["task_suite"] = task_sampler.metadata()
+    return metadata
 
 
 def _demo_filename(config: MarioRLConfig) -> str:

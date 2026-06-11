@@ -21,6 +21,7 @@ from mario_rl.collect_demo import (
     _keys_to_action_for_action_set,
     run as run_collect_demo,
 )
+from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.imitation import load_imitation_dataset
 from mario_rl.tests.fakes import FakeMarioEnv, tiny_ppo_config
 
@@ -58,7 +59,7 @@ class CollectDemoTest(TestCase):
 
             def fake_env_factory(_config):
                 return RenderableFakeMarioEnv(
-                    env_id=config.env.id,
+                    env_id=_config.env.id,
                     num_actions=12,
                     episode_length=8,
                 )
@@ -93,7 +94,66 @@ class CollectDemoTest(TestCase):
 
             dataset = load_imitation_dataset(config, data_dir=data_dir)
             self.assertEqual(2, len(dataset))
-            self.assertEqual(("FakeMario-v0",), dataset.env_ids)
+            self.assertEqual((config.env.id,), dataset.env_ids)
+
+    def test_collect_demo_switches_task_suite_envs_at_episode_boundaries(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            data_dir = Path(tmpdir) / "demos"
+            suite_config = TaskSuiteConfig(
+                enabled=True,
+                include_env_ids=("SuperMarioBros-1-1-v0", "SuperMarioBros3-1-1-v0"),
+                single_stage=True,
+                seed=2,
+                switch_interval_episodes=1,
+            )
+            config = replace(
+                config,
+                env=replace(config.env, id="SuperMarioBros-1-1-v0"),
+                task_suite=suite_config,
+            )
+            seen_env_ids = []
+
+            def tracking_env_factory(_config):
+                seen_env_ids.append(_config.env.id)
+                return RenderableFakeMarioEnv(
+                    env_id=_config.env.id,
+                    num_actions=12,
+                    episode_length=1,
+                )
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                payload = run_collect_demo(
+                    config,
+                    options=DemoCollectionOptions(
+                        output_dir=data_dir,
+                        episodes=4,
+                        max_steps=4,
+                    ),
+                    env_factory=tracking_env_factory,
+                    key_reader=lambda _frame: KeyInput(pressed_keys=(ord("d"),)),
+                )
+
+            expected = []
+            last_env_id = None
+            suite = TaskSuite(suite_config)
+            for episode in range(int(payload["episodes"])):
+                env_id = suite.task_for_episode(episode).env_id
+                if env_id != last_env_id:
+                    expected.append(env_id)
+                    last_env_id = env_id
+
+            self.assertEqual(expected, seen_env_ids)
+            self.assertGreater(len(set(seen_env_ids)), 1)
+            self.assertEqual(sorted(set(expected)), sorted(payload["env_ids"]))
+            with np.load(Path(payload["output"]), allow_pickle=False) as data:
+                metadata = json.loads(str(data["metadata"].reshape(-1)[0].item()))
+            self.assertEqual("mixed", metadata["env_id"])
+            self.assertEqual(sorted(set(expected)), sorted(metadata["env_ids"]))
+
+            dataset = load_imitation_dataset(config, data_dir=data_dir)
+            self.assertEqual(tuple(sorted(set(expected))), dataset.env_ids)
 
     def test_complex_keys_match_nes_py_human_mode(self):
         keys_to_action = _keys_to_action_for_action_set("complex")
