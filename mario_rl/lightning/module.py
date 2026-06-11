@@ -17,6 +17,7 @@ from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
 from mario_rl.rewards import RewardTransformer
+from mario_rl.snapshots import SnapshotLibrary
 from mario_rl.schedules import EpsilonGreedyActionSelector, LinearEpsilonSchedule
 
 
@@ -67,6 +68,7 @@ class DQNLightningModule(LightningModule):
             if bool(getattr(self.config.task_suite, "enabled", False))
             else None
         )
+        self.snapshot_library = SnapshotLibrary(self.config.snapshot, seed=seed)
         self.task_encoder = None
         self._task_features: np.ndarray | None = None
         self._configure_task_features()
@@ -280,6 +282,12 @@ class DQNLightningModule(LightningModule):
             "counts": self.task_suite.summary_counts(),
         }
 
+    def snapshot_payload(self) -> dict[str, Any] | None:
+        """Return JSON-safe snapshot metadata for training artifacts."""
+        if not self.snapshot_library.enabled and not self.snapshot_library.entries:
+            return None
+        return self.snapshot_library.payload()
+
     def _ensure_env(self) -> None:
         if self.env is not None and self._last_state is not None:
             return
@@ -303,7 +311,12 @@ class DQNLightningModule(LightningModule):
             self._active_task_env_id = env_id
             self._set_task_features_for_env_id(env_id)
         assert self.env is not None
-        state, reset_info = self.env.reset(seed=self.config.env.seed)
+        state, reset_info = self.snapshot_library.reset_or_restore(
+            self.env,
+            env_id=env_id,
+            action_set=self._active_action_set(),
+            seed=self.config.env.seed,
+        )
         self.metrics.start_episode(
             reset_info if isinstance(reset_info, dict) else None,
             fallback_env_id=env_id,
@@ -383,6 +396,11 @@ class DQNLightningModule(LightningModule):
         if transformed.clipped_reward is not None:
             self.episode_clipped_reward += transformed.clipped_reward
 
+        self._maybe_capture_snapshot(
+            next_state,
+            info_map,
+            terminal=bool(terminated or truncated),
+        )
         if terminated or truncated:
             episode_metrics = self.metrics.finish_episode(
                 terminated=bool(terminated),
@@ -476,6 +494,34 @@ class DQNLightningModule(LightningModule):
         if optimizer is None:
             return None
         return float(optimizer.param_groups[0]["lr"])
+
+    def _maybe_capture_snapshot(
+        self,
+        observation: np.ndarray,
+        info: dict[str, Any] | None,
+        *,
+        terminal: bool,
+    ) -> None:
+        if self.env is None:
+            return
+        active = self.metrics.active_episode()
+        episode_step = active.step_count if active is not None else None
+        self.snapshot_library.maybe_capture(
+            self.env,
+            observation=observation,
+            info=info,
+            env_id=self._active_task_env_id or self.config.env.id,
+            action_set=self._active_action_set(),
+            seed_lineage=(self.config.env.seed, self.episodes),
+            episode_step=episode_step,
+            global_step=self.env_frames,
+            terminal=terminal,
+        )
+
+    def _active_action_set(self) -> str:
+        if self.env is None:
+            return str(self.config.env.action_set)
+        return str(getattr(self.env, "mario_rl_action_set", self.config.env.action_set))
 
     def _task_suite_metric_counts(self) -> dict[str, Any]:
         if self.task_suite is None:

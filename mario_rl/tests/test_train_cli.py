@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from mario_rl.auxiliary import AuxiliaryLossConfig
+from mario_rl.config import SnapshotCurriculumConfig
 from mario_rl.envs import TaskSuiteConfig
 from mario_rl.tests.fakes import fake_env_factory, tiny_ppo_config, tiny_training_config
 from mario_rl.train import run
@@ -142,3 +143,42 @@ class TrainCliTest(TestCase):
                 )
             )
             self.assertGreaterEqual(curriculum["counts"]["active"], 1)
+
+    def test_train_run_writes_snapshot_metadata_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                snapshot=SnapshotCurriculumConfig(
+                    enabled=True,
+                    max_snapshots=8,
+                    capture_interval_steps=1,
+                    sample_probability=1.0,
+                    tags=("fake-train",),
+                ),
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=5),
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            snapshot_path = Path(payload["snapshot_metadata"])
+            self.assertTrue(snapshot_path.is_file())
+            snapshot_text = snapshot_path.read_text(encoding="utf-8")
+            snapshot_payload = json.loads(snapshot_text)
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+
+            self.assertGreaterEqual(snapshot_payload["counts"]["captured"], 1)
+            self.assertGreaterEqual(snapshot_payload["counts"]["restored"], 1)
+            self.assertGreaterEqual(
+                structured_metrics["global"]["snapshot_start_count"],
+                1,
+            )
+            self.assertIn("snapshots", structured_metrics)
+            self.assertFalse(
+                snapshot_payload["serialization"]["artifact_contains_rom_bytes"]
+            )
+            self.assertNotIn("native_snapshot", snapshot_text)
+            self.assertNotIn('"observation"', snapshot_text)

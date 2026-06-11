@@ -77,6 +77,20 @@ class FakeMarioEnv(gym.Env):
             },
         )
 
+    def dump_state(self):
+        """Return an opaque fake snapshot of the current env state."""
+        return {
+            "env_id": self.env_id,
+            "game_family": self.game_family,
+            "step_count": self.step_count,
+        }
+
+    def load_state(self, snapshot):
+        """Restore a fake snapshot captured by :meth:`dump_state`."""
+        if not isinstance(snapshot, dict) or snapshot.get("env_id") != self.env_id:
+            raise ValueError("incompatible fake snapshot")
+        self.step_count = int(snapshot["step_count"])
+
     def _obs(self, value: int):
         return np.full(self.observation_space.shape, value % 256, dtype=np.uint8)
 

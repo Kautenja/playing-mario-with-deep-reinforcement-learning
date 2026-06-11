@@ -203,6 +203,7 @@ class EpisodeMetrics:
 
     episode: int
     complete: bool
+    snapshot_start: bool
     task: TaskMetricKey
     step_count: int
     frame_count: int
@@ -226,6 +227,7 @@ class EpisodeMetrics:
         return {
             "episode": self.episode,
             "complete": self.complete,
+            "snapshot_start": self.snapshot_start,
             **self.task.to_dict(),
             "steps": self.step_count,
             "frames": self.frame_count,
@@ -278,6 +280,10 @@ class AggregateMetrics:
     final_progress_mean: float | None
     reward_component_sums: dict[str, float] = field(default_factory=dict)
     missing_info_counts: dict[str, int] = field(default_factory=dict)
+    snapshot_start_count: int = 0
+    full_reset_episode_count: int = 0
+    full_reset_clear_count: int = 0
+    full_reset_clear_rate: float | None = None
 
     @classmethod
     def from_episodes(
@@ -306,6 +312,10 @@ class AggregateMetrics:
             if item.clipped_return is not None
         ]
         clear_count = sum(1 for item in episode_list if item.clear)
+        full_reset_episodes = tuple(
+            item for item in episode_list if not item.snapshot_start
+        )
+        full_reset_clear_count = sum(1 for item in full_reset_episodes if item.clear)
         death_count = sum(1 for item in episode_list if item.death)
         timeout_count = sum(1 for item in episode_list if item.timeout)
         truncation_count = sum(1 for item in episode_list if item.truncated)
@@ -359,6 +369,13 @@ class AggregateMetrics:
             missing_info_counts={
                 name: int(value) for name, value in sorted(missing_counts.items())
             },
+            snapshot_start_count=sum(1 for item in episode_list if item.snapshot_start),
+            full_reset_episode_count=len(full_reset_episodes),
+            full_reset_clear_count=full_reset_clear_count,
+            full_reset_clear_rate=_rate(
+                full_reset_clear_count,
+                len(full_reset_episodes),
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -391,6 +408,10 @@ class AggregateMetrics:
             "final_progress_mean": self.final_progress_mean,
             "reward_component_sums": dict(self.reward_component_sums),
             "missing_info_counts": dict(self.missing_info_counts),
+            "snapshot_start_count": self.snapshot_start_count,
+            "full_reset_episode_count": self.full_reset_episode_count,
+            "full_reset_clear_count": self.full_reset_clear_count,
+            "full_reset_clear_rate": self.full_reset_clear_rate,
         }
 
 
@@ -427,7 +448,11 @@ class MarioMetricsAccumulator:
             )
         fallback = fallback_env_id or self.default_task_id
         task = TaskMetricKey.from_info(reset_info, fallback_env_id=fallback)
-        self._active[slot] = _ActiveEpisode(episode=self._next_episode, task=task)
+        self._active[slot] = _ActiveEpisode(
+            episode=self._next_episode,
+            task=task,
+            snapshot_start=bool((reset_info or {}).get("snapshot_start", False)),
+        )
         self._next_episode += 1
 
     def observe_step(
@@ -581,6 +606,10 @@ def metric_field_groups() -> dict[str, tuple[str, ...]]:
             "truncation_rate",
             "max_progress",
             "final_progress_mean",
+            "snapshot_start_count",
+            "full_reset_episode_count",
+            "full_reset_clear_count",
+            "full_reset_clear_rate",
             "reward_component_sums",
             "missing_info_counts",
         ),
@@ -615,6 +644,10 @@ def flatten_global_metrics(payload: Mapping[str, Any]) -> dict[str, Any]:
         "truncation_rate": global_metrics.get("truncation_rate"),
         "max_progress": global_metrics.get("max_progress"),
         "final_progress_mean": global_metrics.get("final_progress_mean"),
+        "snapshot_start_count": global_metrics.get("snapshot_start_count", 0),
+        "full_reset_episode_count": global_metrics.get("full_reset_episode_count", 0),
+        "full_reset_clear_count": global_metrics.get("full_reset_clear_count", 0),
+        "full_reset_clear_rate": global_metrics.get("full_reset_clear_rate"),
         "reward_component_sums_json": json.dumps(
             global_metrics.get("reward_component_sums", {}),
             sort_keys=True,
@@ -649,6 +682,7 @@ class _ActiveEpisode:
 
     episode: int
     task: TaskMetricKey
+    snapshot_start: bool = False
     step_count: int = 0
     frame_count: int = 0
     episode_return: float = 0.0
@@ -710,6 +744,7 @@ class _ActiveEpisode:
         return EpisodeMetrics(
             episode=self.episode,
             complete=bool(complete),
+            snapshot_start=bool(self.snapshot_start),
             task=self.task,
             step_count=int(self.step_count),
             frame_count=int(self.frame_count),

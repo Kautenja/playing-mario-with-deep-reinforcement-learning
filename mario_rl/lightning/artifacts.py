@@ -24,6 +24,7 @@ class ExperimentPaths:
     train_metrics: Path
     train_metrics_json: Path
     curriculum_state: Path
+    snapshot_metadata: Path
     eval_metrics: Path
 
 
@@ -45,6 +46,7 @@ def experiment_paths(config: MarioRLConfig) -> ExperimentPaths:
         train_metrics=root / config.train.metrics_name,
         train_metrics_json=(root / config.train.metrics_name).with_suffix(".json"),
         curriculum_state=root / "curriculum-state.json",
+        snapshot_metadata=root / "snapshot-metadata.json",
         eval_metrics=root / config.eval.metrics_name,
     )
 
@@ -145,6 +147,10 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "truncation_rate",
         "max_progress",
         "final_progress_mean",
+        "snapshot_start_count",
+        "full_reset_episode_count",
+        "full_reset_clear_count",
+        "full_reset_clear_rate",
         "reward_component_sums_json",
         "missing_info_counts_json",
     ]

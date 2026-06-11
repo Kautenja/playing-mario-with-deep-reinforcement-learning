@@ -13,6 +13,7 @@ import torch
 from lightning.pytorch import LightningModule, Trainer
 
 from mario_rl.auxiliary import AuxiliaryLossConfig
+from mario_rl.config import SnapshotCurriculumConfig
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
@@ -407,6 +408,48 @@ class PPOLightningModuleTest(TestCase):
             module._ensure_env()
 
             self.assertEqual(["FakeMario-A-v0", "FakeMario-B-v0"], seen_env_ids)
+
+    def test_vectorized_ppo_snapshot_curriculum_restores_slots(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                snapshot=SnapshotCurriculumConfig(
+                    enabled=True,
+                    max_snapshots=8,
+                    capture_interval_steps=1,
+                    sample_probability=1.0,
+                ),
+                ppo=replace(config.ppo, num_envs=2, rollout_steps=4),
+                train=replace(config.train, max_steps=2),
+            )
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            payload = module.snapshot_payload()
+            metrics = module.metrics_payload(include_active=True)
+
+            self.assertIsNotNone(payload)
+            self.assertGreaterEqual(payload["counts"]["captured"], 1)
+            self.assertGreaterEqual(payload["counts"]["restored"], 1)
+            self.assertGreaterEqual(metrics["global"]["snapshot_start_count"], 1)
+            captured_slots = {
+                entry["seed_lineage"][-1]
+                for entry in payload["entries"]
+                if entry["seed_lineage"]
+            }
+            self.assertEqual({"0", "1"}, captured_slots)
 
     def test_fake_env_ppo_run_trains_with_auxiliary_losses(self):
         with TemporaryDirectory() as tmpdir:

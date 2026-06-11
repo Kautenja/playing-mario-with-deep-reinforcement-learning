@@ -149,6 +149,36 @@ two-environment gate is stable on the target laptop. Use this path as the
 starting point for multi-game task suites and native NES action-space
 experiments.
 
+## Snapshot Curriculum
+
+The snapshot curriculum uses the public `nes-py` opaque snapshot API:
+`NESEnv.dump_state()` captures native emulator state and `NESEnv.load_state(...)`
+restores it later in the same Python process. Snapshot objects are not
+serialized to disk. Training artifacts write metadata only, including snapshot
+ID, environment ID, ROM SHA-256 compatibility key, action set, seed lineage,
+progress, episode step, task ID, tags, and rank score. ROM bytes, native
+snapshot bytes, and copied observations are intentionally excluded.
+
+Snapshots are valid only for a compatible environment stack: same configured
+environment ID, same action set, same wrapper stack and observation shape, same
+ROM fingerprint, and compatible installed `nes-py`/`gym-super-mario-bros`
+versions. Incompatible restores raise a clear snapshot compatibility error or
+are skipped during sampling. The current implementation is process-local; a
+future durable format must validate emulator version, mapper, ROM hash, and
+wrapper compatibility before loading.
+
+Enable sampling with config overrides such as:
+
+```shell
+./main.sh train --config smb_ppo_fast_dev --snapshot.enabled true --snapshot.capture_interval_steps 4 --snapshot.sample_probability 0.5
+```
+
+Restored episodes still feed only pixel observations into DQN/PPO models.
+Task IDs, progress, seed lineage, and snapshot tags are used for sampling,
+metrics, and artifacts only. Metrics mark `snapshot_start` episodes separately
+and report full-reset clear counts so hard-section starts are not confused with
+full-level clears.
+
 ## Auxiliary Losses
 
 Auxiliary losses are optional supervised heads on the recurrent actor-critic

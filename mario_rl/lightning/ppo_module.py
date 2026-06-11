@@ -29,6 +29,7 @@ from mario_rl.models import (
     make_optimizer,
 )
 from mario_rl.rewards import RewardTransformer
+from mario_rl.snapshots import SnapshotLibrary
 
 
 EnvFactory = Callable[[MarioRLConfig], Any]
@@ -64,6 +65,12 @@ class PPOLightningModule(LightningModule):
             if bool(getattr(self.config.task_suite, "enabled", False))
             else None
         )
+        seed = (
+            self.config.trainer.seed
+            if self.config.trainer.seed is not None
+            else self.config.env.seed
+        )
+        self.snapshot_library = SnapshotLibrary(self.config.snapshot, seed=seed)
         self.task_encoder = None
         self._task_features: np.ndarray | None = None
         self._configure_task_features()
@@ -424,6 +431,12 @@ class PPOLightningModule(LightningModule):
             "counts": self.task_suite.summary_counts(),
         }
 
+    def snapshot_payload(self) -> dict[str, Any] | None:
+        """Return JSON-safe snapshot metadata for training artifacts."""
+        if not self.snapshot_library.enabled and not self.snapshot_library.entries:
+            return None
+        return self.snapshot_library.payload()
+
     def _ensure_env(self) -> None:
         if self._vector_state_ready():
             return
@@ -478,7 +491,13 @@ class PPOLightningModule(LightningModule):
             self.env = self.envs[0]
         self._set_task_features_for_slot(slot, env_id)
         assert env is not None
-        state, reset_info = env.reset(seed=self._seed_for_episode(episode_index))
+        seed = self._seed_for_episode(episode_index)
+        state, reset_info = self.snapshot_library.reset_or_restore(
+            env,
+            env_id=env_id,
+            action_set=self._action_set_for_env(env),
+            seed=seed,
+        )
         self.metrics.start_episode(
             reset_info if isinstance(reset_info, dict) else None,
             fallback_env_id=env_id,
@@ -607,6 +626,12 @@ class PPOLightningModule(LightningModule):
                 if transformed.clipped_reward is not None:
                     self._slot_episode_clipped_reward[slot] += transformed.clipped_reward
                 self._last_states[slot] = next_state
+                self._maybe_capture_snapshot(
+                    slot,
+                    next_state,
+                    info_map,
+                    terminal=bool(terminated or truncated),
+                )
 
             rollout.insert(
                 observation,
@@ -840,6 +865,41 @@ class PPOLightningModule(LightningModule):
         if array.shape != expected:
             raise ValueError(f"expected observation shape {expected}, got {array.shape}")
         return array
+
+    def _maybe_capture_snapshot(
+        self,
+        slot: int,
+        observation: np.ndarray,
+        info: dict[str, Any] | None,
+        *,
+        terminal: bool,
+    ) -> None:
+        slot = int(slot)
+        env = self.envs[slot]
+        if env is None:
+            return
+        active = self.metrics.active_episode(slot=slot)
+        episode_step = active.step_count if active is not None else None
+        episode_index = self._slot_episode_indices[slot]
+        seed = (
+            self._seed_for_episode(episode_index)
+            if episode_index is not None
+            else None
+        )
+        self.snapshot_library.maybe_capture(
+            env,
+            observation=observation,
+            info=info,
+            env_id=self._active_task_env_ids[slot] or self.config.env.id,
+            action_set=self._action_set_for_env(env),
+            seed_lineage=(seed, episode_index, slot),
+            episode_step=episode_step,
+            global_step=self.env_frames,
+            terminal=terminal,
+        )
+
+    def _action_set_for_env(self, env: Any) -> str:
+        return str(getattr(env, "mario_rl_action_set", self.config.env.action_set))
 
     def _task_suite_metric_counts(self) -> dict[str, Any]:
         if self.task_suite is None:

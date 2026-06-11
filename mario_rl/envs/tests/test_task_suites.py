@@ -265,6 +265,7 @@ def _episode(env_id: str, *, clear: bool, progress: float) -> EpisodeMetrics:
     return EpisodeMetrics(
         episode=0,
         complete=True,
+        snapshot_start=False,
         task=TaskMetricKey(task_id=env_id, game_family="smb1"),
         step_count=1,
         frame_count=1,

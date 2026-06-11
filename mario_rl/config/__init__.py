@@ -140,6 +140,19 @@ class PPOConfig:
 
 
 @dataclass(frozen=True)
+class SnapshotCurriculumConfig:
+    """Process-local emulator snapshot curriculum settings."""
+
+    enabled: bool = False
+    max_snapshots: int = 32
+    capture_interval_steps: int = 64
+    sample_probability: float = 0.25
+    min_progress: float | None = None
+    rank_strategy: str = "progress"
+    tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class EpsilonConfig:
     """Exploration schedule settings."""
 
@@ -193,6 +206,7 @@ class MarioRLConfig:
     replay: ReplayConfig = ReplayConfig()
     model: ModelConfig = ModelConfig()
     ppo: PPOConfig = PPOConfig()
+    snapshot: SnapshotCurriculumConfig = SnapshotCurriculumConfig()
     epsilon: EpsilonConfig = EpsilonConfig()
     train: TrainConfig = TrainConfig()
     eval: EvalConfig = EvalConfig()
@@ -210,6 +224,7 @@ _SECTIONS = {
     "replay": ReplayConfig,
     "model": ModelConfig,
     "ppo": PPOConfig,
+    "snapshot": SnapshotCurriculumConfig,
     "epsilon": EpsilonConfig,
     "train": TrainConfig,
     "eval": EvalConfig,
@@ -627,6 +642,7 @@ __all__ = [
     "TaskSuiteConfig",
     "TrainConfig",
     "TrainerConfig",
+    "SnapshotCurriculumConfig",
     "apply_overrides",
     "action_space_summary",
     "available_configs",

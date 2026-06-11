@@ -91,6 +91,10 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     if task_suite_payload is not None:
         metrics_payload["curriculum"] = task_suite_payload
         write_json(paths.curriculum_state, task_suite_payload)
+    snapshot_payload = module.snapshot_payload()
+    if snapshot_payload is not None:
+        metrics_payload["snapshots"] = snapshot_payload
+        write_json(paths.snapshot_metadata, snapshot_payload)
     if algorithm == "ppo":
         metrics_payload["ppo"] = {
             "total_loss": metrics.get("loss"),
@@ -128,6 +132,11 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "curriculum_state": (
                     str(paths.curriculum_state)
                     if task_suite_payload is not None
+                    else None
+                ),
+                "snapshot_metadata": (
+                    str(paths.snapshot_metadata)
+                    if snapshot_payload is not None
                     else None
                 ),
                 "resolved_config": str(paths.resolved_config),

@@ -18,6 +18,7 @@ from mario_rl.config import (
     PPOConfig,
     ReplayConfig,
     RewardTransformConfig,
+    SnapshotCurriculumConfig,
     TaskSuiteConfig,
     TrainConfig,
     TrainerConfig,
@@ -43,6 +44,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIsInstance(config.auxiliary, AuxiliaryLossConfig)
         self.assertIsInstance(config.evaluation_matrix, EvaluationMatrixConfig)
         self.assertIsInstance(config.ppo, PPOConfig)
+        self.assertIsInstance(config.snapshot, SnapshotCurriculumConfig)
         self.assertIn(config.experiment_name, "smb_dqn_fast_dev")
         self.assertEqual("runs", config.save_dir)
 
@@ -129,6 +131,7 @@ class ConfigSchemaTest(TestCase):
         ppo_fields = PPOConfig.__dataclass_fields__
         for name in (
             "rollout_steps",
+            "num_envs",
             "minibatch_size",
             "epochs",
             "gae_lambda",
@@ -139,6 +142,18 @@ class ConfigSchemaTest(TestCase):
             "max_grad_norm",
         ):
             self.assertIn(name, ppo_fields)
+
+        snapshot_fields = SnapshotCurriculumConfig.__dataclass_fields__
+        for name in (
+            "enabled",
+            "max_snapshots",
+            "capture_interval_steps",
+            "sample_probability",
+            "min_progress",
+            "rank_strategy",
+            "tags",
+        ):
+            self.assertIn(name, snapshot_fields)
 
         task_suite_fields = TaskSuiteConfig.__dataclass_fields__
         for name in (
