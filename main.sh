@@ -28,6 +28,10 @@ case "$command" in
         shift
         "$python_bin" -m mario_rl.imitation "$@"
         ;;
+    collect-demo)
+        shift
+        "$python_bin" -m mario_rl.collect_demo "$@"
+        ;;
     play)
         shift
         "$python_bin" -m mario_rl.play "$@"

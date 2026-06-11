@@ -61,6 +61,7 @@ name or path:
 python -m mario_rl.config list
 python -m mario_rl.config path smb_dqn_fast_dev
 python -m mario_rl.train --config smb_dqn_fast_dev --train.accelerator cpu
+python -m mario_rl.collect_demo --config smb_ppo_imitation_fast_dev
 python -m mario_rl.imitation --config smb_ppo_imitation_fast_dev
 python -m mario_rl.train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/smb_dqn_fast_dev/checkpoints/fast-dev.ckpt
@@ -73,6 +74,7 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ```shell
 ./main.sh config list
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+./main.sh collect-demo --config smb_ppo_imitation_fast_dev
 ./main.sh pretrain --config smb_ppo_imitation_fast_dev
 ./main.sh train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 ./main.sh play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
@@ -90,6 +92,16 @@ Local demonstrations live under `data/imitation/`, which is ignored by git.
 Place one or more `.npz` segment files there, or point
 `imitation.data_dir` at another local directory. Do not commit demonstrations,
 videos, ROMs, or generated datasets.
+
+Collect a local keyboard demonstration with:
+
+```shell
+./main.sh collect-demo --config smb_ppo_imitation_fast_dev --episodes 3
+```
+
+Controls are printed at startup. The collector stores only preprocessed pixels,
+integer action labels, terminal flags, and metadata; it does not store RAM,
+reward, info dictionaries, task metadata, object maps, or tile maps.
 
 Each `.npz` file is a pixel-only episode or segment with these arrays:
 

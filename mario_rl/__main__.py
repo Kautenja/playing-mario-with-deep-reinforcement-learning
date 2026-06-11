@@ -7,7 +7,10 @@ def main() -> int:
     """Print concise command help."""
     configs = ", ".join(available_configs())
     print(f"mario_rl {__version__}")
-    print("commands: config, train, pretrain, play, eval-matrix, random, verify-macbook")
+    print(
+        "commands: config, train, collect-demo, pretrain, play, "
+        "eval-matrix, random, verify-macbook"
+    )
     print(f"packaged configs: {configs}")
     return 0
 

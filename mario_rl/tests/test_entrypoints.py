@@ -14,6 +14,7 @@ class EntrypointTest(TestCase):
     def test_entrypoint_imports_do_not_start_legacy_frameworks_or_work(self):
         for module_name in (
             "mario_rl.train",
+            "mario_rl.collect_demo",
             "mario_rl.imitation",
             "mario_rl.play",
             "mario_rl.eval_matrix",
@@ -29,6 +30,7 @@ class EntrypointTest(TestCase):
         before_modules = set(sys.modules)
         for module_name in (
             "mario_rl.train",
+            "mario_rl.collect_demo",
             "mario_rl.imitation",
             "mario_rl.play",
             "mario_rl.eval_matrix",
@@ -53,6 +55,7 @@ class EntrypointTest(TestCase):
         before_modules = set(sys.modules)
         for module_name in (
             "mario_rl.train",
+            "mario_rl.collect_demo",
             "mario_rl.imitation",
             "mario_rl.play",
             "mario_rl.eval_matrix",
