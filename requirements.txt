@@ -11,6 +11,7 @@ opencv-python>=4.13.0.92
 Pillow>=12.2.0
 pandas>=3.0.3
 matplotlib>=3.10.9
+rich>=10.2.2
 tqdm>=4.68.2
 PyYAML>=6.0.3
 jsonargparse[signatures]>=4.49.0

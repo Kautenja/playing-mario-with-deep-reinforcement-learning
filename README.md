@@ -380,7 +380,8 @@ MARIO_RL_RUN_CUDA_SMOKE=1 ./main.sh train --config smb_dqn_fast_dev --train.acce
 
 The play command defaults to the smoke checkpoint path for the selected config.
 Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
-Training shows Lightning progress by default. Pass
+Training shows Lightning's rich progress bar by default. Pass
+`--trainer.progress_bar tqdm` for the classic tqdm indicator, or
 `--trainer.enable_progress_bar false` for quiet/headless runs.
 
 Set `replay.prioritized: true` to enable proportional prioritized replay for

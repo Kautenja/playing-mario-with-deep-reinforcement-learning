@@ -93,6 +93,7 @@ class TrainerConfig:
     deterministic: bool = True
     seed: int | None = 123
     enable_progress_bar: bool = True
+    progress_bar: str = "rich"
 
 
 @dataclass(frozen=True)

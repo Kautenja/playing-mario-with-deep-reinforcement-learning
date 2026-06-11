@@ -168,6 +168,7 @@ def run(config: MarioRLConfig, *, data_dir: str | Path | None = None) -> int:
         experiment_paths,
         trainer_accelerator,
         trainer_devices,
+        trainer_progress_callbacks,
         write_json,
         write_resolved_config,
     )
@@ -225,6 +226,7 @@ def run(config: MarioRLConfig, *, data_dir: str | Path | None = None) -> int:
         logger=[csv_logger, tensorboard_logger],
         enable_checkpointing=False,
         enable_progress_bar=bool(config.trainer.enable_progress_bar),
+        callbacks=trainer_progress_callbacks(config),
         log_every_n_steps=1,
         num_sanity_val_steps=0,
     )

@@ -11,13 +11,19 @@ from unittest import TestCase, skipIf
 import numpy as np
 import torch
 from lightning.pytorch import LightningModule, Trainer
+from lightning.pytorch.callbacks import RichProgressBar, TQDMProgressBar
 
 from mario_rl.auxiliary import AuxiliaryLossConfig
 from mario_rl.config import SnapshotCurriculumConfig, load
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.exploration import ExplorationConfig
-from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
+from mario_rl.lightning import (
+    DQNLightningModule,
+    PPOLightningModule,
+    trainer_accelerator,
+    trainer_progress_callbacks,
+)
 from mario_rl.rewards import RewardTransformConfig
 from mario_rl.tests.fakes import (
     FakeMarioEnv,
@@ -29,6 +35,38 @@ from mario_rl.tests.fakes import (
 
 class LightningModuleTest(TestCase):
     """Validate the active Lightning DQN integration path."""
+
+    def test_trainer_progress_callbacks_use_rich_progress_bar_by_default(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+
+            callbacks = trainer_progress_callbacks(config)
+
+            self.assertEqual(1, len(callbacks))
+            self.assertIsInstance(callbacks[0], RichProgressBar)
+
+    def test_trainer_progress_callbacks_support_quiet_and_tqdm_modes(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            quiet = replace(
+                config,
+                trainer=replace(config.trainer, enable_progress_bar=False),
+            )
+            tqdm = replace(
+                config,
+                trainer=replace(config.trainer, progress_bar="tqdm"),
+            )
+            invalid = replace(
+                config,
+                trainer=replace(config.trainer, progress_bar="classic"),
+            )
+
+            self.assertEqual([], trainer_progress_callbacks(quiet))
+            callbacks = trainer_progress_callbacks(tqdm)
+            self.assertEqual(1, len(callbacks))
+            self.assertIsInstance(callbacks[0], TQDMProgressBar)
+            with self.assertRaisesRegex(ValueError, "trainer.progress_bar"):
+                trainer_progress_callbacks(invalid)
 
     def test_module_owns_networks_optimizer_replay_and_schedule(self):
         with TemporaryDirectory() as tmpdir:

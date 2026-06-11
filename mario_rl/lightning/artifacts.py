@@ -75,6 +75,22 @@ def trainer_devices(config: MarioRLConfig):
     return config.train.devices if config.train.devices is not None else config.trainer.devices
 
 
+def trainer_progress_callbacks(config: MarioRLConfig) -> list[Any]:
+    """Return the configured Lightning progress-bar callback."""
+    if not bool(config.trainer.enable_progress_bar):
+        return []
+    style = str(config.trainer.progress_bar).strip().lower()
+    if style == "rich":
+        from lightning.pytorch.callbacks import RichProgressBar
+
+        return [RichProgressBar(refresh_rate=1, leave=False)]
+    if style == "tqdm":
+        from lightning.pytorch.callbacks import TQDMProgressBar
+
+        return [TQDMProgressBar(refresh_rate=1, leave=False)]
+    raise ValueError("trainer.progress_bar must be one of: rich, tqdm")
+
+
 def write_resolved_config(config: MarioRLConfig, path: Path) -> None:
     """Write a reproducible YAML copy of the resolved config."""
     data = to_dict(config)

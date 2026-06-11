@@ -44,6 +44,8 @@ class ConfigSchemaTest(TestCase):
         config = MarioRLConfig()
 
         self.assertIsInstance(config.trainer, TrainerConfig)
+        self.assertTrue(config.trainer.enable_progress_bar)
+        self.assertEqual("rich", config.trainer.progress_bar)
         self.assertIsInstance(config.task_suite, TaskSuiteConfig)
         self.assertIsInstance(config.reward_transform, RewardTransformConfig)
         self.assertIsInstance(config.exploration, ExplorationConfig)
@@ -523,6 +525,8 @@ class ConfigCliTest(TestCase):
                 "ppo",
                 "--ppo.rollout_steps",
                 "4",
+                "--trainer.progress_bar",
+                "tqdm",
             ]
         )
 
@@ -555,6 +559,7 @@ class ConfigCliTest(TestCase):
         self.assertEqual(0.75, config.exploration.intrinsic_reward_clip)
         self.assertEqual("ppo", config.train.algorithm)
         self.assertEqual(4, config.ppo.rollout_steps)
+        self.assertEqual("tqdm", config.trainer.progress_bar)
 
         with NamedTemporaryFile("w", suffix=".yaml") as config_file:
             config_file.write(

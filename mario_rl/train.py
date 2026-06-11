@@ -27,6 +27,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         experiment_paths,
         trainer_accelerator,
         trainer_devices,
+        trainer_progress_callbacks,
         write_json,
         write_resolved_config,
         write_train_metrics,
@@ -69,6 +70,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         logger=[csv_logger, tensorboard_logger],
         enable_checkpointing=False,
         enable_progress_bar=bool(config.trainer.enable_progress_bar),
+        callbacks=trainer_progress_callbacks(config),
         log_every_n_steps=max(1, min(int(config.train.log_interval), int(config.train.max_steps))),
     )
     fit_checkpoint_path = config.train.checkpoint_path

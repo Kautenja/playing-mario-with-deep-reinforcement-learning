@@ -20,6 +20,7 @@ class DependencyContract(TestCase):
             "nes_py",
             "torch",
             "lightning",
+            "rich",
         ):
             with self.subTest(module_name=module_name):
                 importlib.import_module(module_name)
