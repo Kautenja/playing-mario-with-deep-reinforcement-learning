@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 import random
 from typing import Any
 
@@ -56,6 +58,15 @@ class TaskSuiteConfig:
     family_weights: dict[str, float] = field(default_factory=dict)
     seed: int | None = None
     switch_interval_episodes: int = 1
+    mode: str = "fixed"
+    curriculum_frontier_size: int = 1
+    curriculum_mastery_window: int = 5
+    curriculum_mastery_min_episodes: int = 3
+    curriculum_mastery_clear_rate: float = 0.8
+    curriculum_mastery_death_rate: float = 0.25
+    curriculum_mastery_progress: float | None = None
+    curriculum_lost_levels_prerequisite_family: str = "smb1"
+    curriculum_state_path: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "enabled", _bool(self.enabled))
@@ -91,6 +102,51 @@ class TaskSuiteConfig:
         if interval <= 0:
             raise ValueError("switch_interval_episodes must be > 0")
         object.__setattr__(self, "switch_interval_episodes", interval)
+        mode = str(self.mode).strip().lower()
+        if mode not in {"fixed", "adaptive"}:
+            raise ValueError("task_suite.mode must be 'fixed' or 'adaptive'")
+        object.__setattr__(self, "mode", mode)
+        frontier_size = int(self.curriculum_frontier_size)
+        if frontier_size <= 0:
+            raise ValueError("curriculum_frontier_size must be > 0")
+        object.__setattr__(self, "curriculum_frontier_size", frontier_size)
+        window = int(self.curriculum_mastery_window)
+        if window <= 0:
+            raise ValueError("curriculum_mastery_window must be > 0")
+        object.__setattr__(self, "curriculum_mastery_window", window)
+        min_episodes = int(self.curriculum_mastery_min_episodes)
+        if min_episodes <= 0:
+            raise ValueError("curriculum_mastery_min_episodes must be > 0")
+        object.__setattr__(
+            self,
+            "curriculum_mastery_min_episodes",
+            min_episodes,
+        )
+        clear_rate = float(self.curriculum_mastery_clear_rate)
+        death_rate = float(self.curriculum_mastery_death_rate)
+        if not 0.0 <= clear_rate <= 1.0:
+            raise ValueError("curriculum_mastery_clear_rate must be in [0, 1]")
+        if not 0.0 <= death_rate <= 1.0:
+            raise ValueError("curriculum_mastery_death_rate must be in [0, 1]")
+        object.__setattr__(self, "curriculum_mastery_clear_rate", clear_rate)
+        object.__setattr__(self, "curriculum_mastery_death_rate", death_rate)
+        if self.curriculum_mastery_progress is not None:
+            object.__setattr__(
+                self,
+                "curriculum_mastery_progress",
+                float(self.curriculum_mastery_progress),
+            )
+        object.__setattr__(
+            self,
+            "curriculum_lost_levels_prerequisite_family",
+            str(self.curriculum_lost_levels_prerequisite_family),
+        )
+        if self.curriculum_state_path is not None:
+            object.__setattr__(
+                self,
+                "curriculum_state_path",
+                str(self.curriculum_state_path),
+            )
 
 
 class TaskSuite:
@@ -152,6 +208,42 @@ class TaskSuite:
     def smb3_catalog(self, *, validated: bool | None = None):
         """Return the full SMB3 stage catalog for reports, not train sampling."""
         return tuple(smb3_stage_matrix(validated=validated))
+
+    def observe_episode(self, *_args, **_kwargs) -> None:
+        """Accept episode feedback for sampler API parity with adaptive mode."""
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return serializable fixed-sampler cursor state."""
+        return {
+            "mode": "fixed",
+            "sample_index": int(self._sample_index),
+            "metadata": self.metadata(),
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any] | None) -> None:
+        """Restore the fixed-sampler cursor when present."""
+        if not isinstance(state, Mapping):
+            return
+        self._sample_index = int(state.get("sample_index", self._sample_index))
+
+    def metadata(self) -> dict[str, Any]:
+        """Return resolved fixed task-suite metadata for artifacts."""
+        return {
+            "mode": "fixed",
+            "enabled": bool(self.config.enabled),
+            "candidate_count": len(self.candidates),
+            "env_ids": list(self.env_ids),
+            "family_counts": self.family_counts,
+        }
+
+    def summary_counts(self) -> dict[str, int]:
+        """Return curriculum-style counters for fixed sampler artifacts."""
+        return {
+            "active": len(self.candidates),
+            "mastered": 0,
+            "locked": 0,
+            "retired": 0,
+        }
 
     def _resolve_candidates(
         self,
@@ -220,6 +312,374 @@ class TaskSuite:
         if not candidates:
             raise ValueError("task suite has no candidate tasks")
         return candidates
+
+
+@dataclass
+class CurriculumTaskProgress:
+    """Serializable adaptive-curriculum progress for one task."""
+
+    env_id: str
+    task_id: str
+    game_family: str
+    world: int | None
+    stage: int | None
+    sampled_episodes: int = 0
+    recent_clear_rate: float = 0.0
+    recent_death_rate: float = 0.0
+    recent_max_progress: float = 0.0
+    best_progress: float = 0.0
+    mastered: bool = False
+    status: str = "locked"
+    recent_episodes: tuple[dict[str, Any], ...] = ()
+
+    @classmethod
+    def from_task(cls, task: MarioTask) -> "CurriculumTaskProgress":
+        """Create an empty progress record from registered task metadata."""
+        return cls(
+            env_id=str(task.env_id),
+            task_id=str(task.task_id),
+            game_family=str(task.game_family),
+            world=_optional_int(getattr(task, "world", None)),
+            stage=_optional_int(getattr(task, "stage", None)),
+        )
+
+    @classmethod
+    def from_dict(
+        cls,
+        task: MarioTask,
+        data: Mapping[str, Any],
+    ) -> "CurriculumTaskProgress":
+        """Restore a progress record while keeping current task metadata."""
+        record = cls.from_task(task)
+        record.sampled_episodes = int(
+            data.get("sampled_episodes", record.sampled_episodes)
+        )
+        record.recent_clear_rate = float(
+            data.get("recent_clear_rate", record.recent_clear_rate)
+        )
+        record.recent_death_rate = float(
+            data.get("recent_death_rate", record.recent_death_rate)
+        )
+        record.recent_max_progress = float(
+            data.get("recent_max_progress", record.recent_max_progress)
+        )
+        record.best_progress = float(data.get("best_progress", record.best_progress))
+        record.mastered = bool(data.get("mastered", record.mastered))
+        record.status = str(data.get("status", record.status))
+        record.recent_episodes = tuple(
+            dict(item)
+            for item in data.get("recent_episodes", ())
+            if isinstance(item, Mapping)
+        )
+        return record
+
+    def record_sample(self) -> None:
+        """Record that this task was selected for a training episode."""
+        self.sampled_episodes += 1
+
+    def record_episode(
+        self,
+        *,
+        clear: bool,
+        death: bool,
+        max_progress: float | None,
+        config: TaskSuiteConfig,
+    ) -> None:
+        """Update recent-window progress and mastery from one completed episode."""
+        progress = 0.0 if max_progress is None else float(max_progress)
+        recent = [
+            *self.recent_episodes,
+            {
+                "clear": bool(clear),
+                "death": bool(death),
+                "max_progress": progress,
+            },
+        ]
+        window = int(config.curriculum_mastery_window)
+        if len(recent) > window:
+            recent = recent[-window:]
+        self.recent_episodes = tuple(recent)
+        count = max(len(recent), 1)
+        self.recent_clear_rate = sum(1 for item in recent if item["clear"]) / count
+        self.recent_death_rate = sum(1 for item in recent if item["death"]) / count
+        self.recent_max_progress = max(
+            (float(item["max_progress"]) for item in recent),
+            default=0.0,
+        )
+        self.best_progress = max(self.best_progress, progress)
+        progress_threshold = config.curriculum_mastery_progress
+        progress_met = (
+            progress_threshold is None
+            or self.recent_max_progress >= float(progress_threshold)
+        )
+        if (
+            self.sampled_episodes >= int(config.curriculum_mastery_min_episodes)
+            and self.recent_clear_rate >= float(config.curriculum_mastery_clear_rate)
+            and self.recent_death_rate <= float(config.curriculum_mastery_death_rate)
+            and progress_met
+        ):
+            self.mastered = True
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a deterministic JSON-friendly record."""
+        return {
+            "env_id": self.env_id,
+            "task_id": self.task_id,
+            "game_family": self.game_family,
+            "world": self.world,
+            "stage": self.stage,
+            "sampled_episodes": int(self.sampled_episodes),
+            "recent_clear_rate": float(self.recent_clear_rate),
+            "recent_death_rate": float(self.recent_death_rate),
+            "recent_max_progress": float(self.recent_max_progress),
+            "best_progress": float(self.best_progress),
+            "mastered": bool(self.mastered),
+            "status": self.status,
+            "recent_episodes": [dict(item) for item in self.recent_episodes],
+        }
+
+
+class AdaptiveCurriculum:
+    """Frontier-based task sampler with explicit serializable progress state."""
+
+    def __init__(
+        self,
+        config: TaskSuiteConfig | Mapping[str, Any] | None = None,
+        *,
+        tasks: Iterable[MarioTask] | None = None,
+    ) -> None:
+        self.config = _coerce_task_suite_config(config)
+        base_suite = TaskSuite(self.config, tasks=tasks)
+        self.candidates = tuple(sorted(base_suite.candidates, key=_curriculum_sort_key))
+        self._task_by_env_id = {str(task.env_id): task for task in self.candidates}
+        self._records = {
+            str(task.env_id): CurriculumTaskProgress.from_task(task)
+            for task in self.candidates
+        }
+        self._sample_index = 0
+        self._episode_task_env_ids: dict[str, str] = {}
+        if self.config.curriculum_state_path:
+            self.load_state_path(self.config.curriculum_state_path)
+        self._refresh_statuses()
+
+    @property
+    def env_ids(self) -> tuple[str, ...]:
+        """Return candidate environment IDs in curriculum progression order."""
+        return tuple(str(task.env_id) for task in self.candidates)
+
+    @property
+    def family_counts(self) -> dict[str, int]:
+        """Return candidate counts by game family."""
+        return _family_counts(self.candidates)
+
+    @property
+    def records(self) -> tuple[CurriculumTaskProgress, ...]:
+        """Return progress records in curriculum progression order."""
+        self._refresh_statuses()
+        return tuple(self._records[str(task.env_id)] for task in self.candidates)
+
+    def task_for_index(self, index: int) -> MarioTask:
+        """Return the deterministic adaptive task for a zero-based sample index."""
+        if index < 0:
+            raise ValueError("sample index must be >= 0")
+        key = str(int(index))
+        if key in self._episode_task_env_ids:
+            env_id = self._episode_task_env_ids[key]
+            if env_id in self._task_by_env_id:
+                return self._task_by_env_id[env_id]
+
+        frontier = self._frontier_for_sampling()
+        rng = random.Random(f"{self.config.seed}:adaptive:{int(index)}")
+        task = frontier[0] if len(frontier) == 1 else rng.choice(frontier)
+        env_id = str(task.env_id)
+        self._records[env_id].record_sample()
+        self._episode_task_env_ids[key] = env_id
+        self._refresh_statuses()
+        return task
+
+    def sample(self) -> MarioTask:
+        """Return the next deterministic adaptive sample and advance the cursor."""
+        task = self.task_for_index(self._sample_index)
+        self._sample_index += 1
+        return task
+
+    def task_for_episode(self, episode: int) -> MarioTask:
+        """Return the active task for an episode number and switch interval."""
+        if episode < 0:
+            raise ValueError("episode must be >= 0")
+        index = int(episode) // int(self.config.switch_interval_episodes)
+        return self.task_for_index(index)
+
+    def observe_episode(
+        self,
+        episode_metrics: Any,
+        *,
+        env_id: str | None = None,
+    ) -> None:
+        """Update task progress from completed episode metrics."""
+        record_env_id = env_id or _env_id_from_episode_metrics(episode_metrics)
+        if record_env_id is None or record_env_id not in self._records:
+            return
+        self._records[record_env_id].record_episode(
+            clear=bool(getattr(episode_metrics, "clear", False)),
+            death=bool(getattr(episode_metrics, "death", False)),
+            max_progress=getattr(episode_metrics, "max_progress", None),
+            config=self.config,
+        )
+        self._refresh_statuses()
+
+    def load_state_path(self, path: str | Path) -> None:
+        """Load curriculum state from a JSON artifact."""
+        payload = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+        self.load_state_dict(payload)
+
+    def load_state_dict(self, state: Mapping[str, Any] | None) -> None:
+        """Restore serialized progress records and sampling cursor."""
+        if not isinstance(state, Mapping):
+            return
+        payload: Mapping[str, Any] = state
+        if isinstance(state.get("curriculum"), Mapping):
+            payload = state["curriculum"]
+        if isinstance(payload.get("state"), Mapping):
+            payload = payload["state"]
+        self._sample_index = int(payload.get("sample_index", self._sample_index))
+        episode_task_env_ids = payload.get("episode_task_env_ids", {})
+        if isinstance(episode_task_env_ids, Mapping):
+            self._episode_task_env_ids = {
+                str(index): str(env_id)
+                for index, env_id in episode_task_env_ids.items()
+                if str(env_id) in self._task_by_env_id
+            }
+        records = payload.get("records", ())
+        if isinstance(records, Mapping):
+            records = records.values()
+        for raw_record in records:
+            if not isinstance(raw_record, Mapping):
+                continue
+            env_id = str(raw_record.get("env_id", ""))
+            task = self._task_by_env_id.get(env_id)
+            if task is None:
+                continue
+            self._records[env_id] = CurriculumTaskProgress.from_dict(
+                task,
+                raw_record,
+            )
+        self._refresh_statuses()
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return serializable adaptive-curriculum state."""
+        self._refresh_statuses()
+        return {
+            "mode": "adaptive",
+            "sample_index": int(self._sample_index),
+            "episode_task_env_ids": dict(sorted(self._episode_task_env_ids.items())),
+            "records": [record.to_dict() for record in self.records],
+        }
+
+    def metadata(self) -> dict[str, Any]:
+        """Return resolved curriculum metadata for artifacts."""
+        self._refresh_statuses()
+        active = self._active_frontier()
+        return {
+            "mode": "adaptive",
+            "enabled": bool(self.config.enabled),
+            "candidate_count": len(self.candidates),
+            "frontier_size": int(self.config.curriculum_frontier_size),
+            "active_env_ids": [str(task.env_id) for task in active],
+            "mastered_env_ids": [
+                record.env_id for record in self.records if record.mastered
+            ],
+            "locked_env_ids": [
+                record.env_id for record in self.records if record.status == "locked"
+            ],
+            "retired_env_ids": [
+                record.env_id for record in self.records if record.status == "retired"
+            ],
+            "family_counts": self.family_counts,
+            "mastery": {
+                "window": int(self.config.curriculum_mastery_window),
+                "min_episodes": int(self.config.curriculum_mastery_min_episodes),
+                "clear_rate": float(self.config.curriculum_mastery_clear_rate),
+                "death_rate": float(self.config.curriculum_mastery_death_rate),
+                "progress": self.config.curriculum_mastery_progress,
+            },
+            "lost_levels_prerequisite_family": (
+                self.config.curriculum_lost_levels_prerequisite_family
+            ),
+            "tasks": [
+                {
+                    "env_id": str(task.env_id),
+                    "game_family": str(task.game_family),
+                    "world": _optional_int(getattr(task, "world", None)),
+                    "stage": _optional_int(getattr(task, "stage", None)),
+                    "progression_index": index,
+                    "status": self._records[str(task.env_id)].status,
+                }
+                for index, task in enumerate(self.candidates)
+            ],
+        }
+
+    def payload(self) -> dict[str, Any]:
+        """Return metadata plus state for train artifacts."""
+        return {
+            "metadata": self.metadata(),
+            "state": self.state_dict(),
+            "counts": self.summary_counts(),
+        }
+
+    def summary_counts(self) -> dict[str, int]:
+        """Return active, mastered, locked, and retired task counts."""
+        self._refresh_statuses()
+        counts = {"active": 0, "mastered": 0, "locked": 0, "retired": 0}
+        for record in self.records:
+            if record.mastered:
+                counts["mastered"] += 1
+            if record.status in counts:
+                counts[record.status] += 1
+        return counts
+
+    def _frontier_for_sampling(self) -> tuple[MarioTask, ...]:
+        frontier = self._active_frontier()
+        if frontier:
+            return frontier
+        if not self.candidates:
+            raise ValueError("adaptive curriculum has no candidate tasks")
+        return (self.candidates[-1],)
+
+    def _active_frontier(self) -> tuple[MarioTask, ...]:
+        unlocked = []
+        for task in self.candidates:
+            record = self._records[str(task.env_id)]
+            if record.mastered:
+                continue
+            if self._is_task_locked(task):
+                continue
+            unlocked.append(task)
+        return tuple(unlocked[: int(self.config.curriculum_frontier_size)])
+
+    def _is_task_locked(self, task: MarioTask) -> bool:
+        if str(task.game_family) != "lost_levels":
+            return False
+        prerequisite_family = self.config.curriculum_lost_levels_prerequisite_family
+        prerequisites = [
+            self._records[str(candidate.env_id)]
+            for candidate in self.candidates
+            if str(candidate.game_family) == prerequisite_family
+        ]
+        if not prerequisites:
+            return False
+        return not all(record.mastered for record in prerequisites)
+
+    def _refresh_statuses(self) -> None:
+        active_ids = {str(task.env_id) for task in self._active_frontier()}
+        for task in self.candidates:
+            record = self._records[str(task.env_id)]
+            if record.mastered:
+                record.status = "retired"
+            elif str(task.env_id) in active_ids:
+                record.status = "active"
+            else:
+                record.status = "locked"
 
 
 class TaskFeatureEncoder:
@@ -375,6 +835,18 @@ def task_for_env_id_or_none(env_id: str) -> MarioTask | None:
         return None
 
 
+def build_task_sampler(
+    config: TaskSuiteConfig | Mapping[str, Any] | None,
+    *,
+    tasks: Iterable[MarioTask] | None = None,
+):
+    """Build the fixed task suite or adaptive curriculum requested by config."""
+    suite_config = _coerce_task_suite_config(config)
+    if suite_config.mode == "adaptive":
+        return AdaptiveCurriculum(suite_config, tasks=tasks)
+    return TaskSuite(suite_config, tasks=tasks)
+
+
 def choose_stage_env_id(
     *,
     seed: int | None = None,
@@ -470,6 +942,46 @@ def _task_sort_key(task: MarioTask) -> tuple[Any, ...]:
     )
 
 
+def _curriculum_sort_key(task: MarioTask) -> tuple[Any, ...]:
+    family_rank = {
+        "smb1": 0,
+        "smb2_usa": 1,
+        "smb3": 2,
+        "lost_levels": 3,
+    }.get(str(task.game_family), 50)
+    return (
+        family_rank,
+        not bool(task.single_stage),
+        _world_sort_value(getattr(task, "world", None)),
+        _world_sort_value(getattr(task, "stage", None)),
+        str(task.env_id),
+    )
+
+
+def _world_sort_value(value: Any) -> tuple[int, Any]:
+    if value is None:
+        return (0, 0)
+    try:
+        return (0, int(value))
+    except (TypeError, ValueError):
+        return (1, str(value))
+
+
+def _family_counts(tasks: Iterable[MarioTask]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for task in tasks:
+        family = str(task.game_family)
+        counts[family] = counts.get(family, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _env_id_from_episode_metrics(episode_metrics: Any) -> str | None:
+    task = getattr(episode_metrics, "task", None)
+    if task is None:
+        return None
+    return _optional_str(getattr(task, "task_id", None))
+
+
 def _weighted_choice(
     rng: random.Random,
     values: Sequence[str],
@@ -516,6 +1028,15 @@ def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _str_tuple(value: Any) -> tuple[str, ...]:
@@ -573,6 +1094,8 @@ def _family_weight_mapping(value: Any) -> dict[str, float]:
 
 
 __all__ = [
+    "AdaptiveCurriculum",
+    "CurriculumTaskProgress",
     "MarioTask",
     "TaskFeatureEncoder",
     "TaskFeatures",
@@ -581,6 +1104,7 @@ __all__ = [
     "UNKNOWN_TASK_VALUE",
     "available_env_ids",
     "available_tasks",
+    "build_task_sampler",
     "choose_stage_env_id",
     "encode_task_features",
     "smb3_stage_matrix",

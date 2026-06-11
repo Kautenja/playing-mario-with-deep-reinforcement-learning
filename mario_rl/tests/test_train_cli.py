@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from mario_rl.auxiliary import AuxiliaryLossConfig
+from mario_rl.envs import TaskSuiteConfig
 from mario_rl.tests.fakes import fake_env_factory, tiny_ppo_config, tiny_training_config
 from mario_rl.train import run
 
@@ -95,3 +96,49 @@ class TrainCliTest(TestCase):
             self.assertIn("game_family", structured_metrics["auxiliary"]["losses"])
             self.assertIn("global", structured_metrics)
             self.assertIn("fake_ppo_lightning", Path(payload["resolved_config"]).read_text())
+
+    def test_train_run_writes_adaptive_curriculum_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                task_suite=TaskSuiteConfig(
+                    enabled=True,
+                    mode="adaptive",
+                    include_env_ids=(
+                        "SuperMarioBros-1-1-v0",
+                        "SuperMarioBros-1-2-v0",
+                        "SuperMarioBros2-1-1-v0",
+                    ),
+                    single_stage=True,
+                    seed=7,
+                    curriculum_mastery_min_episodes=1,
+                    curriculum_mastery_clear_rate=1.0,
+                    curriculum_mastery_death_rate=0.0,
+                ),
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=5),
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            self.assertTrue(Path(payload["curriculum_state"]).is_file())
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            curriculum = structured_metrics["curriculum"]
+            state = curriculum["state"]
+
+            self.assertEqual("adaptive", curriculum["metadata"]["mode"])
+            self.assertEqual(
+                "SuperMarioBros-1-1-v0",
+                state["episode_task_env_ids"]["0"],
+            )
+            self.assertTrue(
+                any(
+                    record["env_id"] == "SuperMarioBros-1-1-v0"
+                    and record["mastered"]
+                    for record in state["records"]
+                )
+            )
+            self.assertGreaterEqual(curriculum["counts"]["active"], 1)

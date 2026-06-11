@@ -23,6 +23,7 @@ class ExperimentPaths:
     resolved_config: Path
     train_metrics: Path
     train_metrics_json: Path
+    curriculum_state: Path
     eval_metrics: Path
 
 
@@ -43,6 +44,7 @@ def experiment_paths(config: MarioRLConfig) -> ExperimentPaths:
         resolved_config=root / config.train.resolved_config_name,
         train_metrics=root / config.train.metrics_name,
         train_metrics_json=(root / config.train.metrics_name).with_suffix(".json"),
+        curriculum_state=root / "curriculum-state.json",
         eval_metrics=root / config.eval.metrics_name,
     )
 
@@ -113,6 +115,11 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "ppo_approximate_kl",
         "ppo_clip_fraction",
         "ppo_num_envs",
+        "curriculum_mode",
+        "curriculum_active_count",
+        "curriculum_mastered_count",
+        "curriculum_locked_count",
+        "curriculum_retired_count",
         "auxiliary_loss",
         "auxiliary_losses_json",
         "auxiliary_valid_counts_json",

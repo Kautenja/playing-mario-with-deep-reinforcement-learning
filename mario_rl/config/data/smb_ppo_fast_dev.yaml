@@ -33,6 +33,33 @@ reward_transform:
   missing_total_policy: error
   component_weights: {}
   missing_component_policy: zero
+task_suite:
+  enabled: true
+  mode: adaptive
+  game_families: [smb1, lost_levels, smb3]
+  single_stage: true
+  splits: [train]
+  exclude_splits: []
+  include_validated: true
+  exclude_validated: null
+  include_aliases: false
+  include_env_ids: [SuperMarioBros-1-1-v0, SuperMarioBros-1-2-v0, SuperMarioBros3-1-1-v0, SuperMarioBros2-1-1-v0]
+  exclude_env_ids: []
+  include_worlds: []
+  exclude_worlds: []
+  include_stages: []
+  exclude_stages: []
+  family_weights: {}
+  seed: 123
+  switch_interval_episodes: 1
+  curriculum_frontier_size: 1
+  curriculum_mastery_window: 5
+  curriculum_mastery_min_episodes: 3
+  curriculum_mastery_clear_rate: 0.8
+  curriculum_mastery_death_rate: 0.25
+  curriculum_mastery_progress: null
+  curriculum_lost_levels_prerequisite_family: smb1
+  curriculum_state_path: null
 replay:
   capacity: 1024
   batch_size: 8

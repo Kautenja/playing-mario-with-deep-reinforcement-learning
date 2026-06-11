@@ -11,7 +11,7 @@ import torch
 from lightning.pytorch import LightningModule
 
 from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
-from mario_rl.envs import TaskFeatureEncoder, TaskSuite
+from mario_rl.envs import TaskFeatureEncoder, build_task_sampler
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
@@ -63,7 +63,7 @@ class DQNLightningModule(LightningModule):
             seed=seed,
         )
         self.task_suite = (
-            TaskSuite(self.config.task_suite)
+            build_task_sampler(self.config.task_suite)
             if bool(getattr(self.config.task_suite, "enabled", False))
             else None
         )
@@ -190,6 +190,8 @@ class DQNLightningModule(LightningModule):
             "training_updates": int(self.training_updates),
             "epsilon_schedule": self.epsilon_schedule.state_dict(),
         }
+        if self.task_suite is not None and hasattr(self.task_suite, "state_dict"):
+            checkpoint["mario_rl_task_suite_state"] = self.task_suite.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore explicit schedule and counter state from a checkpoint."""
@@ -213,6 +215,8 @@ class DQNLightningModule(LightningModule):
         self.training_updates = int(state.get("training_updates", self.training_updates))
         if "epsilon_schedule" in state:
             self.epsilon_schedule.load_state_dict(state["epsilon_schedule"])
+        if self.task_suite is not None and "mario_rl_task_suite_state" in checkpoint:
+            self.task_suite.load_state_dict(checkpoint["mario_rl_task_suite_state"])
 
     def close_env(self) -> None:
         """Close the active environment if one has been created."""
@@ -257,11 +261,24 @@ class DQNLightningModule(LightningModule):
             "max_progress": float(global_metrics["max_progress"] or 0.0),
             "final_progress_mean": float(global_metrics["final_progress_mean"] or 0.0),
             "metrics_payload": metrics_payload,
+            **self._task_suite_metric_counts(),
         }
 
     def metrics_payload(self, *, include_active: bool = False) -> dict[str, Any]:
         """Return the structured Mario metrics payload for artifacts."""
         return self.metrics.to_payload(include_active=include_active)
+
+    def task_suite_payload(self) -> dict[str, Any] | None:
+        """Return sampler metadata/state for artifacts."""
+        if self.task_suite is None:
+            return None
+        if hasattr(self.task_suite, "payload"):
+            return self.task_suite.payload()
+        return {
+            "metadata": self.task_suite.metadata(),
+            "state": self.task_suite.state_dict(),
+            "counts": self.task_suite.summary_counts(),
+        }
 
     def _ensure_env(self) -> None:
         if self.env is not None and self._last_state is not None:
@@ -367,10 +384,15 @@ class DQNLightningModule(LightningModule):
             self.episode_clipped_reward += transformed.clipped_reward
 
         if terminated or truncated:
-            self.metrics.finish_episode(
+            episode_metrics = self.metrics.finish_episode(
                 terminated=bool(terminated),
                 truncated=bool(truncated),
             )
+            if episode_metrics is not None and self.task_suite is not None:
+                self.task_suite.observe_episode(
+                    episode_metrics,
+                    env_id=self._active_task_env_id,
+                )
             self.episodes += 1
             self._reset_active_episode()
         else:
@@ -454,6 +476,25 @@ class DQNLightningModule(LightningModule):
         if optimizer is None:
             return None
         return float(optimizer.param_groups[0]["lr"])
+
+    def _task_suite_metric_counts(self) -> dict[str, Any]:
+        if self.task_suite is None:
+            return {
+                "curriculum_mode": "disabled",
+                "curriculum_active_count": 0,
+                "curriculum_mastered_count": 0,
+                "curriculum_locked_count": 0,
+                "curriculum_retired_count": 0,
+            }
+        counts = self.task_suite.summary_counts()
+        mode = getattr(getattr(self.task_suite, "config", None), "mode", "fixed")
+        return {
+            "curriculum_mode": str(mode),
+            "curriculum_active_count": int(counts.get("active", 0)),
+            "curriculum_mastered_count": int(counts.get("mastered", 0)),
+            "curriculum_locked_count": int(counts.get("locked", 0)),
+            "curriculum_retired_count": int(counts.get("retired", 0)),
+        }
 
 
 __all__ = ["DQNLightningModule", "EnvFactory"]

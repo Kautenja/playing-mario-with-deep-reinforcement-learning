@@ -1,5 +1,7 @@
 """Public task metadata and feature encoding API."""
 from mario_rl.envs.tasks import (
+    AdaptiveCurriculum,
+    CurriculumTaskProgress,
     MarioTask,
     TaskFeatureEncoder,
     TaskFeatures,
@@ -8,6 +10,7 @@ from mario_rl.envs.tasks import (
     UNKNOWN_TASK_VALUE,
     available_env_ids,
     available_tasks,
+    build_task_sampler,
     choose_stage_env_id,
     encode_task_features,
     smb3_stage_matrix,
@@ -18,6 +21,8 @@ from mario_rl.envs.tasks import (
 
 
 __all__ = [
+    "AdaptiveCurriculum",
+    "CurriculumTaskProgress",
     "MarioTask",
     "TaskFeatureEncoder",
     "TaskFeatures",
@@ -26,6 +31,7 @@ __all__ = [
     "UNKNOWN_TASK_VALUE",
     "available_env_ids",
     "available_tasks",
+    "build_task_sampler",
     "choose_stage_env_id",
     "encode_task_features",
     "smb3_stage_matrix",

@@ -151,6 +151,15 @@ class ConfigSchemaTest(TestCase):
             "family_weights",
             "seed",
             "switch_interval_episodes",
+            "mode",
+            "curriculum_frontier_size",
+            "curriculum_mastery_window",
+            "curriculum_mastery_min_episodes",
+            "curriculum_mastery_clear_rate",
+            "curriculum_mastery_death_rate",
+            "curriculum_mastery_progress",
+            "curriculum_lost_levels_prerequisite_family",
+            "curriculum_state_path",
         ):
             self.assertIn(name, task_suite_fields)
 
@@ -229,6 +238,12 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("recurrent_actor_critic", actor_critic.model.architecture)
         self.assertTrue(actor_critic.model.task_conditioning)
         self.assertEqual(8, actor_critic.ppo.rollout_steps)
+        self.assertTrue(actor_critic.task_suite.enabled)
+        self.assertEqual("adaptive", actor_critic.task_suite.mode)
+        self.assertEqual(
+            "SuperMarioBros-1-1-v0",
+            actor_critic.task_suite.include_env_ids[0],
+        )
 
         auxiliary = load("smb_ppo_auxiliary_fast_dev")
         self.assertTrue(auxiliary.auxiliary.enabled)

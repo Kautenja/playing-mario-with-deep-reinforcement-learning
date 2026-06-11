@@ -17,7 +17,7 @@ from mario_rl.auxiliary import (
     extract_auxiliary_targets,
 )
 from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_actions
-from mario_rl.envs import TaskFeatureEncoder, TaskSuite
+from mario_rl.envs import TaskFeatureEncoder, build_task_sampler
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.metrics import MarioMetricsAccumulator
 from mario_rl.models import (
@@ -60,7 +60,7 @@ class PPOLightningModule(LightningModule):
         self.reward_transformer = RewardTransformer(self.config.reward_transform)
         self.metrics = MarioMetricsAccumulator(default_task_id=self.config.env.id)
         self.task_suite = (
-            TaskSuite(self.config.task_suite)
+            build_task_sampler(self.config.task_suite)
             if bool(getattr(self.config.task_suite, "enabled", False))
             else None
         )
@@ -283,6 +283,8 @@ class PPOLightningModule(LightningModule):
             "last_auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
             "training_updates": int(self.training_updates),
         }
+        if self.task_suite is not None and hasattr(self.task_suite, "state_dict"):
+            checkpoint["mario_rl_task_suite_state"] = self.task_suite.state_dict()
 
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore explicit rollout and metric counter state from a checkpoint."""
@@ -343,6 +345,8 @@ class PPOLightningModule(LightningModule):
             }
         )
         self.training_updates = int(state.get("training_updates", self.training_updates))
+        if self.task_suite is not None and "mario_rl_task_suite_state" in checkpoint:
+            self.task_suite.load_state_dict(checkpoint["mario_rl_task_suite_state"])
 
     def close_env(self) -> None:
         """Close all active rollout environments."""
@@ -401,11 +405,24 @@ class PPOLightningModule(LightningModule):
             "auxiliary_losses": dict(self.last_auxiliary_losses),
             "auxiliary_valid_counts": dict(self.last_auxiliary_valid_counts),
             "metrics_payload": metrics_payload,
+            **self._task_suite_metric_counts(),
         }
 
     def metrics_payload(self, *, include_active: bool = False) -> dict[str, Any]:
         """Return the structured Mario metrics payload for artifacts."""
         return self.metrics.to_payload(include_active=include_active)
+
+    def task_suite_payload(self) -> dict[str, Any] | None:
+        """Return sampler metadata/state for artifacts."""
+        if self.task_suite is None:
+            return None
+        if hasattr(self.task_suite, "payload"):
+            return self.task_suite.payload()
+        return {
+            "metadata": self.task_suite.metadata(),
+            "state": self.task_suite.state_dict(),
+            "counts": self.task_suite.summary_counts(),
+        }
 
     def _ensure_env(self) -> None:
         if self._vector_state_ready():
@@ -619,11 +636,16 @@ class PPOLightningModule(LightningModule):
                 for slot, is_done in enumerate(done):
                     if not bool(is_done):
                         continue
-                    self.metrics.finish_episode(
+                    episode_metrics = self.metrics.finish_episode(
                         terminated=bool(terminated_flags[slot]),
                         truncated=bool(truncated_flags[slot]),
                         slot=slot,
                     )
+                    if episode_metrics is not None and self.task_suite is not None:
+                        self.task_suite.observe_episode(
+                            episode_metrics,
+                            env_id=self._active_task_env_ids[slot],
+                        )
                     self.episodes += 1
                     self._reset_slot(slot)
             self._sync_episode_totals()
@@ -818,6 +840,25 @@ class PPOLightningModule(LightningModule):
         if array.shape != expected:
             raise ValueError(f"expected observation shape {expected}, got {array.shape}")
         return array
+
+    def _task_suite_metric_counts(self) -> dict[str, Any]:
+        if self.task_suite is None:
+            return {
+                "curriculum_mode": "disabled",
+                "curriculum_active_count": 0,
+                "curriculum_mastered_count": 0,
+                "curriculum_locked_count": 0,
+                "curriculum_retired_count": 0,
+            }
+        counts = self.task_suite.summary_counts()
+        mode = getattr(getattr(self.task_suite, "config", None), "mode", "fixed")
+        return {
+            "curriculum_mode": str(mode),
+            "curriculum_active_count": int(counts.get("active", 0)),
+            "curriculum_mastered_count": int(counts.get("mastered", 0)),
+            "curriculum_locked_count": int(counts.get("locked", 0)),
+            "curriculum_retired_count": int(counts.get("retired", 0)),
+        }
 
 
 def _positive_int(value: int, name: str) -> int:

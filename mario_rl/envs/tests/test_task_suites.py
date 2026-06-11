@@ -3,9 +3,13 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import replace
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from mario_rl.envs import MarioTask, TaskSuite, TaskSuiteConfig
+from mario_rl.envs import AdaptiveCurriculum, MarioTask, TaskSuite, TaskSuiteConfig
+from mario_rl.metrics import EpisodeMetrics, TaskMetricKey
 
 
 class TaskSuiteTest(TestCase):
@@ -121,3 +125,159 @@ class TaskSuiteTest(TestCase):
         self.assertGreater(len(full_catalog), len(registered))
         self.assertTrue(unvalidated)
         self.assertFalse(any(stage.env_id in registered for stage in unvalidated))
+
+    def test_adaptive_curriculum_unlocks_frontier_in_order(self):
+        tasks = _curriculum_tasks()
+        curriculum = AdaptiveCurriculum(
+            TaskSuiteConfig(
+                mode="adaptive",
+                seed=11,
+                curriculum_mastery_min_episodes=1,
+                curriculum_mastery_clear_rate=1.0,
+                curriculum_mastery_death_rate=0.0,
+            ),
+            tasks=tasks,
+        )
+
+        first = curriculum.task_for_episode(0)
+        self.assertEqual("SuperMarioBros-1-1-v0", first.env_id)
+        self.assertEqual("SuperMarioBros-1-1-v0", curriculum.task_for_episode(1).env_id)
+        self.assertIn(
+            "SuperMarioBros2-1-1-v0",
+            curriculum.metadata()["locked_env_ids"],
+        )
+
+        curriculum.observe_episode(
+            _episode(first.env_id, clear=True, progress=150.0),
+            env_id=first.env_id,
+        )
+        second = curriculum.task_for_episode(2)
+        self.assertEqual("SuperMarioBros-1-2-v0", second.env_id)
+        self.assertIn(
+            "SuperMarioBros2-1-1-v0",
+            curriculum.metadata()["locked_env_ids"],
+        )
+
+        curriculum.observe_episode(
+            _episode(second.env_id, clear=True, progress=175.0),
+            env_id=second.env_id,
+        )
+        self.assertEqual("SuperMarioBros2-1-1-v0", curriculum.task_for_episode(3).env_id)
+        counts = curriculum.summary_counts()
+        self.assertEqual(1, counts["active"])
+        self.assertEqual(2, counts["mastered"])
+        self.assertEqual(2, counts["retired"])
+
+    def test_adaptive_curriculum_sampling_is_seed_deterministic(self):
+        config = TaskSuiteConfig(
+            mode="adaptive",
+            seed=23,
+            curriculum_frontier_size=2,
+        )
+
+        first = [
+            AdaptiveCurriculum(config, tasks=_curriculum_tasks()).task_for_index(index).env_id
+            for index in range(8)
+        ]
+        second = [
+            AdaptiveCurriculum(config, tasks=_curriculum_tasks()).task_for_index(index).env_id
+            for index in range(8)
+        ]
+        changed_seed = replace(config, seed=24)
+        different = [
+            AdaptiveCurriculum(changed_seed, tasks=_curriculum_tasks())
+            .task_for_index(index)
+            .env_id
+            for index in range(8)
+        ]
+
+        self.assertEqual(first, second)
+        self.assertNotEqual(first, different)
+
+    def test_adaptive_curriculum_resumes_from_saved_state_artifact(self):
+        with TemporaryDirectory() as tmpdir:
+            tasks = _curriculum_tasks()
+            config = TaskSuiteConfig(
+                mode="adaptive",
+                seed=5,
+                curriculum_mastery_min_episodes=1,
+                curriculum_mastery_clear_rate=1.0,
+                curriculum_mastery_death_rate=0.0,
+            )
+            curriculum = AdaptiveCurriculum(config, tasks=tasks)
+            first = curriculum.task_for_episode(0)
+            curriculum.observe_episode(
+                _episode(first.env_id, clear=True, progress=120.0),
+                env_id=first.env_id,
+            )
+            state_path = Path(tmpdir) / "curriculum-state.json"
+            state_path.write_text(
+                json.dumps({"curriculum": curriculum.payload()}),
+                encoding="utf-8",
+            )
+
+            resumed = AdaptiveCurriculum(
+                replace(config, curriculum_state_path=str(state_path)),
+                tasks=tasks,
+            )
+
+            records = {record.env_id: record for record in resumed.records}
+            self.assertTrue(records["SuperMarioBros-1-1-v0"].mastered)
+            self.assertEqual("SuperMarioBros-1-2-v0", resumed.task_for_episode(1).env_id)
+
+
+def _curriculum_tasks():
+    return (
+        MarioTask(
+            env_id="SuperMarioBros-1-2-v0",
+            game="smb1",
+            game_family="smb1",
+            version=0,
+            rom_mode="vanilla",
+            world=1,
+            stage=2,
+            single_stage=True,
+        ),
+        MarioTask(
+            env_id="SuperMarioBros2-1-1-v0",
+            game="lost",
+            game_family="lost_levels",
+            version=0,
+            rom_mode="vanilla",
+            world=1,
+            stage=1,
+            single_stage=True,
+        ),
+        MarioTask(
+            env_id="SuperMarioBros-1-1-v0",
+            game="smb1",
+            game_family="smb1",
+            version=0,
+            rom_mode="vanilla",
+            world=1,
+            stage=1,
+            single_stage=True,
+        ),
+    )
+
+
+def _episode(env_id: str, *, clear: bool, progress: float) -> EpisodeMetrics:
+    return EpisodeMetrics(
+        episode=0,
+        complete=True,
+        task=TaskMetricKey(task_id=env_id, game_family="smb1"),
+        step_count=1,
+        frame_count=1,
+        episode_return=1.0,
+        transformed_return=1.0,
+        raw_return=1.0,
+        unclipped_return=1.0,
+        clipped_return=1.0,
+        clear=clear,
+        death=False,
+        timeout=False,
+        terminated=True,
+        truncated=False,
+        max_progress=progress,
+        final_progress=progress,
+    )

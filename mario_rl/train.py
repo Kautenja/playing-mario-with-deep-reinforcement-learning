@@ -87,6 +87,10 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         },
         **module.metrics_payload(include_active=True),
     }
+    task_suite_payload = module.task_suite_payload()
+    if task_suite_payload is not None:
+        metrics_payload["curriculum"] = task_suite_payload
+        write_json(paths.curriculum_state, task_suite_payload)
     if algorithm == "ppo":
         metrics_payload["ppo"] = {
             "total_loss": metrics.get("loss"),
@@ -121,6 +125,11 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "experiment_dir": str(paths.root),
                 "metrics": str(paths.train_metrics),
                 "metrics_json": str(paths.train_metrics_json),
+                "curriculum_state": (
+                    str(paths.curriculum_state)
+                    if task_suite_payload is not None
+                    else None
+                ),
                 "resolved_config": str(paths.resolved_config),
                 "tensorboard": str(tensorboard_logger.log_dir),
                 "env_frames": metrics["env_frames"],

@@ -11,6 +11,8 @@ from .actions import (
 from .config import MarioEnvConfig
 from .factory import make_env
 from .tasks import (
+    AdaptiveCurriculum,
+    CurriculumTaskProgress,
     MarioTask,
     TaskFeatureEncoder,
     TaskFeatures,
@@ -19,6 +21,7 @@ from .tasks import (
     UNKNOWN_TASK_VALUE,
     available_env_ids,
     available_tasks,
+    build_task_sampler,
     choose_stage_env_id,
     encode_task_features,
     smb3_stage_matrix,
@@ -40,7 +43,9 @@ from .wrappers import (
 
 __all__ = [
     "ACTION_SETS",
+    "AdaptiveCurriculum",
     "ClipRewardEnv",
+    "CurriculumTaskProgress",
     "DefaultSeedEnv",
     "DownsampleObservationEnv",
     "FrameStackEnv",
@@ -61,6 +66,7 @@ __all__ = [
     "action_set_summary",
     "available_env_ids",
     "available_tasks",
+    "build_task_sampler",
     "choose_stage_env_id",
     "encode_task_features",
     "get_action_set",

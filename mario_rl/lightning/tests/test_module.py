@@ -138,6 +138,59 @@ class LightningModuleTest(TestCase):
             self.assertEqual(module.env_frames, loaded.env_frames)
             self.assertEqual(module.epsilon_schedule.current_step, loaded.epsilon_schedule.current_step)
 
+    def test_checkpoint_round_trip_restores_adaptive_curriculum_state(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                task_suite=TaskSuiteConfig(
+                    enabled=True,
+                    mode="adaptive",
+                    include_env_ids=(
+                        "SuperMarioBros-1-1-v0",
+                        "SuperMarioBros-1-2-v0",
+                    ),
+                    single_stage=True,
+                    seed=13,
+                    curriculum_mastery_min_episodes=1,
+                    curriculum_mastery_clear_rate=1.0,
+                    curriculum_mastery_death_rate=0.0,
+                ),
+                replay=replace(config.replay, warmup=1),
+                train=replace(config.train, max_steps=5),
+            )
+            module = DQNLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+            trainer.fit(module)
+            checkpoint = Path(tmpdir) / "adaptive-round-trip.ckpt"
+            trainer.save_checkpoint(checkpoint)
+
+            loaded = DQNLightningModule.load_from_checkpoint(
+                checkpoint,
+                config=config,
+                env_factory=fake_env_factory,
+                map_location="cpu",
+            )
+
+            records = {
+                record["env_id"]: record
+                for record in loaded.task_suite.state_dict()["records"]
+            }
+            self.assertTrue(records["SuperMarioBros-1-1-v0"]["mastered"])
+            self.assertEqual(
+                "SuperMarioBros-1-2-v0",
+                loaded.task_suite.task_for_episode(loaded.episodes).env_id,
+            )
+
     def test_task_conditioning_trains_with_fake_unknown_task_metadata(self):
         with TemporaryDirectory() as tmpdir:
             config = tiny_training_config(tmpdir)
