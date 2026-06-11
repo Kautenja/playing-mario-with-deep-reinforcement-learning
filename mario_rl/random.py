@@ -21,11 +21,15 @@ else:
 
     from .config import MarioRLConfig, action_space_summary, cli
 
-    def run(config: MarioRLConfig) -> int:
+    def run(config: MarioRLConfig, *, env_factory=None) -> int:
         """Run a bounded random rollout for smoke checks."""
         from mario_rl.envs import make_env
 
-        env = make_env(config=config.env.to_mario_env_config())
+        env = (
+            env_factory(config)
+            if env_factory is not None
+            else make_env(config=config.env.to_mario_env_config())
+        )
         action_summary = action_space_summary(config, env=env)
         total_reward = 0.0
         steps = 0

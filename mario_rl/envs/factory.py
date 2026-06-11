@@ -5,13 +5,14 @@ import gymnasium as gym
 import gym_super_mario_bros
 from nes_py.wrappers import JoypadSpace
 
-from .actions import resolve_action_set
+from .actions import macro_action_summary, resolve_action_set, resolve_macro_action_set
 from .config import UNSET, MarioEnvConfig, coerce_config
 from .wrappers import (
     ClipRewardEnv,
     DefaultSeedEnv,
     DownsampleObservationEnv,
     FrameStackEnv,
+    MacroActionEnv,
     MaxFrameskipEnv,
     OpenCVLiveRenderEnv,
     OpenCVRecordVideoEnv,
@@ -26,6 +27,8 @@ def make_env(
     render_mode=UNSET,
     seed=UNSET,
     action_set=UNSET,
+    macro_actions=UNSET,
+    macro_action_set=UNSET,
     preprocess=UNSET,
     frame_skip=UNSET,
     image_size=UNSET,
@@ -55,6 +58,8 @@ def make_env(
         "render_mode": render_mode,
         "seed": seed,
         "action_set": action_set,
+        "macro_actions": macro_actions,
+        "macro_action_set": macro_action_set,
         "preprocess": preprocess,
         "frame_skip": frame_skip,
         "image_size": image_size,
@@ -83,6 +88,11 @@ def make_env(
     resolved_action_set = resolve_action_set(cfg.action_set, env=env)
     if not resolved_action_set.native:
         env = JoypadSpace(env, resolved_action_set.actions)
+    resolved_macro_action_set = (
+        resolve_macro_action_set(cfg.macro_action_set, resolved_action_set)
+        if cfg.macro_actions
+        else None
+    )
 
     if cfg.seed is not None:
         env = DefaultSeedEnv(env, cfg.seed)
@@ -91,6 +101,14 @@ def make_env(
         if cfg.frame_skip is not None and cfg.frame_skip > 1:
             env = MaxFrameskipEnv(env, skip=cfg.frame_skip)
 
+    if resolved_macro_action_set is not None:
+        env = MacroActionEnv(
+            env,
+            resolved_macro_action_set.actions,
+            macro_action_set=resolved_macro_action_set.name,
+        )
+
+    if cfg.preprocess:
         env = DownsampleObservationEnv(
             env,
             image_size=cfg.image_size,
@@ -134,8 +152,25 @@ def make_env(
         env = OpenCVLiveRenderEnv(env, window_name=cfg.env_id)
 
     env.mario_rl_action_set = resolved_action_set.name
-    env.mario_rl_action_count = resolved_action_set.num_actions
+    env.mario_rl_base_action_set = resolved_action_set.name
+    env.mario_rl_base_action_count = resolved_action_set.num_actions
+    env.mario_rl_action_count = (
+        resolved_macro_action_set.num_actions
+        if resolved_macro_action_set is not None
+        else resolved_action_set.num_actions
+    )
     env.mario_rl_native_action_space = resolved_action_set.native
+    env.mario_rl_macro_actions_enabled = resolved_macro_action_set is not None
+    env.mario_rl_macro_action_set = (
+        resolved_macro_action_set.name
+        if resolved_macro_action_set is not None
+        else None
+    )
+    env.mario_rl_macro_actions = (
+        [macro_action_summary(action) for action in resolved_macro_action_set.actions]
+        if resolved_macro_action_set is not None
+        else []
+    )
     return env
 
 

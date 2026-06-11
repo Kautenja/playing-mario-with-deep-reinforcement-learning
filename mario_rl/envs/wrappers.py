@@ -1,5 +1,6 @@
 """Gymnasium preprocessing wrappers for Mario training observations."""
 from collections import deque
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,64 @@ _INTERPOLATION = {
     "linear": cv2.INTER_LINEAR,
     "cubic": cv2.INTER_CUBIC,
 }
+
+
+class _StepInfoAccumulator:
+    """Accumulate reward diagnostics across repeated low-level env steps."""
+
+    def __init__(self) -> None:
+        self.total_reward = 0.0
+        self.frames_skipped = 0
+        self.raw_reward_sum = 0.0
+        self.has_raw_reward = False
+        self.unclipped_reward_sum = 0.0
+        self.has_unclipped_reward = False
+        self.clipped_reward_sum = 0.0
+        self.has_clipped_reward = False
+        self.component_sums: dict[str, float] = {}
+
+    def add(self, reward: float, info: dict[str, Any] | None, *, frame_count: int = 1) -> None:
+        self.total_reward += float(reward)
+        self.frames_skipped += max(int(frame_count), 1)
+        if not isinstance(info, dict):
+            return
+        raw_reward = info.get("raw_reward")
+        if raw_reward is not None:
+            self.raw_reward_sum += float(raw_reward)
+            self.has_raw_reward = True
+        unclipped_reward = info.get("reward_total_unclipped")
+        if unclipped_reward is not None:
+            self.unclipped_reward_sum += float(unclipped_reward)
+            self.has_unclipped_reward = True
+        clipped_reward = info.get("reward_total_clipped")
+        if clipped_reward is not None:
+            self.clipped_reward_sum += float(clipped_reward)
+            self.has_clipped_reward = True
+        components = info.get("reward_components")
+        if isinstance(components, dict):
+            for name, value in components.items():
+                key = str(name)
+                self.component_sums[key] = self.component_sums.get(key, 0.0) + float(value)
+
+    def apply(self, info: dict[str, Any] | None) -> dict[str, Any]:
+        result = dict(info or {})
+        if self.has_raw_reward:
+            result["raw_reward"] = self.raw_reward_sum
+        if self.has_unclipped_reward:
+            result["reward_total_unclipped"] = self.unclipped_reward_sum
+        if self.has_clipped_reward:
+            result["reward_total_clipped"] = self.clipped_reward_sum
+        if self.component_sums:
+            result["reward_components"] = dict(self.component_sums)
+        result["frames_skipped"] = self.frames_skipped
+        return result
+
+
+def _info_frame_count(info: dict[str, Any] | None) -> int:
+    if not isinstance(info, dict):
+        return 1
+    value = info.get("frames_skipped", 1)
+    return max(int(value), 1)
 
 
 class DefaultSeedEnv(gym.Wrapper):
@@ -46,43 +105,15 @@ class MaxFrameskipEnv(gym.Wrapper):
         return self.env.reset(seed=seed, options=options)
 
     def step(self, action):
-        total_reward = 0.0
+        accumulator = _StepInfoAccumulator()
         terminated = False
         truncated = False
         info: dict[str, Any] = {}
         obs = None
-        frames_skipped = 0
-        raw_reward_sum = 0.0
-        has_raw_reward = False
-        unclipped_reward_sum = 0.0
-        has_unclipped_reward = False
-        clipped_reward_sum = 0.0
-        has_clipped_reward = False
-        component_sums: dict[str, float] = {}
 
         for _ in range(self.skip):
             obs, reward, terminated, truncated, info = self.env.step(action)
-            frames_skipped += 1
-            total_reward += float(reward)
-            if isinstance(info, dict):
-                raw_reward = info.get("raw_reward")
-                if raw_reward is not None:
-                    raw_reward_sum += float(raw_reward)
-                    has_raw_reward = True
-                unclipped_reward = info.get("reward_total_unclipped")
-                if unclipped_reward is not None:
-                    unclipped_reward_sum += float(unclipped_reward)
-                    has_unclipped_reward = True
-                clipped_reward = info.get("reward_total_clipped")
-                if clipped_reward is not None:
-                    clipped_reward_sum += float(clipped_reward)
-                    has_clipped_reward = True
-                components = info.get("reward_components")
-                if isinstance(components, dict):
-                    for name, value in components.items():
-                        component_sums[str(name)] = (
-                            component_sums.get(str(name), 0.0) + float(value)
-                        )
+            accumulator.add(float(reward), info, frame_count=1)
             self._obs_buffer.append(np.array(obs, copy=True))
             if terminated or truncated:
                 break
@@ -92,17 +123,65 @@ class MaxFrameskipEnv(gym.Wrapper):
         if len(self._obs_buffer) == 2:
             obs = np.maximum(self._obs_buffer[0], self._obs_buffer[1])
 
-        info = dict(info)
-        if has_raw_reward:
-            info["raw_reward"] = raw_reward_sum
-        if has_unclipped_reward:
-            info["reward_total_unclipped"] = unclipped_reward_sum
-        if has_clipped_reward:
-            info["reward_total_clipped"] = clipped_reward_sum
-        if component_sums:
-            info["reward_components"] = component_sums
-        info["frames_skipped"] = frames_skipped
-        return obs, total_reward, terminated, truncated, info
+        info = accumulator.apply(info)
+        return obs, accumulator.total_reward, terminated, truncated, info
+
+
+class MacroActionEnv(gym.Wrapper):
+    """Expose named deterministic sequences of existing Joypad actions."""
+
+    def __init__(
+        self,
+        env: gym.Env,
+        macro_actions: Sequence[Any],
+        *,
+        macro_action_set: str,
+    ):
+        actions = tuple(macro_actions)
+        if not actions:
+            raise ValueError("macro_actions must contain at least one action")
+        super().__init__(env)
+        self.macro_actions = actions
+        self.macro_action_set = str(macro_action_set)
+        self.action_space = gym.spaces.Discrete(len(actions))
+
+    def step(self, action):
+        macro_index = int(action)
+        try:
+            macro = self.macro_actions[macro_index]
+        except IndexError as exc:
+            raise ValueError(f"macro action index out of range: {macro_index}") from exc
+
+        accumulator = _StepInfoAccumulator()
+        terminated = False
+        truncated = False
+        info: dict[str, Any] = {}
+        obs = None
+        macro_steps = 0
+
+        for joypad_action in tuple(macro.action_indices):
+            obs, reward, terminated, truncated, info = self.env.step(int(joypad_action))
+            macro_steps += 1
+            accumulator.add(
+                float(reward),
+                info if isinstance(info, dict) else None,
+                frame_count=_info_frame_count(info),
+            )
+            if terminated or truncated:
+                break
+
+        if obs is None:
+            raise RuntimeError("macro action wrapper did not step the environment")
+
+        info = accumulator.apply(info)
+        info["macro_action"] = macro_index
+        info["macro_action_name"] = str(macro.name)
+        info["macro_action_sequence"] = [int(index) for index in macro.action_indices]
+        info["macro_action_length"] = int(len(macro.action_indices))
+        info["macro_steps"] = int(macro_steps)
+        info["macro_actions_enabled"] = True
+        info["macro_action_set"] = self.macro_action_set
+        return obs, accumulator.total_reward, terminated, truncated, info
 
 
 class DownsampleObservationEnv(gym.ObservationWrapper):

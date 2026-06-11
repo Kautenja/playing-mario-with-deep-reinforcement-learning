@@ -14,6 +14,7 @@ from mario_rl.envs import (
     get_action_set,
     make_env,
     resolve_action_set,
+    resolve_macro_action_set,
     task_for_env_id,
 )
 
@@ -163,6 +164,55 @@ class MarioEnvFactoryTest(TestCase):
                     self.assertEqual(expected_count, env.mario_rl_action_count)
                 finally:
                     env.close()
+
+    def test_factory_can_enable_conservative_macro_actions(self):
+        base = resolve_action_set("complex")
+        macros = resolve_macro_action_set("conservative", base)
+        macro_names = {action.name for action in macros.actions}
+
+        self.assertIn("run_right", macro_names)
+        self.assertIn("short_jump", macro_names)
+        self.assertIn("full_jump", macro_names)
+        self.assertIn("run_jump", macro_names)
+        self.assertIn("hold_left", macro_names)
+        self.assertIn("crouch", macro_names)
+        self.assertIn("wait", macro_names)
+
+        env = make_env(
+            "SuperMarioBros-1-1-v0",
+            render_mode="rgb_array",
+            seed=123,
+            action_set="complex",
+            macro_actions=True,
+            frame_skip=1,
+            preprocess=False,
+            record_statistics=False,
+        )
+
+        try:
+            obs, info = env.reset(seed=123)
+            self.assertEqual((240, 256, 3), obs.shape)
+            self.assertIsInstance(info, dict)
+            self.assertEqual(macros.num_actions, env.action_space.n)
+            self.assertEqual("complex", env.mario_rl_action_set)
+            self.assertEqual(12, env.mario_rl_base_action_count)
+            self.assertEqual(macros.num_actions, env.mario_rl_action_count)
+            self.assertTrue(env.mario_rl_macro_actions_enabled)
+            self.assertEqual("conservative", env.mario_rl_macro_action_set)
+            self.assertEqual(macros.num_actions, len(env.mario_rl_macro_actions))
+        finally:
+            env.close()
+
+    def test_macro_actions_reject_native_nes_action_space(self):
+        with self.assertRaisesRegex(ValueError, "macro actions require"):
+            make_env(
+                "SuperMarioBros-1-1-v0",
+                render_mode="rgb_array",
+                action_set="nes",
+                macro_actions=True,
+                preprocess=False,
+                record_statistics=False,
+            )
 
     def test_config_object_can_create_unpreprocessed_base_env_alias(self):
         config = MarioEnvConfig(

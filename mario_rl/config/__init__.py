@@ -102,6 +102,8 @@ class EnvConfig:
     id: str = "SuperMarioBros-1-1-v0"
     render_mode: str | None = None
     action_set: str = "complex"
+    macro_actions: bool = False
+    macro_action_set: str = "conservative"
     seed: int | None = 123
     pixel_profile: str = CUSTOM_PIXEL_PROFILE
     image_size: tuple[int, int] = (84, 84)
@@ -131,6 +133,8 @@ class EnvConfig:
             render_mode=self.render_mode,
             seed=self.seed,
             action_set=self.action_set,
+            macro_actions=self.macro_actions,
+            macro_action_set=self.macro_action_set,
             preprocess=self.preprocess,
             frame_skip=self.frame_skip,
             image_size=self.image_size,
@@ -508,11 +512,17 @@ def pixel_observation_summary(config: MarioRLConfig) -> dict[str, Any]:
     }
 
 
-def action_space_summary(config: MarioRLConfig, *, env=None) -> dict[str, int | str | bool]:
+def action_space_summary(config: MarioRLConfig, *, env=None) -> dict[str, object]:
     """Return resolved action-space metadata for a config or constructed env."""
     from mario_rl.envs.actions import action_set_summary as _action_set_summary
 
-    return _action_set_summary(config.env.action_set, env=env)
+    return _action_set_summary(
+        config.env.action_set,
+        env=env,
+        macro_actions=bool(config.env.macro_actions),
+        macro_action_set=config.env.macro_action_set,
+        frame_skip=config.env.frame_skip,
+    )
 
 
 def resolve_model_num_actions(config: MarioRLConfig, *, env=None) -> int:

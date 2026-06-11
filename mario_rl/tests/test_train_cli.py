@@ -125,6 +125,50 @@ class TrainCliTest(TestCase):
             self.assertIn("global", structured_metrics)
             self.assertIn("fake_ppo_lightning", Path(payload["resolved_config"]).read_text())
 
+    def test_train_run_with_macro_actions_writes_macro_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                experiment_name="fake_ppo_macro_lightning",
+                env=replace(
+                    config.env,
+                    macro_actions=True,
+                    macro_action_set="conservative",
+                ),
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            self.assertEqual("train", payload["command"])
+            self.assertEqual("ppo", payload["algorithm"])
+            self.assertEqual("complex", payload["base_action_set"])
+            self.assertEqual(12, payload["base_action_count"])
+            self.assertTrue(payload["macro_actions_enabled"])
+            self.assertEqual("conservative", payload["macro_action_set"])
+            self.assertEqual(payload["action_count"], payload["macro_action_count"])
+            self.assertGreater(payload["action_count"], payload["base_action_count"])
+            self.assertTrue(
+                any(action["name"] == "run_jump" for action in payload["macro_actions"])
+            )
+            self.assertEqual(config.env.frame_skip, payload["macro_frame_skip"])
+            self.assertGreaterEqual(payload["global_step"], 1)
+
+            with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
+                metrics = list(csv.DictReader(stream))[-1]
+            self.assertEqual("True", metrics["macro_actions_enabled"])
+            self.assertEqual("conservative", metrics["macro_action_set"])
+            self.assertIn("run_jump", metrics["macro_actions_json"])
+
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            self.assertTrue(structured_metrics["macro_actions_enabled"])
+            self.assertEqual(payload["action_count"], structured_metrics["action_count"])
+            resolved_config_text = Path(payload["resolved_config"]).read_text()
+            self.assertIn("macro_actions: true", resolved_config_text)
+            self.assertIn("macro_action_set: conservative", resolved_config_text)
+
     def test_train_run_writes_rnd_exploration_artifacts(self):
         with TemporaryDirectory() as tmpdir:
             config = tiny_ppo_config(tmpdir)

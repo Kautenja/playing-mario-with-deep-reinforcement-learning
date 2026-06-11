@@ -9,10 +9,12 @@ from mario_rl.envs.wrappers import (
     ClipRewardEnv,
     DownsampleObservationEnv,
     FrameStackEnv,
+    MacroActionEnv,
     MaxFrameskipEnv,
     OpenCVLiveRenderEnv,
     TrainingTimeoutEnv,
 )
+from mario_rl.envs.actions import MacroAction
 from mario_rl.rewards import RewardTransformConfig, RewardTransformer
 
 
@@ -30,6 +32,7 @@ class TinyImageEnv(gym.Env):
     def __init__(self, steps):
         self.steps = list(steps)
         self.index = 0
+        self.actions = []
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
@@ -37,6 +40,7 @@ class TinyImageEnv(gym.Env):
         return self._obs(0), {"seed": seed, "reset_options": options}
 
     def step(self, action):
+        self.actions.append(int(action))
         reward, terminated, truncated, info = self.steps[self.index]
         self.index += 1
         return self._obs(self.index), reward, terminated, truncated, dict(info)
@@ -286,6 +290,65 @@ class RewardTransformTest(TestCase):
             self.assertEqual(4.0, info["raw_reward"])
             self.assertEqual(4.0, info["reward_total_unclipped"])
             self.assertEqual(3.0, info["reward_total_clipped"])
+            self.assertEqual(5.0, info["reward_components"]["progress"])
+            self.assertEqual(-1.0, info["reward_components"]["death"])
+        finally:
+            env.close()
+
+    def test_macro_action_sequences_stop_early_and_aggregate_diagnostics(self):
+        base_env = TinyImageEnv([
+            (
+                1.0,
+                False,
+                False,
+                {
+                    "frames_skipped": 2,
+                    "raw_reward": 1.0,
+                    "reward_total_unclipped": 1.5,
+                    "reward_total_clipped": 1.0,
+                    "reward_components": {"progress": 2.0},
+                },
+            ),
+            (
+                2.0,
+                True,
+                False,
+                {
+                    "frames_skipped": 3,
+                    "raw_reward": 2.0,
+                    "reward_total_unclipped": 2.5,
+                    "reward_total_clipped": 1.0,
+                    "reward_components": {"progress": 3.0, "death": -1.0},
+                },
+            ),
+            (99.0, False, False, {"frames_skipped": 1}),
+        ])
+        env = MacroActionEnv(
+            base_env,
+            (
+                MacroAction(
+                    name="test_macro",
+                    action_indices=(3, 4, 5),
+                    button_sequence=(("right",), ("right", "A"), ("right", "B")),
+                    description="Test sequence.",
+                ),
+            ),
+            macro_action_set="unit",
+        )
+
+        try:
+            _, reward, terminated, truncated, info = env.step(0)
+            self.assertEqual([3, 4], base_env.actions)
+            self.assertEqual(3.0, reward)
+            self.assertTrue(terminated)
+            self.assertFalse(truncated)
+            self.assertEqual(5, info["frames_skipped"])
+            self.assertEqual(2, info["macro_steps"])
+            self.assertEqual("test_macro", info["macro_action_name"])
+            self.assertEqual([3, 4, 5], info["macro_action_sequence"])
+            self.assertEqual(3.0, info["raw_reward"])
+            self.assertEqual(4.0, info["reward_total_unclipped"])
+            self.assertEqual(2.0, info["reward_total_clipped"])
             self.assertEqual(5.0, info["reward_components"]["progress"])
             self.assertEqual(-1.0, info["reward_components"]["death"])
         finally:

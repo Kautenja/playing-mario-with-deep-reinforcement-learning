@@ -68,3 +68,31 @@ class PlayCliTest(TestCase):
             self.assertEqual(1, payload["episode_count"])
             self.assertLessEqual(payload["total_steps"], config.eval.max_steps)
             self.assertTrue(Path(payload["checkpoint"]).is_file())
+
+    def test_play_loads_macro_action_checkpoint(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                experiment_name="fake_ppo_macro_eval",
+                env=replace(
+                    config.env,
+                    macro_actions=True,
+                    macro_action_set="conservative",
+                ),
+            )
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(0, train_run(config, env_factory=fake_env_factory))
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, play_run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            self.assertEqual("play", payload["command"])
+            self.assertEqual("ppo", payload["algorithm"])
+            self.assertTrue(payload["macro_actions_enabled"])
+            self.assertEqual("conservative", payload["macro_action_set"])
+            self.assertEqual(payload["action_count"], payload["macro_action_count"])
+            self.assertGreater(payload["action_count"], payload["base_action_count"])
+            self.assertEqual(1, payload["episode_count"])

@@ -96,8 +96,19 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
     )
     fieldnames = [
         "action_set",
+        "base_action_set",
+        "base_action_count",
         "action_count",
         "native_action_space",
+        "frame_skip",
+        "macro_actions_enabled",
+        "macro_action_set",
+        "macro_action_count",
+        "macro_action_sequence_count",
+        "macro_frame_skip",
+        "macro_frame_skip_interaction",
+        "macro_actions_json",
+        "macro_unavailable_actions_json",
         "reward_transform_mode",
         "reward_missing_total_policy",
         "reward_missing_component_policy",
@@ -188,6 +199,13 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
     if isinstance(row.get("auxiliary_valid_counts"), dict):
         row["auxiliary_valid_counts_json"] = json.dumps(
             row["auxiliary_valid_counts"],
+            sort_keys=True,
+        )
+    if isinstance(row.get("macro_actions"), (dict, list, tuple)):
+        row["macro_actions_json"] = json.dumps(row["macro_actions"], sort_keys=True)
+    if isinstance(row.get("macro_unavailable_actions"), (dict, list, tuple)):
+        row["macro_unavailable_actions_json"] = json.dumps(
+            row["macro_unavailable_actions"],
             sort_keys=True,
         )
     row = {name: _csv_value(row.get(name, "")) for name in fieldnames}

@@ -15,6 +15,8 @@ class MarioEnvConfig:
     render_mode: str | None = None
     seed: int | None = None
     action_set: str | tuple[tuple[str, ...], ...] = "complex"
+    macro_actions: bool = False
+    macro_action_set: str = "conservative"
     preprocess: bool = True
     frame_skip: int | None = 4
     image_size: tuple[int, int] = (84, 84)

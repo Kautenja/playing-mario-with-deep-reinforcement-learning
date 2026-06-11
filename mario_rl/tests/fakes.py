@@ -7,7 +7,7 @@ from pathlib import Path
 import gymnasium as gym
 import numpy as np
 
-from mario_rl.config import MarioRLConfig, load
+from mario_rl.config import MarioRLConfig, load, resolve_model_num_actions
 
 
 class FakeMarioEnv(gym.Env):
@@ -22,10 +22,12 @@ class FakeMarioEnv(gym.Env):
         env_id: str = "FakeMario-v0",
         game_family: str = "unknown",
         observation_shape: tuple[int, int, int] = (4, 84, 84),
+        num_actions: int = 12,
     ) -> None:
         self.episode_length = int(episode_length)
         self.env_id = str(env_id)
         self.game_family = str(game_family)
+        self.action_space = gym.spaces.Discrete(int(num_actions))
         self.observation_space = gym.spaces.Box(
             low=0,
             high=255,
@@ -102,6 +104,7 @@ def fake_env_factory(_config: MarioRLConfig) -> FakeMarioEnv:
         env_id=_config.env.id,
         game_family=_fake_game_family(_config.env.id),
         observation_shape=tuple(_config.replay.state_shape),
+        num_actions=resolve_model_num_actions(_config),
     )
 
 

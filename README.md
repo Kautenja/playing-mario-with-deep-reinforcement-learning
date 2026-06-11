@@ -61,6 +61,7 @@ name or path:
 python -m mario_rl.config list
 python -m mario_rl.config path smb_dqn_fast_dev
 python -m mario_rl.train --config smb_dqn_fast_dev --train.accelerator cpu
+python -m mario_rl.train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 python -m mario_rl.play --config smb_dqn_fast_dev --eval.checkpoint runs/smb_dqn_fast_dev/checkpoints/fast-dev.ckpt
 python -m mario_rl.eval_matrix --config smb_dqn_eval_matrix_fast_dev
 python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
@@ -71,6 +72,7 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 ```shell
 ./main.sh config list
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
+./main.sh train --config smb_ppo_macro_fast_dev --trainer.enable_progress_bar false
 ./main.sh play --config smb_dqn_fast_dev --eval.checkpoint runs/example.ckpt
 ./main.sh eval-matrix --config smb_dqn_eval_matrix_fast_dev
 ./main.sh random --config smb_dqn_fast_dev
@@ -79,6 +81,30 @@ python -m mario_rl.random --config smb_dqn_fast_dev --env.max_smoke_steps 32
 Nested overrides use `--section.field value` syntax. Bare positional
 `KEY=VALUE` overrides are intentionally rejected so experiment configuration is
 always explicit.
+
+## Action Abstractions
+
+Macro actions are disabled by default. Set `env.macro_actions: true` with a
+Joypad action set such as `complex` to expose named deterministic sequences of
+existing Joypad action indices to the policy. Native NES action mode
+(`env.action_set: nes`) remains available for 256-action experiments and is not
+combined with macro actions.
+
+The packaged `smb_ppo_macro_fast_dev` config uses the conservative macro set.
+It keeps every primitive Joypad action as a one-step macro, then adds named
+movement options: `run_right`, `short_jump`, `full_jump`, `run_jump`,
+`hold_left`, `crouch` when the selected Joypad set exposes down, and `wait`.
+Train, play, eval-matrix, and random payloads include the base action set, base
+action count, active macro set, active macro action count, and the resolved
+index/button sequence for each macro.
+
+Frame skip is applied inside each macro step. With `frame_skip: 4`, a macro
+sequence of eight Joypad indices can advance up to 32 emulator frames; if the
+underlying environment terminates or truncates early, the macro stops
+immediately and `frames_skipped` reports only the executed aggregate. Reward
+totals, unclipped/clipped reward diagnostics, and reward component sums are
+aggregated across the executed macro sequence using the same rules as the
+frame-skip wrapper.
 
 ## MacBook Trainability Gate
 

@@ -24,6 +24,7 @@ from mario_rl.config import (
     TaskSuiteConfig,
     TrainConfig,
     TrainerConfig,
+    action_space_summary,
     available_configs,
     config_path,
     from_mapping,
@@ -58,6 +59,8 @@ class ConfigSchemaTest(TestCase):
             "id",
             "render_mode",
             "action_set",
+            "macro_actions",
+            "macro_action_set",
             "seed",
             "pixel_profile",
             "image_size",
@@ -234,6 +237,7 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_eval_matrix_fast_dev", names)
         self.assertIn("smb_ppo_auxiliary_fast_dev", names)
         self.assertIn("smb_ppo_fast_dev", names)
+        self.assertIn("smb_ppo_macro_fast_dev", names)
         self.assertIn("smb_ppo_rnd_fast_dev", names)
         self.assertIn("smb_ppo_rgb_fast_dev", names)
         self.assertIn("smb_ppo_rgb_high_fidelity", names)
@@ -317,6 +321,17 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual("next_observation", rnd.exploration.observation_source)
         self.assertEqual(0.05, rnd.exploration.intrinsic_reward_scale)
         self.assertEqual(1.0, rnd.exploration.intrinsic_reward_clip)
+
+        macro = load("smb_ppo_macro_fast_dev")
+        macro_summary = action_space_summary(macro)
+        self.assertTrue(macro.env.macro_actions)
+        self.assertEqual("conservative", macro.env.macro_action_set)
+        self.assertEqual("complex", macro_summary["base_action_set"])
+        self.assertEqual(12, macro_summary["base_action_count"])
+        self.assertTrue(macro_summary["macro_actions_enabled"])
+        self.assertEqual("conservative", macro_summary["macro_action_set"])
+        self.assertEqual(macro_summary["action_count"], resolve_model_num_actions(macro))
+        self.assertGreater(macro_summary["action_count"], macro_summary["base_action_count"])
 
         from_path = load(path)
         self.assertEqual(config, from_path)
@@ -414,6 +429,24 @@ class ConfigSchemaTest(TestCase):
 
         self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
         self.assertEqual(256, resolved.model.num_actions)
+
+    def test_model_num_actions_auto_resolves_from_macro_actions(self):
+        config = parse_cli_config(
+            [
+                "--config",
+                "smb_ppo_fast_dev",
+                "--env.macro_actions",
+                "true",
+            ]
+        )
+
+        resolved = with_resolved_model_num_actions(config)
+        summary = action_space_summary(config)
+
+        self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
+        self.assertTrue(summary["macro_actions_enabled"])
+        self.assertEqual(summary["action_count"], resolved.model.num_actions)
+        self.assertGreater(resolved.model.num_actions, summary["base_action_count"])
 
     def test_fixed_model_num_actions_must_match_action_set(self):
         config = parse_cli_config(
