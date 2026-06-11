@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import json
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -14,6 +15,7 @@ from mario_rl.collect_demo import (
     DemoCollectionOptions,
     KeyInput,
     _command_for_key,
+    _collection_step_duration,
     _keys_to_action,
     _keys_to_action_for_action_set,
     run as run_collect_demo,
@@ -114,3 +116,10 @@ class CollectDemoTest(TestCase):
         self.assertEqual(1, keys_to_action[(ord("d"),)])
         self.assertEqual(4, keys_to_action[tuple(sorted((ord("d"), ord("o"), ord("p"))))])
         self.assertEqual(set(range(12)), set(keys_to_action.values()))
+
+    def test_fps_caps_native_frames_not_collector_steps(self):
+        config = tiny_ppo_config("/tmp")
+        config = replace(config, env=replace(config.env, frame_skip=4))
+
+        self.assertAlmostEqual(4.0 / 60.0, _collection_step_duration(config, 60.0))
+        self.assertAlmostEqual(4.0 / 30.0, _collection_step_duration(config, 30.0))

@@ -40,7 +40,7 @@ class DemoCollectionOptions:
     output_dir: str | Path | None = None
     episodes: int = 1
     max_steps: int = 5000
-    fps: float = 30.0
+    fps: float = 60.0
     repeat_last: bool = False
     source_notes: str = "human keyboard demonstration"
     window_name: str = "mario-rl demo"
@@ -85,10 +85,15 @@ def run(
     keys_to_action = _keys_to_action(env, config.env.action_set)
     reader = key_reader or PygletKeyboardReader(
         window_name=options.window_name,
-        fps=options.fps,
+        step_duration=_collection_step_duration(config, options.fps),
         action_keys=_action_keys(keys_to_action),
     )
-    _print_controls(keys_to_action, repeat_last=options.repeat_last)
+    _print_controls(
+        keys_to_action,
+        repeat_last=options.repeat_last,
+        native_fps=options.fps,
+        frame_skip=_collection_frame_skip(config),
+    )
     current_action = 0
     completed_episodes = 0
     total_steps = 0
@@ -174,14 +179,14 @@ class PygletKeyboardReader:
         self,
         *,
         window_name: str,
-        fps: float,
+        step_duration: float,
         action_keys: set[int],
     ) -> None:
         import pyglet
 
         self.pyglet = pyglet
         self.window_name = str(window_name)
-        self.frame_duration = 1.0 / max(float(fps), 1.0)
+        self.step_duration = max(float(step_duration), 0.0)
         self.next_frame_time = time.monotonic()
         self.action_keys = set(action_keys)
         self.relevant_keys = set(action_keys) | {ord("t")}
@@ -217,7 +222,7 @@ class PygletKeyboardReader:
         if self.next_frame_time > now:
             time.sleep(self.next_frame_time - now)
             now = time.monotonic()
-        self.next_frame_time = max(now, self.next_frame_time) + self.frame_duration
+        self.next_frame_time = max(now, self.next_frame_time) + self.step_duration
 
     def _show(self, frame: np.ndarray) -> None:
         if frame.ndim != 3 or frame.shape[2] != 3:
@@ -294,7 +299,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--max-steps", type=int, default=5000)
-    parser.add_argument("--fps", type=float, default=30.0)
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=60.0,
+        help="native NES frame-rate cap; collector action pacing accounts for frame skip",
+    )
     parser.add_argument("--repeat-last", action="store_true")
     parser.add_argument("--no-repeat-last", action="store_false", dest="repeat_last")
     parser.add_argument("--source-notes", default="human keyboard demonstration")
@@ -325,6 +335,20 @@ def _validate_supported_collection_config(config: MarioRLConfig) -> None:
     shape = tuple(int(value) for value in config.replay.state_shape)
     if int(config.model.input_channels) != shape[0]:
         raise ValueError("model.input_channels must match replay.state_shape channels")
+
+
+def _collection_frame_skip(config: MarioRLConfig) -> int:
+    if not bool(config.env.preprocess):
+        return 1
+    frame_skip = config.env.frame_skip
+    if frame_skip is None:
+        return 1
+    return max(int(frame_skip), 1)
+
+
+def _collection_step_duration(config: MarioRLConfig, native_fps: float) -> float:
+    fps = max(float(native_fps), 1.0)
+    return _collection_frame_skip(config) / fps
 
 
 NES_PY_BUTTON_KEYS = {
@@ -467,12 +491,20 @@ def _demo_filename(config: MarioRLConfig) -> str:
     return f"{timestamp}--{env_slug or 'mario'}--human-demo.npz"
 
 
-def _print_controls(keys_to_action: Mapping[Sequence[int], int], *, repeat_last: bool) -> None:
+def _print_controls(
+    keys_to_action: Mapping[Sequence[int], int],
+    *,
+    repeat_last: bool,
+    native_fps: float,
+    frame_skip: int,
+) -> None:
+    action_hz = float(native_fps) / max(int(frame_skip), 1)
     controls = [
         "Controls match nes-py human mode: d=right, a=left, s=down/crouch, w=up/door,",
         "          p=B/run, o=A/jump. Hold keys together for combos:",
         "          d+p=run right, d+o=right+jump, d+o+p=right+run+jump.",
         "          Enter=start and Space=select when exposed; t=manual reset; Esc=finish and save.",
+        f"Native FPS cap is {float(native_fps):g}; frame_skip={int(frame_skip)} -> {action_hz:g} collector steps/sec.",
         f"Repeat-last is {'on' if repeat_last else 'off'}; no held action defaults to NOOP.",
         f"Available bound key combos: {_format_bound_key_combos(keys_to_action)}",
     ]
