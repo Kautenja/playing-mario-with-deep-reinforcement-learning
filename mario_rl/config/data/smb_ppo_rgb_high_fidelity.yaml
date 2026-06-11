@@ -1,24 +1,23 @@
-experiment_name: smb_dqn_task_suite_fast_dev
+experiment_name: smb_ppo_rgb_high_fidelity
 save_dir: runs
 trainer:
-  accelerator: cpu
+  accelerator: auto
   devices: 1
   precision: 32-true
   deterministic: true
   seed: 123
-  enable_progress_bar: false
 env:
   id: SuperMarioBros-1-1-v0
-  render_mode: null
+  render_mode: rgb_array
   action_set: complex
   seed: 123
-  pixel_profile: custom
-  image_size: [40, 40]
+  pixel_profile: rgb_high_fidelity_120x128
+  image_size: [120, 128]
   frame_stack: 4
   reward_clipping: false
   frame_skip: 4
   preprocess: true
-  grayscale: true
+  grayscale: false
   channel_first: true
   interpolation: area
   record_statistics: true
@@ -28,8 +27,8 @@ env:
   video_enabled: false
   video_dir: null
   video_length: 0
-  video_name_prefix: mario-rl-task-suite-fast-dev
-  max_smoke_steps: 16
+  video_name_prefix: mario-rl-ppo-rgb-high-fidelity
+  max_smoke_steps: 256
 reward_transform:
   mode: env
   missing_total_policy: error
@@ -37,67 +36,88 @@ reward_transform:
   missing_component_policy: zero
 task_suite:
   enabled: true
-  game_families: [smb1, smb3]
+  mode: adaptive
+  game_families: [smb1, lost_levels, smb3]
   single_stage: true
   splits: [train]
   exclude_splits: []
   include_validated: true
   exclude_validated: null
   include_aliases: false
-  include_env_ids: [SuperMarioBros-1-1-v0, SuperMarioBros3-1-1-v0]
+  include_env_ids: [SuperMarioBros-1-1-v0, SuperMarioBros-1-2-v0, SuperMarioBros3-1-1-v0, SuperMarioBros2-1-1-v0]
   exclude_env_ids: []
   include_worlds: []
   exclude_worlds: []
   include_stages: []
   exclude_stages: []
-  family_weights:
-    smb1: 1.0
-    smb3: 1.0
-  seed: 321
+  family_weights: {}
+  seed: 123
   switch_interval_episodes: 1
+  curriculum_frontier_size: 2
+  curriculum_mastery_window: 20
+  curriculum_mastery_min_episodes: 10
+  curriculum_mastery_clear_rate: 0.8
+  curriculum_mastery_death_rate: 0.25
+  curriculum_mastery_progress: null
+  curriculum_lost_levels_prerequisite_family: smb1
+  curriculum_state_path: null
 replay:
-  capacity: 64
-  batch_size: 2
-  warmup: 2
+  capacity: 4096
+  batch_size: 8
+  warmup: 32
   prioritized: false
   priority_alpha: 0.6
   priority_beta: 0.4
   sample_dtype: uint8
-  state_shape: [4, 40, 40]
+  state_shape: [12, 120, 128]
   store_reward_info: true
 model:
-  architecture: dqn
-  input_channels: 4
-  hidden_size: 64
+  architecture: recurrent_actor_critic
+  input_channels: 12
+  hidden_size: 256
+  recurrent_hidden_size: 128
+  task_embedding_size: 32
   optimizer: adam
   learning_rate: 0.00025
   discount_factor: 0.99
   double_dqn: true
-  target_update_frequency: 4
+  target_update_frequency: 512
   compile: false
   num_actions: auto
   task_conditioning: true
   task_feature_size: 0
+ppo:
+  num_envs: 1
+  rollout_steps: 16
+  minibatch_size: 4
+  epochs: 2
+  gae_lambda: 0.95
+  clip_range: 0.2
+  value_loss_coefficient: 0.5
+  entropy_coefficient: 0.01
+  normalize_advantages: true
+  max_grad_norm: 0.5
 epsilon:
   start: 1.0
   final: 0.1
-  decay_frames: 32
+  decay_frames: 10000
 train:
-  max_frames: 32
-  max_steps: 8
-  fast_dev_run: true
-  log_interval: 1
+  algorithm: ppo
+  max_frames: 4096
+  max_steps: 256
+  fast_dev_run: false
+  log_interval: 16
   checkpoint_path: null
-  accelerator: cpu
+  accelerator: auto
   devices: 1
   output_dir_name: checkpoints
-  checkpoint_name: task-suite-fast-dev.ckpt
+  checkpoint_name: ppo-rgb-high-fidelity.ckpt
   resolved_config_name: resolved-config.yaml
   metrics_name: train-metrics.csv
 eval:
   checkpoint: null
   episodes: 1
-  max_steps: 8
+  max_steps: 256
   deterministic: true
   metrics_name: eval-metrics.json
   video_name: eval.mp4

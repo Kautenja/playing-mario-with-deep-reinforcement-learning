@@ -12,6 +12,7 @@ env:
   render_mode: null
   action_set: complex
   seed: 123
+  pixel_profile: custom
   image_size: [40, 40]
   frame_stack: 4
   reward_clipping: false

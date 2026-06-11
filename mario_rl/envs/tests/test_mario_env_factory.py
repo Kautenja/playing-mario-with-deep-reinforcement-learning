@@ -100,6 +100,27 @@ class MarioEnvFactoryTest(TestCase):
         finally:
             env.close()
 
+    def test_factory_creates_rgb_frame_stack(self):
+        env = make_env(
+            "SuperMarioBros-1-1-v0",
+            render_mode="rgb_array",
+            seed=123,
+            action_set="simple",
+            frame_skip=1,
+            frame_stack=2,
+            image_size=(30, 32),
+            grayscale=False,
+        )
+
+        try:
+            obs, _ = env.reset(seed=123)
+
+            self.assertEqual((6, 30, 32), obs.shape)
+            self.assertEqual(np.uint8, obs.dtype)
+            self.assertEqual((6, 30, 32), env.observation_space.shape)
+        finally:
+            env.close()
+
     def test_factory_can_keep_native_nes_action_space(self):
         env = make_env(
             "SuperMarioBros-1-1-v0",

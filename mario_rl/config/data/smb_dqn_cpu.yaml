@@ -11,6 +11,7 @@ env:
   render_mode: null
   action_set: complex
   seed: 123
+  pixel_profile: grayscale_84
   image_size: [84, 84]
   frame_stack: 4
   reward_clipping: false

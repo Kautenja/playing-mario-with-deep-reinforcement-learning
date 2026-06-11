@@ -5,7 +5,13 @@ import json
 from collections.abc import Sequence
 from dataclasses import replace
 
-from .config import MarioRLConfig, action_space_summary, cli, with_resolved_model_num_actions
+from .config import (
+    MarioRLConfig,
+    action_space_summary,
+    cli,
+    pixel_observation_summary,
+    with_resolved_model_num_actions,
+)
 from .rewards import reward_transform_summary
 
 
@@ -69,6 +75,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
 
     metrics = module.metrics_summary()
     action_summary = action_space_summary(config)
+    pixel_summary = pixel_observation_summary(config)
     reward_summary = reward_transform_summary(config.reward_transform)
     metrics.update(action_summary)
     metrics.update(reward_summary)
@@ -76,6 +83,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
         "command": "train",
         "algorithm": algorithm,
         **action_summary,
+        "pixel_observation": pixel_summary,
         **reward_summary,
         "lightning": {
             "global_step": metrics["global_step"],
@@ -124,6 +132,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
                 "command": "train",
                 "algorithm": algorithm,
                 **action_summary,
+                "pixel_observation": pixel_summary,
                 **reward_summary,
                 "checkpoint": str(paths.checkpoint),
                 "experiment_dir": str(paths.root),

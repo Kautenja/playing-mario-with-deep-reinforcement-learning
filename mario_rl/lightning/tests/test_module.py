@@ -13,7 +13,7 @@ import torch
 from lightning.pytorch import LightningModule, Trainer
 
 from mario_rl.auxiliary import AuxiliaryLossConfig
-from mario_rl.config import SnapshotCurriculumConfig
+from mario_rl.config import SnapshotCurriculumConfig, load
 from mario_rl.envs import UNKNOWN_TASK_VALUE
 from mario_rl.envs import TaskSuite, TaskSuiteConfig
 from mario_rl.lightning import DQNLightningModule, PPOLightningModule, trainer_accelerator
@@ -380,6 +380,23 @@ class PPOLightningModuleTest(TestCase):
             )
             self.assertEqual(3, module.episodes)
             self.assertEqual(6, module.metrics.global_summary(include_active=True).step_count)
+
+    def test_vectorized_ppo_rgb_rollout_storage_uses_resolved_state_shape(self):
+        with TemporaryDirectory() as tmpdir:
+            config = load("smb_ppo_rgb_fast_dev")
+            config = replace(
+                config,
+                save_dir=tmpdir,
+                env=replace(config.env, id="FakeMario-v0"),
+                task_suite=TaskSuiteConfig(enabled=False),
+            )
+            module = PPOLightningModule(config, env_factory=fake_env_factory)
+            rollout = module._new_rollout_storage()
+
+            self.assertEqual((12, 90, 96), rollout.observation_shape)
+            self.assertEqual((8, 2, 12, 90, 96), rollout.observations.shape)
+            self.assertEqual((12, 90, 96), module.policy.input_shape)
+            self.assertEqual(12, module.policy.features[0].in_channels)
 
     def test_vectorized_ppo_task_suite_assigns_initial_slots_independently(self):
         class _Task:

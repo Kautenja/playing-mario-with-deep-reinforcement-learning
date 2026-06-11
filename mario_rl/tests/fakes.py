@@ -14,12 +14,6 @@ class FakeMarioEnv(gym.Env):
     """Deterministic channel-first image env with Gymnasium step semantics."""
 
     action_space = gym.spaces.Discrete(12)
-    observation_space = gym.spaces.Box(
-        low=0,
-        high=255,
-        shape=(4, 84, 84),
-        dtype=np.uint8,
-    )
 
     def __init__(
         self,
@@ -27,10 +21,17 @@ class FakeMarioEnv(gym.Env):
         *,
         env_id: str = "FakeMario-v0",
         game_family: str = "unknown",
+        observation_shape: tuple[int, int, int] = (4, 84, 84),
     ) -> None:
         self.episode_length = int(episode_length)
         self.env_id = str(env_id)
         self.game_family = str(game_family)
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=255,
+            shape=tuple(int(dimension) for dimension in observation_shape),
+            dtype=np.uint8,
+        )
         self.step_count = 0
 
     def reset(self, *, seed=None, options=None):
@@ -100,6 +101,7 @@ def fake_env_factory(_config: MarioRLConfig) -> FakeMarioEnv:
     return FakeMarioEnv(
         env_id=_config.env.id,
         game_family=_fake_game_family(_config.env.id),
+        observation_shape=tuple(_config.replay.state_shape),
     )
 
 

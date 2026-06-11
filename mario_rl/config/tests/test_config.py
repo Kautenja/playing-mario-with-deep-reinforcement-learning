@@ -9,6 +9,7 @@ from unittest import TestCase
 
 from mario_rl.config import (
     AUTO_NUM_ACTIONS,
+    CUSTOM_PIXEL_PROFILE,
     AuxiliaryLossConfig,
     EnvConfig,
     EvalConfig,
@@ -24,9 +25,11 @@ from mario_rl.config import (
     TrainerConfig,
     available_configs,
     config_path,
+    from_mapping,
     load,
     main,
     parse_cli_config,
+    pixel_observation_summary,
     resolve_model_num_actions,
     with_resolved_model_num_actions,
 )
@@ -54,6 +57,7 @@ class ConfigSchemaTest(TestCase):
             "render_mode",
             "action_set",
             "seed",
+            "pixel_profile",
             "image_size",
             "frame_stack",
             "reward_clipping",
@@ -209,6 +213,8 @@ class ConfigSchemaTest(TestCase):
         self.assertIn("smb_dqn_eval_matrix_fast_dev", names)
         self.assertIn("smb_ppo_auxiliary_fast_dev", names)
         self.assertIn("smb_ppo_fast_dev", names)
+        self.assertIn("smb_ppo_rgb_fast_dev", names)
+        self.assertIn("smb_ppo_rgb_high_fidelity", names)
         self.assertIn("smb_dqn_cpu", names)
         self.assertIn("smb_dqn_mps", names)
 
@@ -222,8 +228,10 @@ class ConfigSchemaTest(TestCase):
         self.assertFalse(config.env.reward_clipping)
         self.assertEqual("env", config.reward_transform.mode)
         self.assertTrue(config.replay.store_reward_info)
+        self.assertEqual("grayscale_84", config.env.pixel_profile)
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
+        self.assertEqual(4, config.model.input_channels)
         self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
         self.assertEqual(12, resolve_model_num_actions(config))
 
@@ -276,6 +284,85 @@ class ConfigSchemaTest(TestCase):
 
         from_path = load(path)
         self.assertEqual(config, from_path)
+
+    def test_packaged_pixel_profiles_resolve_replay_and_model_shapes(self):
+        rgb = load("smb_ppo_rgb_fast_dev")
+
+        self.assertFalse(rgb.env.grayscale)
+        self.assertEqual("rgb_balanced_90x96", rgb.env.pixel_profile)
+        self.assertEqual((90, 96), rgb.env.image_size)
+        self.assertEqual((12, 90, 96), rgb.replay.state_shape)
+        self.assertEqual(12, rgb.model.input_channels)
+        self.assertEqual(2, rgb.ppo.num_envs)
+
+        summary = pixel_observation_summary(rgb)
+        self.assertEqual("rgb_balanced_90x96", summary["pixel_profile"])
+        self.assertEqual([12, 90, 96], summary["state_shape"])
+        self.assertEqual(103680, summary["bytes_per_observation"])
+
+        high = load("smb_ppo_rgb_high_fidelity")
+        self.assertEqual("rgb_high_fidelity_120x128", high.env.pixel_profile)
+        self.assertEqual((12, 120, 128), high.replay.state_shape)
+        self.assertEqual(12, high.model.input_channels)
+
+    def test_pixel_profile_can_fill_derived_shape_defaults(self):
+        config = from_mapping(
+            {
+                "env": {"pixel_profile": "rgb_balanced_90x96"},
+                "replay": {"capacity": 16},
+                "model": {"architecture": "recurrent_actor_critic"},
+            }
+        )
+
+        self.assertEqual((90, 96), config.env.image_size)
+        self.assertFalse(config.env.grayscale)
+        self.assertEqual((12, 90, 96), config.replay.state_shape)
+        self.assertEqual(12, config.model.input_channels)
+
+    def test_pixel_shape_mismatches_fail_clearly(self):
+        with self.assertRaisesRegex(ValueError, "replay.state_shape"):
+            from_mapping(
+                {
+                    "env": {
+                        "pixel_profile": "rgb_balanced_90x96",
+                        "image_size": [90, 96],
+                        "frame_stack": 4,
+                        "grayscale": False,
+                        "channel_first": True,
+                        "interpolation": "area",
+                    },
+                    "replay": {"state_shape": [4, 90, 96]},
+                }
+            )
+
+        with self.assertRaisesRegex(ValueError, "model.input_channels"):
+            from_mapping(
+                {
+                    "env": {"pixel_profile": "rgb_balanced_90x96"},
+                    "model": {"input_channels": 4},
+                }
+            )
+
+        with self.assertRaisesRegex(ValueError, "env.image_size"):
+            from_mapping(
+                {
+                    "env": {
+                        "pixel_profile": "rgb_balanced_90x96",
+                        "image_size": [84, 84],
+                    },
+                }
+            )
+
+    def test_all_packaged_configs_load_with_resolved_pixel_shapes(self):
+        for name in available_configs():
+            with self.subTest(name=name):
+                config = load(name)
+                expected_channels = (1 if config.env.grayscale else 3) * int(
+                    config.env.frame_stack or 1
+                )
+                self.assertEqual(expected_channels, config.model.input_channels)
+                self.assertEqual(expected_channels, config.replay.state_shape[0])
+                self.assertEqual(config.env.image_size, config.replay.state_shape[1:])
 
     def test_model_num_actions_auto_resolves_from_action_set(self):
         config = parse_cli_config(
@@ -333,6 +420,8 @@ class ConfigCliTest(TestCase):
                 "SuperMarioBros-1-1-v0",
                 "--env.image_size",
                 "20,24",
+                "--env.grayscale",
+                "false",
                 "--task_suite.enabled",
                 "true",
                 "--task_suite.family_weights",
@@ -364,7 +453,11 @@ class ConfigCliTest(TestCase):
 
         self.assertTrue(config.train.fast_dev_run)
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
+        self.assertEqual(CUSTOM_PIXEL_PROFILE, config.env.pixel_profile)
         self.assertEqual((20, 24), config.env.image_size)
+        self.assertFalse(config.env.grayscale)
+        self.assertEqual((12, 20, 24), config.replay.state_shape)
+        self.assertEqual(12, config.model.input_channels)
         self.assertTrue(config.task_suite.enabled)
         self.assertEqual({"smb1": 1, "smb3": 2}, config.task_suite.family_weights)
         self.assertTrue(config.evaluation_matrix.enabled)

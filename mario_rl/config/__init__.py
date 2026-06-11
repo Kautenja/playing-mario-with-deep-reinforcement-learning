@@ -21,6 +21,65 @@ except ImportError:  # pragma: no cover - local test fallback.
 
 
 AUTO_NUM_ACTIONS = "auto"
+CUSTOM_PIXEL_PROFILE = "custom"
+
+
+@dataclass(frozen=True)
+class PixelObservationProfile:
+    """Named preprocessing profile for pixel-only policy observations."""
+
+    name: str
+    description: str
+    grayscale: bool
+    image_size: tuple[int, int]
+    frame_stack: int
+    channel_first: bool = True
+    interpolation: str = "area"
+
+    @property
+    def input_channels(self) -> int:
+        """Return the channel count after grayscale/RGB conversion and stacking."""
+        channels = 1 if self.grayscale else 3
+        return channels * int(self.frame_stack)
+
+    @property
+    def state_shape(self) -> tuple[int, int, int]:
+        """Return the channel-first observation shape produced by this profile."""
+        height, width = self.image_size
+        return (self.input_channels, height, width)
+
+
+PIXEL_OBSERVATION_PROFILES: dict[str, PixelObservationProfile] = {
+    "grayscale_84": PixelObservationProfile(
+        name="grayscale_84",
+        description="Fast grayscale 84x84 baseline for smoke tests and laptop gates.",
+        grayscale=True,
+        image_size=(84, 84),
+        frame_stack=4,
+    ),
+    "rgb_balanced_90x96": PixelObservationProfile(
+        name="rgb_balanced_90x96",
+        description="Aspect-aware RGB profile for laptop smoke runs.",
+        grayscale=False,
+        image_size=(90, 96),
+        frame_stack=4,
+    ),
+    "rgb_high_fidelity_120x128": PixelObservationProfile(
+        name="rgb_high_fidelity_120x128",
+        description="Aspect-aware RGB profile for longer experiments.",
+        grayscale=False,
+        image_size=(120, 128),
+        frame_stack=4,
+    ),
+}
+
+_PIXEL_PROFILE_FIELDS = (
+    "image_size",
+    "frame_stack",
+    "grayscale",
+    "channel_first",
+    "interpolation",
+)
 
 
 @dataclass(frozen=True)
@@ -43,6 +102,7 @@ class EnvConfig:
     render_mode: str | None = None
     action_set: str = "complex"
     seed: int | None = 123
+    pixel_profile: str = CUSTOM_PIXEL_PROFILE
     image_size: tuple[int, int] = (84, 84)
     frame_stack: int | None = 4
     reward_clipping: bool = False
@@ -261,7 +321,11 @@ def config_path(name: str) -> Path:
 def load(config: str | Path | None = None) -> MarioRLConfig:
     """Load a packaged config name or YAML file path into a typed object."""
     if config is None:
-        return MarioRLConfig()
+        return with_resolved_pixel_observation(
+            MarioRLConfig(),
+            allow_replay_state_shape_update=True,
+            allow_model_input_channels_update=True,
+        )
     path = _resolve_config(config)
     data = _load_yaml_mapping(path)
     return from_mapping(data)
@@ -279,14 +343,27 @@ def from_mapping(data: Mapping[str, Any]) -> MarioRLConfig:
         "experiment_name": data.get("experiment_name", MarioRLConfig.experiment_name),
         "save_dir": data.get("save_dir", MarioRLConfig.save_dir),
     }
+    raw_sections: dict[str, Mapping[str, Any]] = {}
     for section_name, section_type in _SECTIONS.items():
         raw_section = data.get(section_name, {})
         if raw_section is None:
             raw_section = {}
         if not isinstance(raw_section, Mapping):
             raise TypeError(f"{section_name!r} must be a mapping")
+        raw_sections[section_name] = raw_section
         values[section_name] = _section_from_mapping(section_type, raw_section)
-    return MarioRLConfig(**values)
+    config = MarioRLConfig(**values)
+    config = _apply_pixel_profile(
+        config,
+        explicit_env_fields=set(raw_sections.get("env", ())),
+    )
+    return with_resolved_pixel_observation(
+        config,
+        allow_replay_state_shape_update="state_shape"
+        not in raw_sections.get("replay", ()),
+        allow_model_input_channels_update="input_channels"
+        not in raw_sections.get("model", ()),
+    )
 
 
 def parse_cli_config(argv: Sequence[str] | None = None, *, description: str | None = None) -> MarioRLConfig:
@@ -377,12 +454,55 @@ def apply_overrides(config: MarioRLConfig, overrides: Mapping[str, Any]) -> Mari
         else:
             value = _coerce_cli_value(raw_value, current)
         result = replace(result, **{section_name: replace(section, **{field_name: value})})
-    return result
+    env_override_fields = {
+        path.split(".", 1)[1]
+        for path in overrides
+        if path.startswith("env.")
+    }
+    if env_override_fields & set(_PIXEL_PROFILE_FIELDS) and "pixel_profile" not in env_override_fields:
+        result = replace(
+            result,
+            env=replace(result.env, pixel_profile=CUSTOM_PIXEL_PROFILE),
+        )
+    result = _apply_pixel_profile(result, explicit_env_fields=env_override_fields)
+    return with_resolved_pixel_observation(
+        result,
+        allow_replay_state_shape_update="replay.state_shape" not in overrides,
+        allow_model_input_channels_update="model.input_channels" not in overrides,
+    )
 
 
 def to_dict(config: MarioRLConfig) -> dict[str, Any]:
     """Return a JSON/YAML-friendly dictionary for a typed config."""
     return asdict(config)
+
+
+def pixel_observation_summary(config: MarioRLConfig) -> dict[str, Any]:
+    """Return resolved pixel-observation metadata for artifacts."""
+    resolved = with_resolved_pixel_observation(config)
+    state_shape = tuple(int(dimension) for dimension in resolved.replay.state_shape)
+    try:
+        import numpy as np
+    except ImportError:  # pragma: no cover - numpy is a declared dependency.
+        item_size = 1
+    else:
+        item_size = int(np.dtype(resolved.replay.sample_dtype).itemsize)
+    return {
+        "pixel_profile": resolved.env.pixel_profile,
+        "grayscale": bool(resolved.env.grayscale),
+        "image_size": list(resolved.env.image_size),
+        "frame_stack": (
+            int(resolved.env.frame_stack)
+            if resolved.env.frame_stack is not None
+            else 1
+        ),
+        "channel_first": bool(resolved.env.channel_first),
+        "interpolation": resolved.env.interpolation,
+        "state_shape": list(state_shape),
+        "input_channels": int(resolved.model.input_channels),
+        "sample_dtype": resolved.replay.sample_dtype,
+        "bytes_per_observation": int(item_size * _product(state_shape)),
+    }
 
 
 def action_space_summary(config: MarioRLConfig, *, env=None) -> dict[str, int | str | bool]:
@@ -412,10 +532,48 @@ def resolve_model_num_actions(config: MarioRLConfig, *, env=None) -> int:
 
 def with_resolved_model_num_actions(config: MarioRLConfig, *, env=None) -> MarioRLConfig:
     """Return ``config`` with automatic ``model.num_actions`` resolved to an int."""
+    config = with_resolved_pixel_observation(config)
     num_actions = resolve_model_num_actions(config, env=env)
     if config.model.num_actions == num_actions:
         return config
     return replace(config, model=replace(config.model, num_actions=num_actions))
+
+
+def with_resolved_pixel_observation(
+    config: MarioRLConfig,
+    *,
+    allow_replay_state_shape_update: bool = False,
+    allow_model_input_channels_update: bool = False,
+) -> MarioRLConfig:
+    """Return ``config`` with replay/model observation dimensions resolved."""
+    config = _apply_pixel_profile(config, explicit_env_fields=set(_PIXEL_PROFILE_FIELDS))
+    expected_shape = _expected_pixel_state_shape(config.env)
+    expected_channels = expected_shape[0]
+    result = config
+
+    if tuple(int(dimension) for dimension in result.replay.state_shape) != expected_shape:
+        if not allow_replay_state_shape_update:
+            raise ValueError(
+                "replay.state_shape "
+                f"{tuple(result.replay.state_shape)} does not match resolved "
+                f"pixel observation shape {expected_shape}"
+            )
+        result = replace(
+            result,
+            replay=replace(result.replay, state_shape=expected_shape),
+        )
+
+    if int(result.model.input_channels) != expected_channels:
+        if not allow_model_input_channels_update:
+            raise ValueError(
+                f"model.input_channels={result.model.input_channels} does not "
+                f"match resolved pixel channel count {expected_channels}"
+            )
+        result = replace(
+            result,
+            model=replace(result.model, input_channels=expected_channels),
+        )
+    return result
 
 
 def _override_paths() -> tuple[str, ...]:
@@ -508,6 +666,64 @@ def _section_from_mapping(section_type, data: Mapping[str, Any]):
                     getattr(defaults, field.name),
                 )
     return section_type(**values)
+
+
+def _apply_pixel_profile(
+    config: MarioRLConfig,
+    *,
+    explicit_env_fields: set[str],
+) -> MarioRLConfig:
+    profile_name = str(config.env.pixel_profile or CUSTOM_PIXEL_PROFILE)
+    if profile_name == CUSTOM_PIXEL_PROFILE:
+        return config
+    profile = PIXEL_OBSERVATION_PROFILES.get(profile_name)
+    if profile is None:
+        choices = ", ".join(
+            (CUSTOM_PIXEL_PROFILE, *sorted(PIXEL_OBSERVATION_PROFILES))
+        )
+        raise ValueError(
+            f"unknown env.pixel_profile {profile_name!r}; choose one of: {choices}"
+        )
+
+    updates = {}
+    for field_name in _PIXEL_PROFILE_FIELDS:
+        expected = getattr(profile, field_name)
+        current = getattr(config.env, field_name)
+        if field_name in explicit_env_fields:
+            if current != expected:
+                raise ValueError(
+                    f"env.{field_name}={current!r} does not match "
+                    f"pixel profile {profile_name!r} expected {expected!r}; "
+                    f"set env.pixel_profile={CUSTOM_PIXEL_PROFILE!r} for custom pixels"
+                )
+        else:
+            updates[field_name] = expected
+    if not updates:
+        return config
+    return replace(config, env=replace(config.env, **updates))
+
+
+def _expected_pixel_state_shape(env: EnvConfig) -> tuple[int, int, int]:
+    if not env.preprocess:
+        raise ValueError("env.preprocess must be true for pixel-only training configs")
+    if not env.channel_first:
+        raise ValueError("env.channel_first must be true for policy/model observations")
+    image_size = tuple(int(dimension) for dimension in env.image_size)
+    if len(image_size) != 2 or any(dimension <= 0 for dimension in image_size):
+        raise ValueError(f"env.image_size must be two positive integers, got {env.image_size!r}")
+    frame_stack = 1 if env.frame_stack is None else int(env.frame_stack)
+    if frame_stack <= 0:
+        raise ValueError(f"env.frame_stack must be positive or null, got {env.frame_stack!r}")
+    base_channels = 1 if env.grayscale else 3
+    height, width = image_size
+    return (base_channels * frame_stack, height, width)
+
+
+def _product(values: Sequence[int]) -> int:
+    total = 1
+    for value in values:
+        total *= int(value)
+    return total
 
 
 def _coerce_loaded_value(value: Any, default: Any) -> Any:
@@ -630,6 +846,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = [
     "AUTO_NUM_ACTIONS",
+    "CUSTOM_PIXEL_PROFILE",
     "AuxiliaryLossConfig",
     "EnvConfig",
     "EpsilonConfig",
@@ -637,6 +854,8 @@ __all__ = [
     "EvaluationMatrixConfig",
     "MarioRLConfig",
     "ModelConfig",
+    "PIXEL_OBSERVATION_PROFILES",
+    "PixelObservationProfile",
     "ReplayConfig",
     "RewardTransformConfig",
     "TaskSuiteConfig",
@@ -653,7 +872,9 @@ __all__ = [
     "load",
     "main",
     "parse_cli_config",
+    "pixel_observation_summary",
     "resolve_model_num_actions",
     "to_dict",
     "with_resolved_model_num_actions",
+    "with_resolved_pixel_observation",
 ]

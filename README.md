@@ -126,6 +126,40 @@ The previous DQN gate remains available when explicitly requested:
 ./main.sh verify-macbook --config smb_dqn_macbook_gate --experiment-prefix smb_dqn_macbook_gate
 ```
 
+## Pixel Observation Profiles
+
+Policies receive an image tensor only. RAM, `info` dictionaries, reward
+components, object maps, and tile maps are not fed into observation tensors.
+Task metadata remains separate from the pixel tensor and is used only by the
+existing sampler, metrics, artifact, and task-conditioning paths.
+
+Packaged configs declare `env.pixel_profile` so preprocessing choices are
+visible in resolved configs and train artifacts:
+
+| Profile | Configs | Shape | Use |
+| --- | --- | --- | --- |
+| `grayscale_84` | `smb_ppo_fast_dev`, `smb_dqn_fast_dev`, CPU/MPS DQN configs | `(4, 84, 84)` | Fastest smoke tests and the default MacBook gate. |
+| `rgb_balanced_90x96` | `smb_ppo_rgb_fast_dev` | `(12, 90, 96)` | Laptop RGB smoke runs that preserve NES aspect ratio. |
+| `rgb_high_fidelity_120x128` | `smb_ppo_rgb_high_fidelity` | `(12, 120, 128)` | Longer RGB experiments where throughput and memory headroom are acceptable. |
+
+The RGB profiles use four stacked RGB frames, so `model.input_channels` resolves
+to `3 * frame_stack`. The grayscale profile resolves to `1 * frame_stack`.
+`replay.state_shape` is derived from the same preprocessing settings; explicit
+mismatches fail during config load instead of allocating the wrong replay or PPO
+rollout shape.
+
+Approximate per-observation storage with `uint8` samples is 28 KiB for
+`grayscale_84`, 101 KiB for `rgb_balanced_90x96`, and 180 KiB for
+`rgb_high_fidelity_120x128`. RGB improves color fidelity for enemies, blocks,
+backgrounds, and powerups, but it increases convolution cost and PPO rollout
+memory. Use the grayscale profile for fast regression gates, the balanced RGB
+profile before committing to a color experiment, and the high-fidelity profile
+only after the balanced run shows acceptable local throughput.
+
+```shell
+./main.sh train --config smb_ppo_rgb_fast_dev --trainer.enable_progress_bar false
+```
+
 ## Recurrent Actor-Critic Smoke Training
 
 The recommended path for all-game policy training is the recurrent

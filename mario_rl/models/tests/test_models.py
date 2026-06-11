@@ -71,6 +71,21 @@ class DQNModelTest(TestCase):
         self.assertEqual(256, model.num_actions)
         self.assertEqual((2, 256), tuple(y.shape))
 
+    def test_model_factory_builds_rgb_recurrent_actor_critic(self):
+        config = load("smb_ppo_rgb_fast_dev")
+        model = build_model(config)
+        x = torch.zeros(1, *config.replay.state_shape, dtype=torch.uint8)
+        hidden = model.initial_state(batch_size=1)
+
+        with torch.no_grad():
+            output = model(x, hidden)
+
+        self.assertIsInstance(model, RecurrentActorCritic)
+        self.assertEqual((12, 90, 96), model.input_shape)
+        self.assertEqual(12, model.features[0].in_channels)
+        self.assertEqual((1, resolve_model_num_actions(config)), tuple(output.policy_logits.shape))
+        self.assertEqual((1,), tuple(output.value.shape))
+
     def test_dqn_task_conditioning_preserves_pixel_only_call_path(self):
         encoder = TaskFeatureEncoder()
         model = DQN(
