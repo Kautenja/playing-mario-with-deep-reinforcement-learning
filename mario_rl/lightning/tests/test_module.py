@@ -74,6 +74,35 @@ class LightningModuleTest(TestCase):
                 1,
             )
 
+    def test_fake_env_dqn_trains_with_prioritized_replay(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                replay=replace(config.replay, prioritized=True, warmup=1),
+                train=replace(config.train, max_steps=4),
+            )
+            module = DQNLightningModule(config, env_factory=fake_env_factory)
+            trainer = Trainer(
+                accelerator="cpu",
+                devices=1,
+                max_epochs=1,
+                max_steps=-1,
+                limit_train_batches=config.train.max_steps,
+                logger=False,
+                enable_checkpointing=False,
+                enable_progress_bar=False,
+            )
+
+            trainer.fit(module)
+
+            replay = module.replay_payload()
+            self.assertTrue(replay["prioritized"])
+            self.assertGreaterEqual(replay["priority_updates"], 1)
+            self.assertGreater(replay["max_priority"], 0.0)
+            self.assertGreater(module.last_importance_weight_mean, 0.0)
+            self.assertGreater(module.last_priority_mean, 0.0)
+
     def test_component_reward_transform_trains_with_fake_reward_components(self):
         with TemporaryDirectory() as tmpdir:
             config = tiny_training_config(tmpdir)

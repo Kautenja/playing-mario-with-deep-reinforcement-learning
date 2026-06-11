@@ -35,6 +35,16 @@ class DQNLossTest(TestCase):
 
         self.assertTrue(torch.allclose(torch.tensor(1.0), loss))
 
+    def test_huber_td_loss_applies_importance_sampling_weights(self):
+        q_values = torch.tensor([[0.0, 2.0, 4.0], [3.0, 5.0, 7.0]])
+        actions = torch.tensor([1, 0])
+        targets = torch.tensor([0.0, 4.0])
+        weights = torch.tensor([0.5, 1.0])
+
+        loss = compute_dqn_loss(q_values, actions, targets, sample_weights=weights)
+
+        self.assertTrue(torch.allclose(torch.tensor(0.625), loss))
+
     def test_td_targets_handle_terminated_and_truncated_transitions(self):
         rewards = torch.tensor([1.0, 1.0, 1.0])
         terminated = torch.tensor([False, True, False])

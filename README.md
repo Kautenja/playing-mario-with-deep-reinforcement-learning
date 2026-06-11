@@ -138,7 +138,7 @@ visible in resolved configs and train artifacts:
 
 | Profile | Configs | Shape | Use |
 | --- | --- | --- | --- |
-| `grayscale_84` | `smb_ppo_fast_dev`, `smb_dqn_fast_dev`, CPU/MPS DQN configs | `(4, 84, 84)` | Fastest smoke tests and the default MacBook gate. |
+| `grayscale_84` | `smb_ppo_fast_dev`, `smb_dqn_fast_dev`, `smb_dqn_prioritized_fast_dev`, CPU/MPS DQN configs | `(4, 84, 84)` | Fastest smoke tests and the default MacBook gate. |
 | `rgb_balanced_90x96` | `smb_ppo_rgb_fast_dev` | `(12, 90, 96)` | Laptop RGB smoke runs that preserve NES aspect ratio. |
 | `rgb_high_fidelity_120x128` | `smb_ppo_rgb_high_fidelity` | `(12, 120, 128)` | Longer RGB experiments where throughput and memory headroom are acceptable. |
 
@@ -258,9 +258,9 @@ auxiliary total is added directly to the PPO policy/value objective.
 ## Lightning DQN Smoke Training
 
 DQN remains available as a compact off-policy baseline using PyTorch Lightning,
-native PyTorch DQN modules, uniform replay, and the packaged config tree. Smoke
-runs write a resolved config, Lightning CSV and TensorBoard logs, train metrics,
-and a checkpoint under `runs/<experiment_name>/`.
+native PyTorch DQN modules, uniform replay by default, and the packaged config
+tree. Smoke runs write a resolved config, Lightning CSV and TensorBoard logs,
+train metrics, and a checkpoint under `runs/<experiment_name>/`.
 
 ```shell
 ./main.sh train --config smb_dqn_fast_dev --train.accelerator cpu
@@ -284,6 +284,21 @@ The play command defaults to the smoke checkpoint path for the selected config.
 Pass `--eval.checkpoint PATH` to evaluate a specific Lightning checkpoint.
 Training shows Lightning progress by default. Pass
 `--trainer.enable_progress_bar false` for quiet/headless runs.
+
+Set `replay.prioritized: true` to enable proportional prioritized replay for
+DQN. Prioritized batches carry sample indices and normalized importance weights,
+the Huber TD loss applies those weights per sample, and priorities are updated
+after each optimizer step from absolute TD error plus epsilon. The packaged
+smoke config exercises the path:
+
+```shell
+./main.sh train --config smb_dqn_prioritized_fast_dev --trainer.enable_progress_bar false
+```
+
+Train artifacts include a `replay` section in `train-metrics.json` plus CSV
+columns for whether replay was prioritized, alpha/beta, priority updates, and
+the latest importance-weight mean. The uniform replay contract remains the
+default when `replay.prioritized: false`.
 
 ## Task Metrics Artifacts
 

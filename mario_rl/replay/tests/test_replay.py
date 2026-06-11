@@ -9,7 +9,11 @@ import torch
 
 from mario_rl.config import MarioRLConfig
 from mario_rl.envs import TaskFeatureEncoder
-from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
+from mario_rl.replay import (
+    PrioritizedReplayBuffer,
+    UniformReplayBuffer,
+    build_replay_buffer,
+)
 
 
 class ReplayBufferTest(TestCase):
@@ -87,6 +91,8 @@ class ReplayBufferTest(TestCase):
         self.assertEqual(torch.float32, batch.reward.dtype)
         self.assertEqual(torch.bool, batch.terminated.dtype)
         self.assertEqual(torch.bool, batch.truncated.dtype)
+        self.assertIsNone(batch.indices)
+        self.assertIsNone(batch.importance_weights)
 
     def test_task_features_survive_push_sample_and_to_torch(self):
         encoder = TaskFeatureEncoder()
@@ -122,7 +128,76 @@ class ReplayBufferTest(TestCase):
         with self.assertRaises(ValueError):
             replay.sample(1)
 
-    def test_replay_factory_uses_config_and_gates_prioritized_replay(self):
+    def test_prioritized_replay_samples_high_priority_items_more_often(self):
+        replay = PrioritizedReplayBuffer(
+            capacity=4,
+            state_shape=(4, 8, 8),
+            priority_alpha=1.0,
+            priority_beta=0.5,
+            seed=123,
+        )
+        for index in range(4):
+            replay.push(
+                self._state(index),
+                action=index,
+                reward=float(index),
+                terminated=False,
+                truncated=False,
+                next_state=self._state(index + 1),
+            )
+        replay.update_priorities(
+            np.arange(4),
+            np.asarray([1.0, 1.0, 1.0, 100.0], dtype=np.float32),
+        )
+
+        counts = np.zeros(4, dtype=np.int64)
+        for _ in range(500):
+            batch = replay.sample(1)
+            self.assertIsNotNone(batch.indices)
+            self.assertIsNotNone(batch.importance_weights)
+            counts[int(batch.indices[0])] += 1
+
+        self.assertGreater(counts[3], 400)
+        self.assertLess(counts[:3].max(), counts[3])
+
+    def test_prioritized_replay_updates_are_deterministic_with_fixed_seed(self):
+        first = PrioritizedReplayBuffer(capacity=5, state_shape=(4, 8, 8), seed=99)
+        second = PrioritizedReplayBuffer(capacity=5, state_shape=(4, 8, 8), seed=99)
+        for replay in (first, second):
+            for index in range(5):
+                replay.push(
+                    self._state(index),
+                    action=index,
+                    reward=float(index),
+                    terminated=False,
+                    truncated=False,
+                    next_state=self._state(index + 1),
+                )
+            replay.update_priorities(
+                np.arange(5),
+                np.asarray([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32),
+            )
+
+        first_batch = first.sample(4)
+        second_batch = second.sample(4)
+        self.assertTrue(np.array_equal(first_batch.indices, second_batch.indices))
+        self.assertTrue(
+            np.allclose(
+                first_batch.importance_weights,
+                second_batch.importance_weights,
+            )
+        )
+
+        new_priorities = np.asarray([0.25, 0.5, 0.75, 1.0], dtype=np.float32)
+        first.update_priorities(first_batch.indices, new_priorities)
+        second.update_priorities(second_batch.indices, new_priorities)
+
+        self.assertEqual(first.priority_summary(), second.priority_summary())
+        self.assertTrue(
+            np.array_equal(first.sample(4).indices, second.sample(4).indices)
+        )
+
+    def test_replay_factory_uses_config_and_builds_prioritized_replay(self):
         config = MarioRLConfig()
         replay = build_replay_buffer(config, seed=123)
 
@@ -132,8 +207,16 @@ class ReplayBufferTest(TestCase):
         self.assertTrue(replay.store_reward_info)
 
         prioritized = replace(config, replay=replace(config.replay, prioritized=True))
-        with self.assertRaises(NotImplementedError):
-            build_replay_buffer(prioritized)
+        prioritized_replay = build_replay_buffer(prioritized, seed=123)
+        self.assertIsInstance(prioritized_replay, PrioritizedReplayBuffer)
+        self.assertEqual(
+            config.replay.priority_alpha,
+            prioritized_replay.priority_alpha,
+        )
+        self.assertEqual(
+            config.replay.priority_beta,
+            prioritized_replay.priority_beta,
+        )
 
         conditioned = replace(
             config,

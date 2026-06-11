@@ -79,15 +79,18 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
     pixel_summary = pixel_observation_summary(config)
     reward_summary = reward_transform_summary(config.reward_transform)
     exploration = exploration_summary(config)
+    replay = _replay_summary(config, module)
     metrics.update(action_summary)
     metrics.update(reward_summary)
     metrics.update(exploration)
+    metrics.update(_flat_replay_metrics(replay))
     metrics_payload = {
         "command": "train",
         "algorithm": algorithm,
         **action_summary,
         "pixel_observation": pixel_summary,
         **reward_summary,
+        "replay": replay,
         "exploration": {
             **exploration,
             "intrinsic_reward_total": metrics.get("intrinsic_reward_total", 0.0),
@@ -183,6 +186,43 @@ def _normalized_algorithm(config: MarioRLConfig) -> str:
     if value in {"ppo", "actor_critic", "recurrent_actor_critic"}:
         return "ppo"
     return value
+
+
+def _replay_summary(config: MarioRLConfig, module) -> dict[str, object]:
+    if hasattr(module, "replay_payload"):
+        return module.replay_payload()
+    return {
+        "prioritized": bool(config.replay.prioritized),
+        "capacity": int(config.replay.capacity),
+        "size": None,
+        "batch_size": int(config.replay.batch_size),
+        "warmup": int(config.replay.warmup),
+        "priority_alpha": float(config.replay.priority_alpha),
+        "priority_beta": float(config.replay.priority_beta),
+        "priority_epsilon": None,
+        "priority_updates": 0,
+        "max_priority": None,
+        "mean_priority": None,
+        "last_importance_weight_mean": None,
+        "last_priority_mean": None,
+        "sample_dtype": str(config.replay.sample_dtype),
+        "state_shape": [int(dimension) for dimension in config.replay.state_shape],
+        "store_reward_info": bool(config.replay.store_reward_info),
+        "training_updates": None,
+    }
+
+
+def _flat_replay_metrics(replay: dict[str, object]) -> dict[str, object]:
+    return {
+        "replay_prioritized": replay.get("prioritized"),
+        "replay_priority_alpha": replay.get("priority_alpha"),
+        "replay_priority_beta": replay.get("priority_beta"),
+        "replay_priority_epsilon": replay.get("priority_epsilon"),
+        "replay_priority_updates": replay.get("priority_updates"),
+        "replay_priority_max": replay.get("max_priority"),
+        "replay_priority_mean": replay.get("mean_priority"),
+        "replay_importance_weight_mean": replay.get("last_importance_weight_mean"),
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:

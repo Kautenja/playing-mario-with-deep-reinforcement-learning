@@ -14,7 +14,13 @@ from mario_rl.config import MarioRLConfig, to_dict, with_resolved_model_num_acti
 from mario_rl.envs import TaskFeatureEncoder, build_task_sampler
 from mario_rl.lightning.data import build_step_dataloader
 from mario_rl.metrics import MarioMetricsAccumulator
-from mario_rl.models import build_model, compute_dqn_loss, compute_td_targets, make_optimizer
+from mario_rl.models import (
+    build_model,
+    compute_dqn_loss,
+    compute_td_targets,
+    gather_action_q_values,
+    make_optimizer,
+)
 from mario_rl.replay import UniformReplayBuffer, build_replay_buffer
 from mario_rl.rewards import RewardTransformer
 from mario_rl.snapshots import SnapshotLibrary
@@ -84,6 +90,8 @@ class DQNLightningModule(LightningModule):
         self.episode_unclipped_reward = 0.0
         self.episode_clipped_reward = 0.0
         self.last_loss = 0.0
+        self.last_importance_weight_mean = 1.0
+        self.last_priority_mean = 0.0
         self.training_updates = 0
 
     def train_dataloader(self):
@@ -189,8 +197,11 @@ class DQNLightningModule(LightningModule):
             "episode_unclipped_reward": float(self.episode_unclipped_reward),
             "episode_clipped_reward": float(self.episode_clipped_reward),
             "last_loss": float(self.last_loss),
+            "last_importance_weight_mean": float(self.last_importance_weight_mean),
+            "last_priority_mean": float(self.last_priority_mean),
             "training_updates": int(self.training_updates),
             "epsilon_schedule": self.epsilon_schedule.state_dict(),
+            "replay": self.replay_payload(),
         }
         if self.task_suite is not None and hasattr(self.task_suite, "state_dict"):
             checkpoint["mario_rl_task_suite_state"] = self.task_suite.state_dict()
@@ -214,6 +225,12 @@ class DQNLightningModule(LightningModule):
             state.get("episode_clipped_reward", self.episode_clipped_reward)
         )
         self.last_loss = float(state.get("last_loss", self.last_loss))
+        self.last_importance_weight_mean = float(
+            state.get("last_importance_weight_mean", self.last_importance_weight_mean)
+        )
+        self.last_priority_mean = float(
+            state.get("last_priority_mean", self.last_priority_mean)
+        )
         self.training_updates = int(state.get("training_updates", self.training_updates))
         if "epsilon_schedule" in state:
             self.epsilon_schedule.load_state_dict(state["epsilon_schedule"])
@@ -287,6 +304,25 @@ class DQNLightningModule(LightningModule):
         if not self.snapshot_library.enabled and not self.snapshot_library.entries:
             return None
         return self.snapshot_library.payload()
+
+    def replay_payload(self) -> dict[str, Any]:
+        """Return JSON-safe replay sampling metadata for artifacts."""
+        payload = self.replay.priority_summary()
+        payload.update(
+            {
+                "batch_size": int(self.config.replay.batch_size),
+                "warmup": int(self.config.replay.warmup),
+                "sample_dtype": str(self.config.replay.sample_dtype),
+                "state_shape": [
+                    int(dimension) for dimension in self.config.replay.state_shape
+                ],
+                "store_reward_info": bool(self.config.replay.store_reward_info),
+                "last_importance_weight_mean": float(self.last_importance_weight_mean),
+                "last_priority_mean": float(self.last_priority_mean),
+                "training_updates": int(self.training_updates),
+            }
+        )
+        return payload
 
     def _ensure_env(self) -> None:
         if self.env is not None and self._last_state is not None:
@@ -443,10 +479,31 @@ class DQNLightningModule(LightningModule):
                 double_dqn=self.config.model.double_dqn,
             )
 
-        loss = compute_dqn_loss(q_values, batch.action, targets)
+        selected_q = gather_action_q_values(q_values, batch.action)
+        td_errors = (targets - selected_q).detach()
+        loss = compute_dqn_loss(
+            q_values,
+            batch.action,
+            targets,
+            sample_weights=batch.importance_weights,
+        )
         optimizer.zero_grad()
         self.manual_backward(loss)
         optimizer.step()
+        if batch.importance_weights is not None:
+            self.last_importance_weight_mean = float(
+                batch.importance_weights.detach().float().mean().cpu().item()
+            )
+        else:
+            self.last_importance_weight_mean = 1.0
+        if batch.indices is not None:
+            epsilon = float(getattr(self.replay, "priority_epsilon", 1e-6))
+            priorities = td_errors.abs().cpu().numpy() + epsilon
+            self.replay.update_priorities(
+                batch.indices.detach().cpu().numpy(),
+                priorities,
+            )
+            self.last_priority_mean = float(priorities.mean())
         self.training_updates += 1
         if self.training_updates % int(self.config.model.target_update_frequency) == 0:
             self.target_q_network.load_state_dict(self.q_network.state_dict())

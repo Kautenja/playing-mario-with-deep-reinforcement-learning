@@ -227,6 +227,7 @@ class ConfigSchemaTest(TestCase):
         names = available_configs()
 
         self.assertIn("smb_dqn_fast_dev", names)
+        self.assertIn("smb_dqn_prioritized_fast_dev", names)
         self.assertIn("smb_dqn_macbook_gate", names)
         self.assertIn("smb_dqn_task_conditioned_fast_dev", names)
         self.assertIn("smb_dqn_task_suite_fast_dev", names)
@@ -255,6 +256,12 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual(4, config.model.input_channels)
         self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
         self.assertEqual(12, resolve_model_num_actions(config))
+
+        prioritized = load("smb_dqn_prioritized_fast_dev")
+        self.assertTrue(prioritized.replay.prioritized)
+        self.assertEqual(0.6, prioritized.replay.priority_alpha)
+        self.assertEqual(0.4, prioritized.replay.priority_beta)
+        self.assertEqual((4, 84, 84), prioritized.replay.state_shape)
 
         conditioned = load("smb_dqn_task_conditioned_fast_dev")
         self.assertTrue(conditioned.model.task_conditioning)

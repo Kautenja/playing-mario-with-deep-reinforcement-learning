@@ -59,6 +59,30 @@ class TrainCliTest(TestCase):
             )
             self.assertIn("fake_lightning", Path(payload["resolved_config"]).read_text())
 
+    def test_train_run_writes_prioritized_replay_artifacts(self):
+        with TemporaryDirectory() as tmpdir:
+            config = tiny_training_config(tmpdir)
+            config = replace(
+                config,
+                replay=replace(config.replay, prioritized=True, warmup=1),
+                train=replace(config.train, max_steps=4),
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, run(config, env_factory=fake_env_factory))
+
+            payload = json.loads(output.getvalue().splitlines()[-1])
+            with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
+                metrics = list(csv.DictReader(stream))[-1]
+            structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
+            replay = structured_metrics["replay"]
+
+            self.assertTrue(replay["prioritized"])
+            self.assertGreaterEqual(replay["priority_updates"], 1)
+            self.assertGreater(replay["max_priority"], 0.0)
+            self.assertEqual("True", metrics["replay_prioritized"])
+            self.assertGreaterEqual(int(metrics["replay_priority_updates"]), 1)
+
     def test_train_run_selects_ppo_and_writes_smoke_artifacts(self):
         with TemporaryDirectory() as tmpdir:
             config = tiny_ppo_config(tmpdir)

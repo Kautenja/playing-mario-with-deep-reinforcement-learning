@@ -24,6 +24,8 @@ class TorchReplayBatch:
     clipped_reward: torch.Tensor | None = None
     task_features: torch.Tensor | None = None
     next_task_features: torch.Tensor | None = None
+    indices: torch.Tensor | None = None
+    importance_weights: torch.Tensor | None = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,8 @@ class ReplayBatch:
     clipped_reward: np.ndarray | None = None
     task_features: np.ndarray | None = None
     next_task_features: np.ndarray | None = None
+    indices: np.ndarray | None = None
+    importance_weights: np.ndarray | None = None
 
     def to_torch(self, device: torch.device | str | None = None) -> TorchReplayBatch:
         """Return a tensor batch, moving arrays to ``device`` only at this boundary."""
@@ -61,11 +65,18 @@ class ReplayBatch:
             clipped_reward=_optional_float_tensor(self.clipped_reward, device=device),
             task_features=_optional_tensor(self.task_features, device=device),
             next_task_features=_optional_tensor(self.next_task_features, device=device),
+            indices=_optional_long_tensor(self.indices, device=device),
+            importance_weights=_optional_float_tensor(
+                self.importance_weights,
+                device=device,
+            ),
         )
 
 
 class UniformReplayBuffer:
     """Fixed-capacity uniform replay buffer backed by typed NumPy arrays."""
+
+    prioritized = False
 
     def __init__(
         self,
@@ -197,9 +208,52 @@ class UniformReplayBuffer:
             raise ValueError("batch_size must be > 0")
         if self._size == 0:
             raise ValueError("cannot sample from an empty replay buffer")
+        indices = self._sample_uniform_indices(batch_size)
+        batch = self._batch_for_indices(indices)
+        if as_tensors or device is not None:
+            return batch.to_torch(device=device)
+        return batch
+
+    def update_priorities(self, indices: np.ndarray, priorities: np.ndarray) -> None:
+        """Reject priority updates for the uniform buffer contract."""
+        raise RuntimeError("uniform replay buffer does not track priorities")
+
+    def priority_summary(self) -> dict[str, Any]:
+        """Return JSON-safe replay sampling metadata."""
+        return {
+            "prioritized": False,
+            "capacity": int(self.capacity),
+            "size": int(self._size),
+            "priority_alpha": None,
+            "priority_beta": None,
+            "priority_epsilon": None,
+            "priority_updates": 0,
+            "max_priority": None,
+            "mean_priority": None,
+        }
+
+    def _sample_uniform_indices(self, batch_size: int) -> np.ndarray:
+        batch_size = self._validate_batch_size(batch_size)
         replace = self._size < batch_size
-        indices = self._rng.choice(self._size, size=batch_size, replace=replace)
-        batch = ReplayBatch(
+        return self._rng.choice(self._size, size=batch_size, replace=replace)
+
+    def _validate_batch_size(self, batch_size: int) -> int:
+        batch_size = int(batch_size)
+        if batch_size <= 0:
+            raise ValueError("batch_size must be > 0")
+        if self._size == 0:
+            raise ValueError("cannot sample from an empty replay buffer")
+        return batch_size
+
+    def _batch_for_indices(
+        self,
+        indices: np.ndarray,
+        *,
+        sample_indices: np.ndarray | None = None,
+        importance_weights: np.ndarray | None = None,
+    ) -> ReplayBatch:
+        indices = np.asarray(indices, dtype=np.int64)
+        return ReplayBatch(
             state=self._states[indices],
             action=self._actions[indices],
             reward=self._rewards[indices],
@@ -230,10 +284,9 @@ class UniformReplayBuffer:
                 if self._next_task_features is not None
                 else None
             ),
+            indices=sample_indices,
+            importance_weights=importance_weights,
         )
-        if as_tensors or device is not None:
-            return batch.to_torch(device=device)
-        return batch
 
     def _coerce_state(self, state: np.ndarray) -> np.ndarray:
         array = np.asarray(state, dtype=self.state_dtype)
@@ -254,14 +307,146 @@ class UniformReplayBuffer:
         return array
 
 
+class PrioritizedReplayBuffer(UniformReplayBuffer):
+    """Fixed-capacity proportional prioritized replay buffer."""
+
+    prioritized = True
+
+    def __init__(
+        self,
+        *,
+        capacity: int,
+        state_shape: tuple[int, ...],
+        state_dtype: np.dtype | str = np.uint8,
+        task_feature_shape: tuple[int, ...] | None = None,
+        task_feature_dtype: np.dtype | str = np.float32,
+        store_reward_info: bool = False,
+        priority_alpha: float = 0.6,
+        priority_beta: float = 0.4,
+        priority_epsilon: float = 1e-6,
+        seed: int | None = None,
+    ) -> None:
+        self.priority_alpha = float(priority_alpha)
+        self.priority_beta = float(priority_beta)
+        self.priority_epsilon = float(priority_epsilon)
+        if self.priority_alpha < 0.0:
+            raise ValueError("priority_alpha must be >= 0")
+        if self.priority_beta < 0.0:
+            raise ValueError("priority_beta must be >= 0")
+        if self.priority_epsilon <= 0.0:
+            raise ValueError("priority_epsilon must be > 0")
+        super().__init__(
+            capacity=capacity,
+            state_shape=state_shape,
+            state_dtype=state_dtype,
+            task_feature_shape=task_feature_shape,
+            task_feature_dtype=task_feature_dtype,
+            store_reward_info=store_reward_info,
+            seed=seed,
+        )
+        self._priorities = np.zeros(self.capacity, dtype=np.float32)
+        self._max_priority = 1.0
+        self.priority_updates = 0
+
+    def push(self, *args, **kwargs) -> None:
+        """Insert one transition with the current maximum priority."""
+        index = self._position
+        super().push(*args, **kwargs)
+        self._priorities[index] = max(self._max_priority, self.priority_epsilon)
+
+    def sample(
+        self,
+        batch_size: int,
+        *,
+        device: torch.device | str | None = None,
+        as_tensors: bool = False,
+    ) -> ReplayBatch | TorchReplayBatch:
+        """Sample according to proportional priorities with IS weights."""
+        batch_size = self._validate_batch_size(batch_size)
+        probabilities = self._sampling_probabilities()
+        replace = self._size < batch_size
+        indices = self._rng.choice(
+            self._size,
+            size=batch_size,
+            replace=replace,
+            p=probabilities,
+        )
+        weights = self._importance_weights(indices, probabilities)
+        batch = self._batch_for_indices(
+            indices,
+            sample_indices=np.asarray(indices, dtype=np.int64),
+            importance_weights=weights,
+        )
+        if as_tensors or device is not None:
+            return batch.to_torch(device=device)
+        return batch
+
+    def update_priorities(self, indices: np.ndarray, priorities: np.ndarray) -> None:
+        """Update sampled transition priorities in-place."""
+        index_array = np.asarray(indices, dtype=np.int64).reshape(-1)
+        priority_array = np.asarray(priorities, dtype=np.float32).reshape(-1)
+        if index_array.shape != priority_array.shape:
+            raise ValueError("indices and priorities must have the same shape")
+        if index_array.size == 0:
+            return
+        if np.any(index_array < 0) or np.any(index_array >= self._size):
+            raise IndexError("priority indices must refer to populated transitions")
+        if not np.all(np.isfinite(priority_array)):
+            raise ValueError("priorities must be finite")
+        priority_array = np.maximum(priority_array, self.priority_epsilon)
+        self._priorities[index_array] = priority_array
+        self._max_priority = max(self._max_priority, float(priority_array.max()))
+        self.priority_updates += int(index_array.size)
+
+    def priority_summary(self) -> dict[str, Any]:
+        """Return JSON-safe prioritized replay metadata."""
+        active = self._priorities[: self._size]
+        populated = active[active > 0.0]
+        return {
+            "prioritized": True,
+            "capacity": int(self.capacity),
+            "size": int(self._size),
+            "priority_alpha": float(self.priority_alpha),
+            "priority_beta": float(self.priority_beta),
+            "priority_epsilon": float(self.priority_epsilon),
+            "priority_updates": int(self.priority_updates),
+            "max_priority": (
+                float(populated.max()) if populated.size else float(self._max_priority)
+            ),
+            "mean_priority": (
+                float(populated.mean()) if populated.size else float(self._max_priority)
+            ),
+        }
+
+    def _sampling_probabilities(self) -> np.ndarray:
+        active = np.asarray(self._priorities[: self._size], dtype=np.float64)
+        if self.priority_alpha == 0.0:
+            return np.full(self._size, 1.0 / self._size, dtype=np.float64)
+        scaled = np.power(np.maximum(active, self.priority_epsilon), self.priority_alpha)
+        total = float(scaled.sum())
+        if not np.isfinite(total) or total <= 0.0:
+            return np.full(self._size, 1.0 / self._size, dtype=np.float64)
+        return scaled / total
+
+    def _importance_weights(
+        self,
+        indices: np.ndarray,
+        probabilities: np.ndarray,
+    ) -> np.ndarray:
+        if self.priority_beta == 0.0:
+            return np.ones(len(indices), dtype=np.float32)
+        selected = np.asarray(probabilities[indices], dtype=np.float64)
+        weights = np.power(self._size * selected, -self.priority_beta)
+        maximum = float(weights.max()) if weights.size else 1.0
+        if maximum > 0.0 and np.isfinite(maximum):
+            weights = weights / maximum
+        return weights.astype(np.float32)
+
+
 def build_replay_buffer(config: Any, *, seed: int | None = None) -> UniformReplayBuffer:
     """Build the active replay buffer from a typed config object."""
     replay_config = getattr(config, "replay", config)
     model_config = getattr(config, "model", None)
-    if bool(getattr(replay_config, "prioritized", False)):
-        raise NotImplementedError(
-            "prioritized replay is not part of the active PyTorch path yet"
-        )
     task_feature_shape = None
     if bool(getattr(model_config, "task_conditioning", False)):
         feature_size = int(getattr(model_config, "task_feature_size", 0) or 0)
@@ -270,13 +455,26 @@ def build_replay_buffer(config: Any, *, seed: int | None = None) -> UniformRepla
 
             feature_size = int(task_feature_size())
         task_feature_shape = (feature_size,)
-    return UniformReplayBuffer(
+    buffer_type = (
+        PrioritizedReplayBuffer
+        if bool(getattr(replay_config, "prioritized", False))
+        else UniformReplayBuffer
+    )
+    kwargs: dict[str, Any] = {}
+    if buffer_type is PrioritizedReplayBuffer:
+        kwargs.update(
+            priority_alpha=float(getattr(replay_config, "priority_alpha", 0.6)),
+            priority_beta=float(getattr(replay_config, "priority_beta", 0.4)),
+            priority_epsilon=float(getattr(replay_config, "priority_epsilon", 1e-6)),
+        )
+    return buffer_type(
         capacity=int(getattr(replay_config, "capacity")),
         state_shape=tuple(getattr(replay_config, "state_shape")),
         state_dtype=np.dtype(getattr(replay_config, "sample_dtype", np.uint8)),
         task_feature_shape=task_feature_shape,
         store_reward_info=bool(getattr(replay_config, "store_reward_info", False)),
         seed=seed,
+        **kwargs,
     )
 
 
@@ -298,6 +496,16 @@ def _optional_float_tensor(
     if value is None:
         return None
     return torch.as_tensor(value, dtype=torch.float32, device=device)
+
+
+def _optional_long_tensor(
+    value: np.ndarray | None,
+    *,
+    device: torch.device | str | None,
+) -> torch.Tensor | None:
+    if value is None:
+        return None
+    return torch.as_tensor(value, dtype=torch.long, device=device)
 
 
 def _optional_reward_value(

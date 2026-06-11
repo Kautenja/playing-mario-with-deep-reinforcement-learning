@@ -73,12 +73,25 @@ def compute_dqn_loss(
     actions: torch.Tensor,
     td_targets: torch.Tensor,
     *,
+    sample_weights: torch.Tensor | None = None,
     reduction: str = "mean",
 ) -> torch.Tensor:
     """Return SmoothL1/Huber loss for selected action values."""
     selected_q = gather_action_q_values(q_values, actions)
     td_targets = td_targets.to(device=q_values.device, dtype=torch.float32).view(-1)
-    return F.smooth_l1_loss(selected_q, td_targets, reduction=reduction)
+    losses = F.smooth_l1_loss(selected_q, td_targets, reduction="none")
+    if sample_weights is not None:
+        weights = sample_weights.to(device=q_values.device, dtype=torch.float32).view(-1)
+        if weights.shape[0] != losses.shape[0]:
+            raise ValueError("sample_weights batch dimension must match q_values")
+        losses = losses * weights
+    if reduction == "none":
+        return losses
+    if reduction == "sum":
+        return losses.sum()
+    if reduction == "mean":
+        return losses.mean()
+    raise ValueError(f"unsupported reduction: {reduction!r}")
 
 
 def compute_ppo_loss(
