@@ -127,6 +127,7 @@ class ModelConfig:
 class PPOConfig:
     """Rollout and PPO optimization settings for recurrent actor-critic."""
 
+    num_envs: int = 1
     rollout_steps: int = 32
     minibatch_size: int = 16
     epochs: int = 2

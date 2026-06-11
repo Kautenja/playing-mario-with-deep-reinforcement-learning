@@ -90,12 +90,12 @@ evaluates the checkpoint it just produced:
 ./main.sh verify-macbook
 ```
 
-The default gate uses `smb_dqn_macbook_gate`, a small real-environment config
-with 40x40 frame stacks, eight training steps, one eight-step evaluation
-episode, deterministic seeds, no rendering, and no video output. The command
-always verifies CPU. In `--device auto` mode it also runs the MPS gate when
-PyTorch reports Apple Silicon MPS availability, otherwise it prints a clear
-skip. A targeted MPS check can be run directly:
+The default gate uses `smb_ppo_fast_dev`, a small vectorized recurrent-PPO
+real-environment config with two rollout environments, deterministic seeds, no
+video output, a bounded training pass, and one short single-policy evaluation
+episode. The command always verifies CPU. In `--device auto` mode it also runs
+the MPS gate when PyTorch reports Apple Silicon MPS availability, otherwise it
+prints a clear skip. A targeted MPS check can be run directly:
 
 ```shell
 ./main.sh verify-macbook --device mps
@@ -120,6 +120,12 @@ Benchmark mode measures a bounded random environment rollout plus the same mini
 optimization pass so later specs can compare environment stepping and optimizer
 throughput against the saved summary.
 
+The previous DQN gate remains available when explicitly requested:
+
+```shell
+./main.sh verify-macbook --config smb_dqn_macbook_gate --experiment-prefix smb_dqn_macbook_gate
+```
+
 ## Recurrent Actor-Critic Smoke Training
 
 The recommended path for all-game policy training is the recurrent
@@ -134,11 +140,14 @@ estimation, clipped PPO losses, entropy regularization, and gradient clipping.
 tensorboard --logdir runs/smb_ppo_fast_dev/logs/tensorboard
 ```
 
-The packaged `smb_ppo_fast_dev` config is intentionally tiny: it runs a short
-CPU rollout against the local editable Mario environment and writes the usual
-resolved config, checkpoint, TensorBoard logs, `train-metrics.csv`, and
-structured `train-metrics.json` artifacts. Use this path as the starting point
-for multi-game task suites and native NES action-space experiments.
+The packaged `smb_ppo_fast_dev` config is intentionally tiny: it runs short
+CPU rollouts with `ppo.num_envs: 2` against the local editable Mario
+environment and writes the usual resolved config, checkpoint, TensorBoard logs,
+`train-metrics.csv`, and structured `train-metrics.json` artifacts. Raise
+`ppo.num_envs` to four or more for longer CPU throughput runs after the
+two-environment gate is stable on the target laptop. Use this path as the
+starting point for multi-game task suites and native NES action-space
+experiments.
 
 ## Auxiliary Losses
 

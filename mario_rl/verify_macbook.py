@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 
-DEFAULT_CONFIG = "smb_dqn_macbook_gate"
-DEFAULT_EXPERIMENT_PREFIX = "smb_dqn_macbook_gate"
+DEFAULT_CONFIG = "smb_ppo_fast_dev"
+DEFAULT_EXPERIMENT_PREFIX = "smb_ppo_vector_gate"
 FAST_UNIT_TESTS = (
     "mario_rl.config.tests.test_config",
     "mario_rl.tests.test_train_cli",

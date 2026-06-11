@@ -112,6 +112,7 @@ def write_train_metrics(path: Path, metrics: dict[str, Any]) -> None:
         "ppo_entropy",
         "ppo_approximate_kl",
         "ppo_clip_fraction",
+        "ppo_num_envs",
         "auxiliary_loss",
         "auxiliary_losses_json",
         "auxiliary_valid_counts_json",

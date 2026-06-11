@@ -273,6 +273,7 @@ class PPOLightningModuleTest(TestCase):
             self.assertTrue(math.isfinite(module.last_value_loss))
             self.assertGreaterEqual(module.episodes, 1)
             self.assertIn("train/ppo_policy_loss", trainer.callback_metrics)
+            self.assertIn("train/ppo_num_envs", trainer.callback_metrics)
             self.assertIn("train/clear_rate", trainer.callback_metrics)
 
     def test_ppo_recurrent_state_is_zeroed_after_terminal_step(self):
@@ -286,6 +287,73 @@ class PPOLightningModuleTest(TestCase):
             self.assertTrue(rollout.terminated[-1, 0])
             self.assertIsNotNone(module._hidden_state)
             self.assertTrue(torch.equal(module._hidden_state, torch.zeros_like(module._hidden_state)))
+
+    def test_vectorized_ppo_rollout_batches_slots_and_resets_only_finished_hidden(self):
+        with TemporaryDirectory() as tmpdir:
+            created = 0
+
+            def env_factory(config):
+                nonlocal created
+                episode_length = 1 if created == 0 else 99
+                created += 1
+                return FakeMarioEnv(episode_length=episode_length, env_id=config.env.id)
+
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                ppo=replace(config.ppo, num_envs=2, rollout_steps=3),
+            )
+            module = PPOLightningModule(config, env_factory=env_factory)
+            module._ensure_env()
+            rollout = module._collect_rollout()
+
+            self.assertEqual(2, rollout.num_envs)
+            self.assertEqual((3, 2), rollout.actions.shape)
+            self.assertTrue(np.all(rollout.terminated[:, 0]))
+            self.assertFalse(np.any(rollout.terminated[:, 1]))
+            self.assertIsNotNone(module._hidden_state)
+            self.assertTrue(
+                torch.equal(
+                    module._hidden_state[:, 0],
+                    torch.zeros_like(module._hidden_state[:, 0]),
+                )
+            )
+            self.assertFalse(
+                torch.equal(
+                    module._hidden_state[:, 1],
+                    torch.zeros_like(module._hidden_state[:, 1]),
+                )
+            )
+            self.assertEqual(3, module.episodes)
+            self.assertEqual(6, module.metrics.global_summary(include_active=True).step_count)
+
+    def test_vectorized_ppo_task_suite_assigns_initial_slots_independently(self):
+        class _Task:
+            def __init__(self, env_id):
+                self.env_id = env_id
+
+        class _CyclingSuite:
+            def task_for_episode(self, episode):
+                return _Task(("FakeMario-A-v0", "FakeMario-B-v0")[int(episode) % 2])
+
+        with TemporaryDirectory() as tmpdir:
+            seen_env_ids = []
+
+            def env_factory(config):
+                seen_env_ids.append(config.env.id)
+                return FakeMarioEnv(episode_length=4, env_id=config.env.id)
+
+            config = tiny_ppo_config(tmpdir)
+            config = replace(
+                config,
+                ppo=replace(config.ppo, num_envs=2, rollout_steps=1),
+            )
+            module = PPOLightningModule(config, env_factory=env_factory)
+            module.task_suite = _CyclingSuite()
+
+            module._ensure_env()
+
+            self.assertEqual(["FakeMario-A-v0", "FakeMario-B-v0"], seen_env_ids)
 
     def test_fake_env_ppo_run_trains_with_auxiliary_losses(self):
         with TemporaryDirectory() as tmpdir:

@@ -95,6 +95,7 @@ def run(config: MarioRLConfig, *, env_factory=None) -> int:
             "entropy": metrics.get("ppo_entropy"),
             "approximate_kl": metrics.get("ppo_approximate_kl"),
             "clip_fraction": metrics.get("ppo_clip_fraction"),
+            "num_envs": config.ppo.num_envs,
             "rollout_steps": config.ppo.rollout_steps,
             "minibatch_size": config.ppo.minibatch_size,
             "epochs": config.ppo.epochs,

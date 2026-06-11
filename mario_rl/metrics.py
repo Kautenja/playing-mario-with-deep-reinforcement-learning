@@ -400,7 +400,7 @@ class MarioMetricsAccumulator:
     def __init__(self, *, default_task_id: str | None = None) -> None:
         self.default_task_id = default_task_id
         self._episodes: list[EpisodeMetrics] = []
-        self._active: _ActiveEpisode | None = None
+        self._active: dict[int, _ActiveEpisode] = {}
         self._next_episode = 0
 
     @property
@@ -413,13 +413,22 @@ class MarioMetricsAccumulator:
         reset_info: Mapping[str, Any] | None = None,
         *,
         fallback_env_id: str | None = None,
+        slot: int = 0,
     ) -> None:
         """Start tracking a new episode from reset info."""
-        if self._active is not None and self._active.step_count > 0:
-            self.finish_episode(terminated=False, truncated=True, complete=False)
+        slot = int(slot)
+        active = self._active.get(slot)
+        if active is not None and active.step_count > 0:
+            self.finish_episode(
+                terminated=False,
+                truncated=True,
+                complete=False,
+                slot=slot,
+            )
         fallback = fallback_env_id or self.default_task_id
         task = TaskMetricKey.from_info(reset_info, fallback_env_id=fallback)
-        self._active = _ActiveEpisode(episode=self._next_episode, task=task)
+        self._active[slot] = _ActiveEpisode(episode=self._next_episode, task=task)
+        self._next_episode += 1
 
     def observe_step(
         self,
@@ -432,11 +441,13 @@ class MarioMetricsAccumulator:
         info: Mapping[str, Any] | None = None,
         fallback_env_id: str | None = None,
         frame_count: int | None = None,
+        slot: int = 0,
     ) -> StepMetrics:
         """Consume one step and update the active episode."""
-        if self._active is None:
-            self.start_episode(fallback_env_id=fallback_env_id)
-        assert self._active is not None
+        slot = int(slot)
+        if slot not in self._active:
+            self.start_episode(fallback_env_id=fallback_env_id, slot=slot)
+        active = self._active[slot]
         step = StepMetrics.from_step(
             reward=reward,
             transformed=transformed,
@@ -447,7 +458,7 @@ class MarioMetricsAccumulator:
             fallback_env_id=fallback_env_id or self.default_task_id,
             frame_count=frame_count,
         )
-        self._active.apply(step)
+        active.apply(step)
         return step
 
     def finish_episode(
@@ -456,33 +467,48 @@ class MarioMetricsAccumulator:
         terminated: bool | None = None,
         truncated: bool | None = None,
         complete: bool = True,
+        slot: int = 0,
     ) -> EpisodeMetrics | None:
         """Close the active episode and store its aggregate metrics."""
-        if self._active is None:
+        slot = int(slot)
+        active = self._active.pop(slot, None)
+        if active is None:
             return None
-        episode = self._active.to_episode_metrics(
+        episode = active.to_episode_metrics(
             complete=complete,
             terminated=terminated,
             truncated=truncated,
         )
         self._episodes.append(episode)
-        self._active = None
-        self._next_episode = max(self._next_episode, episode.episode + 1)
         return episode
 
-    def active_episode(self) -> EpisodeMetrics | None:
+    def active_episode(self, *, slot: int | None = None) -> EpisodeMetrics | None:
         """Return a snapshot of the current partial episode if it has steps."""
-        if self._active is None or self._active.step_count <= 0:
-            return None
-        return self._active.to_episode_metrics(complete=False)
+        if slot is not None:
+            active = self._active.get(int(slot))
+            if active is None or active.step_count <= 0:
+                return None
+            return active.to_episode_metrics(complete=False)
+        for active_slot in sorted(self._active):
+            active = self._active[active_slot]
+            if active.step_count > 0:
+                return active.to_episode_metrics(complete=False)
+        return None
+
+    def active_episodes(self) -> tuple[EpisodeMetrics, ...]:
+        """Return snapshots for all active partial episodes with observed steps."""
+        episodes = []
+        for slot in sorted(self._active):
+            active = self._active[slot]
+            if active.step_count > 0:
+                episodes.append(active.to_episode_metrics(complete=False))
+        return tuple(episodes)
 
     def episodes(self, *, include_active: bool = False) -> tuple[EpisodeMetrics, ...]:
-        """Return closed episodes, optionally including the active partial one."""
+        """Return closed episodes, optionally including active partial ones."""
         episodes = list(self._episodes)
         if include_active:
-            active = self.active_episode()
-            if active is not None:
-                episodes.append(active)
+            episodes.extend(self.active_episodes())
         return tuple(episodes)
 
     def global_summary(self, *, include_active: bool = False) -> AggregateMetrics:
@@ -497,7 +523,8 @@ class MarioMetricsAccumulator:
         episodes = self.episodes(include_active=include_active)
         by_family = _group_by(episodes, lambda item: item.task.game_family)
         by_task = _group_by(episodes, lambda item: item.task.task_id)
-        active = self.active_episode()
+        active_episodes = self.active_episodes()
+        active = active_episodes[0] if active_episodes else None
         return {
             "global": self.global_summary(include_active=include_active).to_dict(),
             "by_game_family": {
@@ -511,6 +538,7 @@ class MarioMetricsAccumulator:
             "episodes": [item.to_dict() for item in episodes],
             "closed_episode_count": len(self._episodes),
             "active_episode": active.to_dict() if active is not None else None,
+            "active_episodes": [item.to_dict() for item in active_episodes],
             "field_groups": metric_field_groups(),
         }
 

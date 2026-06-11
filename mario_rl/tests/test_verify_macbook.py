@@ -116,7 +116,7 @@ class VerifyMacbookCliTest(TestCase):
         args = build_parser().parse_args([])
 
         self.assertEqual("auto", args.device)
-        self.assertEqual("smb_dqn_macbook_gate", args.config)
+        self.assertEqual("smb_ppo_fast_dev", args.config)
         self.assertFalse(args.benchmark_only)
 
     def test_select_devices_handles_cpu_mps_and_auto_skip(self):
@@ -204,7 +204,7 @@ class VerifyMacbookArtifactAndMetricsTest(TestCase):
         sample = PerformanceSample(
             mode="gate",
             device="cpu",
-            config="smb_dqn_macbook_gate",
+            config="smb_ppo_fast_dev",
             experiment_name="slow",
             env_id="SuperMarioBros-1-1-v0",
             action_set="simple",
@@ -246,14 +246,17 @@ class VerifyMacbookArtifactAndMetricsTest(TestCase):
 class VerifyMacbookConfigAndSummaryTest(TestCase):
     """Validate the mini config and human summary output."""
 
-    def test_macbook_gate_config_is_bounded_and_loadable(self):
-        config = load("smb_dqn_macbook_gate")
+    def test_macbook_gate_config_is_bounded_vector_ppo_and_loadable(self):
+        config = load("smb_ppo_fast_dev")
 
         self.assertEqual("SuperMarioBros-1-1-v0", config.env.id)
-        self.assertLessEqual(config.train.max_steps, 16)
+        self.assertEqual("ppo", config.train.algorithm)
+        self.assertEqual("recurrent_actor_critic", config.model.architecture)
+        self.assertGreater(config.ppo.num_envs, 1)
+        self.assertLessEqual(config.train.max_steps, 2)
         self.assertLessEqual(config.env.max_smoke_steps, 32)
-        self.assertEqual((4, 40, 40), config.replay.state_shape)
-        self.assertLessEqual(config.replay.batch_size, 4)
+        self.assertEqual((4, 84, 84), config.replay.state_shape)
+        self.assertLessEqual(config.ppo.minibatch_size, 4)
 
     def test_format_device_summary_includes_core_perf_numbers(self):
         summary = {

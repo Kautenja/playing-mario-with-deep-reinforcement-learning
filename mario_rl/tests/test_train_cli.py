@@ -74,17 +74,22 @@ class TrainCliTest(TestCase):
             payload = json.loads(output.getvalue().splitlines()[-1])
             self.assertEqual("train", payload["command"])
             self.assertEqual("ppo", payload["algorithm"])
-            self.assertEqual(config.train.max_steps * config.ppo.rollout_steps, payload["env_frames"])
+            self.assertEqual(
+                config.train.max_steps * config.ppo.rollout_steps * config.ppo.num_envs,
+                payload["env_frames"],
+            )
             self.assertTrue(Path(payload["checkpoint"]).is_file())
             self.assertTrue(Path(payload["metrics_json"]).is_file())
             with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
                 metrics = list(csv.DictReader(stream))[-1]
             self.assertIn("ppo_policy_loss", metrics)
+            self.assertEqual(str(config.ppo.num_envs), metrics["ppo_num_envs"])
             self.assertIn("auxiliary_loss", metrics)
             self.assertIn("game_family", metrics["auxiliary_losses_json"])
             structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())
             self.assertEqual("ppo", structured_metrics["algorithm"])
             self.assertIn("ppo", structured_metrics)
+            self.assertEqual(config.ppo.num_envs, structured_metrics["ppo"]["num_envs"])
             self.assertIn("auxiliary", structured_metrics)
             self.assertTrue(structured_metrics["auxiliary"]["enabled"])
             self.assertIn("game_family", structured_metrics["auxiliary"]["losses"])

@@ -48,6 +48,7 @@ class PPOLightningModule(LightningModule):
         self._env_factory = env_factory
         self.automatic_optimization = False
         self.save_hyperparameters({"config": to_dict(self.config)})
+        self.num_envs = _positive_int(self.config.ppo.num_envs, "ppo.num_envs")
 
         policy = build_model(self.config)
         if not isinstance(policy, RecurrentActorCritic):
@@ -74,11 +75,19 @@ class PPOLightningModule(LightningModule):
         )
 
         self.env = None
-        self._active_task_env_id: str | None = None
-        self._last_state: np.ndarray | None = None
+        self.envs: list[Any | None] = []
+        self._active_task_env_ids: list[str | None] = []
+        self._last_states: list[np.ndarray | None] = []
+        self._slot_episode_indices: list[int | None] = []
+        self._next_episode_index = 0
         self._hidden_state: torch.Tensor | None = None
         self.env_frames = 0
         self.episodes = 0
+        self._slot_episode_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_env_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_raw_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_unclipped_reward = [0.0 for _ in range(self.num_envs)]
+        self._slot_episode_clipped_reward = [0.0 for _ in range(self.num_envs)]
         self.episode_reward = 0.0
         self.episode_env_reward = 0.0
         self.episode_raw_reward = 0.0
@@ -147,6 +156,12 @@ class PPOLightningModule(LightningModule):
         self.log(
             "train/ppo_clip_fraction",
             losses["clip_fraction"],
+            on_step=True,
+            prog_bar=False,
+        )
+        self.log(
+            "train/ppo_num_envs",
+            float(self.num_envs),
             on_step=True,
             prog_bar=False,
         )
@@ -248,8 +263,10 @@ class PPOLightningModule(LightningModule):
     def on_save_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Add rollout and environment counters to Lightning checkpoints."""
         checkpoint["mario_rl_state"] = {
+            "num_envs": int(self.num_envs),
             "env_frames": int(self.env_frames),
             "episodes": int(self.episodes),
+            "next_episode_index": int(self._next_episode_index),
             "episode_reward": float(self.episode_reward),
             "episode_env_reward": float(self.episode_env_reward),
             "episode_raw_reward": float(self.episode_raw_reward),
@@ -270,8 +287,17 @@ class PPOLightningModule(LightningModule):
     def on_load_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore explicit rollout and metric counter state from a checkpoint."""
         state = checkpoint.get("mario_rl_state", {})
+        saved_num_envs = int(state.get("num_envs", self.num_envs))
+        if saved_num_envs != self.num_envs:
+            raise ValueError(
+                f"checkpoint PPO num_envs={saved_num_envs} does not match "
+                f"configured num_envs={self.num_envs}"
+            )
         self.env_frames = int(state.get("env_frames", self.env_frames))
         self.episodes = int(state.get("episodes", self.episodes))
+        self._next_episode_index = int(
+            state.get("next_episode_index", max(self._next_episode_index, self.episodes))
+        )
         self.episode_reward = float(state.get("episode_reward", self.episode_reward))
         self.episode_env_reward = float(
             state.get("episode_env_reward", self.episode_env_reward)
@@ -319,13 +345,16 @@ class PPOLightningModule(LightningModule):
         self.training_updates = int(state.get("training_updates", self.training_updates))
 
     def close_env(self) -> None:
-        """Close the active environment if one has been created."""
-        if self.env is not None:
-            self.env.close()
-            self.env = None
-            self._active_task_env_id = None
-            self._last_state = None
-            self._hidden_state = None
+        """Close all active rollout environments."""
+        for env in self.envs:
+            if env is not None:
+                env.close()
+        self.env = None
+        self.envs = []
+        self._active_task_env_ids = []
+        self._last_states = []
+        self._slot_episode_indices = []
+        self._hidden_state = None
 
     def metrics_summary(self) -> dict[str, Any]:
         """Return stable final metrics for command-level artifact writing."""
@@ -335,6 +364,7 @@ class PPOLightningModule(LightningModule):
             "global_step": int(self.global_step),
             "env_frames": int(self.env_frames),
             "episodes": int(self.episodes),
+            "ppo_num_envs": int(self.num_envs),
             "episode_reward": float(self.episode_reward),
             "episode_env_reward": float(self.episode_env_reward),
             "episode_raw_reward": float(self.episode_raw_reward),
@@ -378,49 +408,82 @@ class PPOLightningModule(LightningModule):
         return self.metrics.to_payload(include_active=include_active)
 
     def _ensure_env(self) -> None:
-        if (
-            self.env is not None
-            and self._last_state is not None
-            and self._hidden_state is not None
-        ):
+        if self._vector_state_ready():
             return
-        self._reset_active_episode()
+        self._initialize_vector_state()
 
-    def _reset_active_episode(self) -> None:
-        task = self._task_for_current_episode()
+    def _vector_state_ready(self) -> bool:
+        return (
+            len(self.envs) == self.num_envs
+            and len(self._last_states) == self.num_envs
+            and all(env is not None for env in self.envs)
+            and all(state is not None for state in self._last_states)
+            and self._hidden_state is not None
+            and tuple(self._hidden_state.shape)
+            == (1, self.num_envs, int(self.policy.recurrent_hidden_size))
+        )
+
+    def _initialize_vector_state(self) -> None:
+        if len(self.envs) != self.num_envs:
+            self.close_env()
+            self.envs = [None for _ in range(self.num_envs)]
+            self._active_task_env_ids = [None for _ in range(self.num_envs)]
+            self._last_states = [None for _ in range(self.num_envs)]
+            self._slot_episode_indices = [None for _ in range(self.num_envs)]
+        self._hidden_state = self.policy.initial_state(self.num_envs, device=self.device)
+        self._ensure_task_feature_matrix()
+        for slot in range(self.num_envs):
+            self._reset_slot(slot)
+
+    def _reset_slot(self, slot: int) -> None:
+        slot = int(slot)
+        episode_index = self._next_episode_index
+        self._next_episode_index += 1
+        self._slot_episode_indices[slot] = episode_index
+        task = self._task_for_episode(episode_index)
         env_id = task.env_id if task is not None else self.config.env.id
-        if self.env is not None and self._active_task_env_id != env_id:
-            self.env.close()
-            self.env = None
-            self._last_state = None
-        if self.env is None:
+        env = self.envs[slot]
+        if env is not None and self._active_task_env_ids[slot] != env_id:
+            env.close()
+            self.envs[slot] = None
+            self._last_states[slot] = None
+            env = None
+        if env is None:
             active_config = self._config_for_env_id(env_id)
             if self._env_factory is None:
                 from mario_rl.envs import make_env
 
-                self.env = make_env(config=active_config.env.to_mario_env_config())
+                env = make_env(config=active_config.env.to_mario_env_config())
             else:
-                self.env = self._env_factory(active_config)
-            self._active_task_env_id = env_id
-            self._set_task_features_for_env_id(env_id)
-        assert self.env is not None
-        state, reset_info = self.env.reset(seed=self.config.env.seed)
+                env = self._env_factory(active_config)
+            self.envs[slot] = env
+            self._active_task_env_ids[slot] = env_id
+            self.env = self.envs[0]
+        self._set_task_features_for_slot(slot, env_id)
+        assert env is not None
+        state, reset_info = env.reset(seed=self._seed_for_episode(episode_index))
         self.metrics.start_episode(
             reset_info if isinstance(reset_info, dict) else None,
             fallback_env_id=env_id,
+            slot=slot,
         )
-        self._last_state = self._coerce_state(state)
-        self._hidden_state = self.policy.initial_state(1, device=self.device)
-        self.episode_reward = 0.0
-        self.episode_env_reward = 0.0
-        self.episode_raw_reward = 0.0
-        self.episode_unclipped_reward = 0.0
-        self.episode_clipped_reward = 0.0
+        self._last_states[slot] = self._coerce_state(state)
+        self._slot_episode_reward[slot] = 0.0
+        self._slot_episode_env_reward[slot] = 0.0
+        self._slot_episode_raw_reward[slot] = 0.0
+        self._slot_episode_unclipped_reward[slot] = 0.0
+        self._slot_episode_clipped_reward[slot] = 0.0
+        self._sync_episode_totals()
 
-    def _task_for_current_episode(self):
+    def _task_for_episode(self, episode_index: int):
         if self.task_suite is None:
             return None
-        return self.task_suite.task_for_episode(self.episodes)
+        return self.task_suite.task_for_episode(int(episode_index))
+
+    def _seed_for_episode(self, episode_index: int) -> int | None:
+        if self.config.env.seed is None:
+            return None
+        return int(self.config.env.seed) + int(episode_index)
 
     def _config_for_env_id(self, env_id: str) -> MarioRLConfig:
         if env_id == self.config.env.id:
@@ -430,106 +493,155 @@ class PPOLightningModule(LightningModule):
     def _collect_rollout(self) -> RolloutStorage:
         rollout = self._new_rollout_storage()
         while not rollout.full:
-            assert self.env is not None
-            assert self._last_state is not None
             assert self._hidden_state is not None
-            observation = self._last_state
+            observation = self._stack_observations()
             hidden_before = self._hidden_state.detach()
             state_tensor = torch.as_tensor(
                 observation,
                 device=self.device,
-            ).unsqueeze(0)
+            )
             with torch.no_grad():
                 output = self.policy(
                     state_tensor,
                     hidden_before,
-                    self._task_feature_tensor(batch_size=1),
+                    self._task_feature_tensor(),
                 )
                 distribution = Categorical(logits=output.policy_logits)
                 action_tensor = distribution.sample()
                 log_probability = distribution.log_prob(action_tensor)
                 value = output.value
 
-            action = int(action_tensor.detach().cpu().item())
-            next_state, reward, terminated, truncated, info = self.env.step(action)
-            transformed = self.reward_transformer.transform(
-                float(reward),
-                info if isinstance(info, dict) else None,
-            )
-            next_state = self._coerce_state(next_state)
-            info_map = info if isinstance(info, dict) else None
-            auxiliary_targets = extract_auxiliary_targets(
-                info_map,
-                transformed_reward=transformed.training_reward,
-                targets=self._auxiliary_target_names,
-            )
-            frames = int(info.get("frames_skipped", 1)) if isinstance(info, dict) else 1
-            rollout.insert(
-                observation,
-                action,
-                float(log_probability.detach().cpu().item()),
-                transformed.training_reward,
-                bool(terminated),
-                bool(truncated),
-                float(value.detach().cpu().item()),
-                hidden_before.detach().cpu().numpy(),
-                task_features=self._task_features,
-                env_reward=transformed.env_reward,
-                raw_reward=transformed.raw_reward,
-                unclipped_reward=transformed.unclipped_reward,
-                clipped_reward=transformed.clipped_reward,
-                frames_skipped=max(frames, 1),
-                auxiliary_targets=auxiliary_targets.values,
-                auxiliary_masks=auxiliary_targets.masks,
-            )
-            self.metrics.observe_step(
-                reward=float(reward),
-                transformed=transformed,
-                terminated=bool(terminated),
-                truncated=bool(truncated),
-                info=info_map,
-                fallback_env_id=self._active_task_env_id,
-                frame_count=max(frames, 1),
-            )
-            self.env_frames += max(frames, 1)
-            self.episode_reward += transformed.training_reward
-            self.episode_env_reward += transformed.env_reward
-            self.episode_raw_reward += transformed.raw_reward
-            if transformed.unclipped_reward is not None:
-                self.episode_unclipped_reward += transformed.unclipped_reward
-            if transformed.clipped_reward is not None:
-                self.episode_clipped_reward += transformed.clipped_reward
+            actions = action_tensor.detach().cpu().numpy().astype(np.int64)
+            log_probabilities = log_probability.detach().cpu().numpy().astype(np.float32)
+            values = value.detach().cpu().numpy().astype(np.float32)
+            rewards = np.zeros(self.num_envs, dtype=np.float32)
+            env_rewards = np.zeros(self.num_envs, dtype=np.float32)
+            raw_rewards = np.zeros(self.num_envs, dtype=np.float32)
+            unclipped_rewards = np.full(self.num_envs, np.nan, dtype=np.float32)
+            clipped_rewards = np.full(self.num_envs, np.nan, dtype=np.float32)
+            terminated_flags = np.zeros(self.num_envs, dtype=np.bool_)
+            truncated_flags = np.zeros(self.num_envs, dtype=np.bool_)
+            frames_skipped = np.ones(self.num_envs, dtype=np.int32)
+            auxiliary_values = {
+                name: np.zeros(self.num_envs, dtype=np.float32)
+                for name in self._auxiliary_target_names
+            }
+            auxiliary_masks = {
+                name: np.zeros(self.num_envs, dtype=np.bool_)
+                for name in self._auxiliary_target_names
+            }
 
-            self._hidden_state = output.hidden_state.detach()
-            if terminated or truncated:
-                self._hidden_state = self.policy.reset_recurrent_state(
-                    self._hidden_state,
-                    torch.ones(1, dtype=torch.bool, device=self.device),
+            for slot in range(self.num_envs):
+                env = self.envs[slot]
+                assert env is not None
+                next_state, reward, terminated, truncated, info = env.step(
+                    int(actions[slot])
                 )
-                self.metrics.finish_episode(
+                transformed = self.reward_transformer.transform(
+                    float(reward),
+                    info if isinstance(info, dict) else None,
+                )
+                next_state = self._coerce_state(next_state)
+                info_map = info if isinstance(info, dict) else None
+                auxiliary_targets = extract_auxiliary_targets(
+                    info_map,
+                    transformed_reward=transformed.training_reward,
+                    targets=self._auxiliary_target_names,
+                )
+                frames = (
+                    int(info.get("frames_skipped", 1))
+                    if isinstance(info, dict)
+                    else 1
+                )
+                frames = max(frames, 1)
+                rewards[slot] = transformed.training_reward
+                env_rewards[slot] = transformed.env_reward
+                raw_rewards[slot] = transformed.raw_reward
+                if transformed.unclipped_reward is not None:
+                    unclipped_rewards[slot] = transformed.unclipped_reward
+                if transformed.clipped_reward is not None:
+                    clipped_rewards[slot] = transformed.clipped_reward
+                terminated_flags[slot] = bool(terminated)
+                truncated_flags[slot] = bool(truncated)
+                frames_skipped[slot] = frames
+                for name in self._auxiliary_target_names:
+                    if name in auxiliary_targets.values:
+                        auxiliary_values[name][slot] = float(auxiliary_targets.values[name])
+                    if name in auxiliary_targets.masks:
+                        auxiliary_masks[name][slot] = bool(auxiliary_targets.masks[name])
+                self.metrics.observe_step(
+                    reward=float(reward),
+                    transformed=transformed,
                     terminated=bool(terminated),
                     truncated=bool(truncated),
+                    info=info_map,
+                    fallback_env_id=self._active_task_env_ids[slot],
+                    frame_count=frames,
+                    slot=slot,
                 )
-                self.episodes += 1
-                self._reset_active_episode()
-            else:
-                self._last_state = next_state
+                self.env_frames += frames
+                self._slot_episode_reward[slot] += transformed.training_reward
+                self._slot_episode_env_reward[slot] += transformed.env_reward
+                self._slot_episode_raw_reward[slot] += transformed.raw_reward
+                if transformed.unclipped_reward is not None:
+                    self._slot_episode_unclipped_reward[slot] += (
+                        transformed.unclipped_reward
+                    )
+                if transformed.clipped_reward is not None:
+                    self._slot_episode_clipped_reward[slot] += transformed.clipped_reward
+                self._last_states[slot] = next_state
+
+            rollout.insert(
+                observation,
+                actions,
+                log_probabilities,
+                rewards,
+                terminated_flags,
+                truncated_flags,
+                values,
+                hidden_before.detach().cpu().numpy(),
+                task_features=self._task_features,
+                env_reward=env_rewards,
+                raw_reward=raw_rewards,
+                unclipped_reward=unclipped_rewards,
+                clipped_reward=clipped_rewards,
+                frames_skipped=frames_skipped,
+                auxiliary_targets=auxiliary_values,
+                auxiliary_masks=auxiliary_masks,
+            )
+            self._hidden_state = output.hidden_state.detach()
+            done = terminated_flags | truncated_flags
+            if np.any(done):
+                self._hidden_state = self.policy.reset_recurrent_state(
+                    self._hidden_state,
+                    torch.as_tensor(done, dtype=torch.bool, device=self.device),
+                )
+                for slot, is_done in enumerate(done):
+                    if not bool(is_done):
+                        continue
+                    self.metrics.finish_episode(
+                        terminated=bool(terminated_flags[slot]),
+                        truncated=bool(truncated_flags[slot]),
+                        slot=slot,
+                    )
+                    self.episodes += 1
+                    self._reset_slot(slot)
+            self._sync_episode_totals()
         return rollout
 
     def _next_value(self) -> np.ndarray:
-        assert self._last_state is not None
         assert self._hidden_state is not None
         state_tensor = torch.as_tensor(
-            self._last_state,
+            self._stack_observations(),
             device=self.device,
-        ).unsqueeze(0)
+        )
         with torch.no_grad():
             output = self.policy(
                 state_tensor,
                 self._hidden_state,
-                self._task_feature_tensor(batch_size=1),
+                self._task_feature_tensor(),
             )
-        return output.value.detach().cpu().numpy().reshape(1)
+        return output.value.detach().cpu().numpy().reshape(self.num_envs)
 
     def _optimize_rollout(self, rollout: RolloutStorage) -> dict[str, torch.Tensor]:
         optimizer = self.optimizers()
@@ -626,7 +738,7 @@ class PPOLightningModule(LightningModule):
             task_feature_shape = (int(self.policy.task_feature_size),)
         return RolloutStorage(
             rollout_steps=int(self.config.ppo.rollout_steps),
-            num_envs=1,
+            num_envs=self.num_envs,
             observation_shape=tuple(self.config.replay.state_shape),
             observation_dtype=np.dtype(self.config.replay.sample_dtype),
             hidden_state_shape=(1, int(self.policy.recurrent_hidden_size)),
@@ -649,24 +761,56 @@ class PPOLightningModule(LightningModule):
                 "configured task feature size "
                 f"{feature_size} does not match encoder size {self.task_encoder.feature_size}"
             )
-        self._set_task_features_for_env_id(self.config.env.id)
+        self._ensure_task_feature_matrix()
+        self._set_task_features_for_slot(0, self.config.env.id)
 
-    def _set_task_features_for_env_id(self, env_id: str) -> None:
+    def _ensure_task_feature_matrix(self) -> None:
         if self.task_encoder is None:
             return
-        self._task_features = self.task_encoder.encode_env_id(env_id).vector
+        if (
+            self._task_features is None
+            or self._task_features.shape
+            != (self.num_envs, int(self.policy.task_feature_size))
+        ):
+            self._task_features = np.zeros(
+                (self.num_envs, int(self.policy.task_feature_size)),
+                dtype=np.float32,
+            )
 
-    def _task_feature_tensor(self, *, batch_size: int) -> torch.Tensor | None:
+    def _set_task_features_for_slot(self, slot: int, env_id: str) -> None:
+        if self.task_encoder is None:
+            return
+        self._ensure_task_feature_matrix()
+        assert self._task_features is not None
+        self._task_features[int(slot)] = self.task_encoder.encode_env_id(env_id).vector
+
+    def _task_feature_tensor(self) -> torch.Tensor | None:
         if self._task_features is None:
             return None
-        tensor = torch.as_tensor(
+        return torch.as_tensor(
             self._task_features,
             dtype=torch.float32,
             device=self.device,
-        ).unsqueeze(0)
-        if batch_size != 1:
-            tensor = tensor.expand(batch_size, -1)
-        return tensor
+        )
+
+    def _stack_observations(self) -> np.ndarray:
+        if len(self._last_states) != self.num_envs:
+            raise RuntimeError("PPO vector observations are not initialized")
+        states = []
+        for slot, state in enumerate(self._last_states):
+            if state is None:
+                raise RuntimeError(f"PPO vector slot {slot} has no observation")
+            states.append(state)
+        return np.stack(states, axis=0)
+
+    def _sync_episode_totals(self) -> None:
+        self.episode_reward = float(sum(self._slot_episode_reward))
+        self.episode_env_reward = float(sum(self._slot_episode_env_reward))
+        self.episode_raw_reward = float(sum(self._slot_episode_raw_reward))
+        self.episode_unclipped_reward = float(
+            sum(self._slot_episode_unclipped_reward)
+        )
+        self.episode_clipped_reward = float(sum(self._slot_episode_clipped_reward))
 
     def _coerce_state(self, state) -> np.ndarray:
         array = np.asarray(state, dtype=np.dtype(self.config.replay.sample_dtype))
@@ -674,6 +818,13 @@ class PPOLightningModule(LightningModule):
         if array.shape != expected:
             raise ValueError(f"expected observation shape {expected}, got {array.shape}")
         return array
+
+
+def _positive_int(value: int, name: str) -> int:
+    value = int(value)
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0")
+    return value
 
 
 __all__ = ["PPOLightningModule"]

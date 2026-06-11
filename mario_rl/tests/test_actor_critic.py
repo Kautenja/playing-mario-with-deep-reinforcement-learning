@@ -78,6 +78,53 @@ class RolloutStorageTest(TestCase):
         )
         self.assertTrue(np.all(storage.frames_skipped == 4))
 
+    def test_rollout_storage_accepts_vectorized_rows(self):
+        storage = RolloutStorage(
+            rollout_steps=2,
+            num_envs=2,
+            observation_shape=(4, 84, 84),
+            hidden_state_shape=(1, 8),
+            seed=123,
+        )
+        observation = np.zeros((2, 4, 84, 84), dtype=np.uint8)
+        hidden = np.ones((1, 2, 8), dtype=np.float32)
+
+        storage.insert(
+            observation,
+            np.array([0, 1]),
+            np.array([-0.1, -0.2], dtype=np.float32),
+            np.array([1.0, 2.0], dtype=np.float32),
+            np.array([False, True]),
+            np.array([False, False]),
+            np.array([0.5, 0.25], dtype=np.float32),
+            hidden,
+            frames_skipped=np.array([1, 4], dtype=np.int32),
+        )
+        storage.insert(
+            observation + 1,
+            np.array([2, 3]),
+            np.array([-0.3, -0.4], dtype=np.float32),
+            np.array([3.0, 4.0], dtype=np.float32),
+            np.array([True, False]),
+            np.array([False, False]),
+            np.array([0.0, 0.75], dtype=np.float32),
+            hidden * 2.0,
+            frames_skipped=np.array([2, 5], dtype=np.int32),
+        )
+
+        storage.compute_returns_and_advantages(
+            torch.tensor([0.0, 0.0]),
+            discount_factor=1.0,
+            gae_lambda=1.0,
+        )
+        batches = list(storage.minibatches(3, device="cpu", shuffle=False))
+
+        self.assertTrue(storage.full)
+        self.assertEqual((2, 2), storage.actions.shape)
+        self.assertEqual((3, 4, 84, 84), tuple(batches[0].observation.shape))
+        self.assertEqual((3, 1, 8), tuple(batches[0].hidden_state.shape))
+        self.assertTrue(np.array_equal(np.array([1, 4]), storage.frames_skipped[0]))
+
     def test_rollout_storage_resets_insert_position(self):
         storage = RolloutStorage(
             rollout_steps=1,
