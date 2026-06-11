@@ -13,7 +13,9 @@ from .wrappers import (
     DownsampleObservationEnv,
     FrameStackEnv,
     MaxFrameskipEnv,
+    OpenCVLiveRenderEnv,
     OpenCVRecordVideoEnv,
+    TrainingTimeoutEnv,
 )
 
 
@@ -34,6 +36,9 @@ def make_env(
     frame_stack=UNSET,
     clip_rewards=UNSET,
     record_statistics=UNSET,
+    max_episode_steps=UNSET,
+    no_progress_timeout_steps=UNSET,
+    stuck_penalty=UNSET,
     video_dir=UNSET,
     video_episode_trigger=UNSET,
     video_length=UNSET,
@@ -60,6 +65,9 @@ def make_env(
         "frame_stack": frame_stack,
         "clip_rewards": clip_rewards,
         "record_statistics": record_statistics,
+        "max_episode_steps": max_episode_steps,
+        "no_progress_timeout_steps": no_progress_timeout_steps,
+        "stuck_penalty": stuck_penalty,
         "video_dir": video_dir,
         "video_episode_trigger": video_episode_trigger,
         "video_length": video_length,
@@ -67,10 +75,11 @@ def make_env(
     }
     cfg: MarioEnvConfig = coerce_config(config, **overrides)
 
-    if cfg.video_dir is not None and cfg.render_mode != "rgb_array":
-        raise ValueError("video recording requires render_mode='rgb_array'")
+    if cfg.video_dir is not None and cfg.render_mode not in ("rgb_array", "human"):
+        raise ValueError("video recording requires render_mode='rgb_array' or 'human'")
 
-    env = gym_super_mario_bros.make(cfg.env_id, render_mode=cfg.render_mode)
+    base_render_mode = "rgb_array" if cfg.render_mode == "human" else cfg.render_mode
+    env = gym_super_mario_bros.make(cfg.env_id, render_mode=base_render_mode)
     resolved_action_set = resolve_action_set(cfg.action_set, env=env)
     if not resolved_action_set.native:
         env = JoypadSpace(env, resolved_action_set.actions)
@@ -101,6 +110,14 @@ def make_env(
     if cfg.clip_rewards:
         env = ClipRewardEnv(env)
 
+    if cfg.max_episode_steps is not None or cfg.no_progress_timeout_steps is not None:
+        env = TrainingTimeoutEnv(
+            env,
+            max_episode_steps=cfg.max_episode_steps,
+            no_progress_timeout_steps=cfg.no_progress_timeout_steps,
+            stuck_penalty=cfg.stuck_penalty,
+        )
+
     if cfg.record_statistics:
         env = gym.wrappers.RecordEpisodeStatistics(env)
 
@@ -112,6 +129,9 @@ def make_env(
             video_length=cfg.video_length,
             name_prefix=cfg.video_name_prefix,
         )
+
+    if cfg.render_mode == "human":
+        env = OpenCVLiveRenderEnv(env, window_name=cfg.env_id)
 
     env.mario_rl_action_set = resolved_action_set.name
     env.mario_rl_action_count = resolved_action_set.num_actions

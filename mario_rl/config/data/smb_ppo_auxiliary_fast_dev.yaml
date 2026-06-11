@@ -10,7 +10,7 @@ trainer:
 env:
   id: SuperMarioBros-1-1-v0
   render_mode: null
-  action_set: simple
+  action_set: complex
   seed: 123
   image_size: [40, 40]
   frame_stack: 4
@@ -21,6 +21,9 @@ env:
   channel_first: true
   interpolation: area
   record_statistics: true
+  max_episode_steps: 4000
+  no_progress_timeout_steps: 600
+  stuck_penalty: 0.01
   video_enabled: false
   video_dir: null
   video_length: 0

@@ -27,8 +27,8 @@ class TrainCliTest(TestCase):
 
             payload = json.loads(output.getvalue().splitlines()[-1])
             self.assertEqual("train", payload["command"])
-            self.assertEqual("simple", payload["action_set"])
-            self.assertEqual(7, payload["action_count"])
+            self.assertEqual("complex", payload["action_set"])
+            self.assertEqual(12, payload["action_count"])
             self.assertFalse(payload["native_action_space"])
             self.assertGreaterEqual(payload["global_step"], 1)
             self.assertEqual(config.train.max_steps, payload["env_frames"])
@@ -37,8 +37,8 @@ class TrainCliTest(TestCase):
             self.assertTrue(Path(payload["metrics_json"]).is_file())
             with Path(payload["metrics"]).open(newline="", encoding="utf-8") as stream:
                 metrics = list(csv.DictReader(stream))[-1]
-            self.assertEqual("simple", metrics["action_set"])
-            self.assertEqual("7", metrics["action_count"])
+            self.assertEqual("complex", metrics["action_set"])
+            self.assertEqual("12", metrics["action_count"])
             self.assertIn("metric_episode_count", metrics)
             self.assertIn("clear_rate", metrics)
             structured_metrics = json.loads(Path(payload["metrics_json"]).read_text())

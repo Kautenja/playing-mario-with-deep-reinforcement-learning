@@ -32,7 +32,9 @@ from .wrappers import (
     DownsampleObservationEnv,
     FrameStackEnv,
     MaxFrameskipEnv,
+    OpenCVLiveRenderEnv,
     OpenCVRecordVideoEnv,
+    TrainingTimeoutEnv,
 )
 
 
@@ -47,12 +49,14 @@ __all__ = [
     "MaxFrameskipEnv",
     "NATIVE_ACTION_COUNT",
     "NATIVE_ACTION_SET",
+    "OpenCVLiveRenderEnv",
     "OpenCVRecordVideoEnv",
     "ResolvedActionSet",
     "TaskFeatureEncoder",
     "TaskFeatures",
     "TaskSuite",
     "TaskSuiteConfig",
+    "TrainingTimeoutEnv",
     "UNKNOWN_TASK_VALUE",
     "action_set_summary",
     "available_env_ids",

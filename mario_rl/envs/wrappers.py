@@ -225,6 +225,147 @@ class ClipRewardEnv(gym.Wrapper):
         return obs, clipped_reward, terminated, truncated, info
 
 
+class TrainingTimeoutEnv(gym.Wrapper):
+    """Truncate training episodes that run too long or stop making progress."""
+
+    _PROGRESS_KEYS = (
+        "progress_max",
+        "position_progress_max",
+        "progress",
+        "position_progress",
+        "x_pos",
+        "x_position",
+    )
+
+    def __init__(
+        self,
+        env: gym.Env,
+        *,
+        max_episode_steps: int | None = 4000,
+        no_progress_timeout_steps: int | None = 600,
+        stuck_penalty: float = 0.01,
+    ):
+        super().__init__(env)
+        self.max_episode_steps = _positive_optional_int(
+            max_episode_steps,
+            "max_episode_steps",
+        )
+        self.no_progress_timeout_steps = _positive_optional_int(
+            no_progress_timeout_steps,
+            "no_progress_timeout_steps",
+        )
+        self.stuck_penalty = float(stuck_penalty)
+        self._episode_steps = 0
+        self._steps_since_progress = 0
+        self._best_progress = None
+
+    def reset(self, *, seed=None, options=None):
+        obs, info = self.env.reset(seed=seed, options=options)
+        self._episode_steps = 0
+        self._steps_since_progress = 0
+        self._best_progress = self._progress_value(info if isinstance(info, dict) else {})
+        return obs, info
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        info = dict(info)
+        self._episode_steps += 1
+        self._update_progress(info)
+        timeout = False
+        timeout_reason = None
+
+        if (
+            self.max_episode_steps is not None
+            and self._episode_steps >= self.max_episode_steps
+            and not terminated
+            and not truncated
+        ):
+            timeout = True
+            timeout_reason = "max_episode_steps"
+        elif (
+            self.no_progress_timeout_steps is not None
+            and self._steps_since_progress >= self.no_progress_timeout_steps
+            and not terminated
+            and not truncated
+        ):
+            timeout = True
+            timeout_reason = "no_progress"
+
+        if self.stuck_penalty and self._steps_since_progress > 0 and not terminated:
+            reward = float(reward) - self.stuck_penalty
+
+        if timeout:
+            truncated = True
+            info["timeout"] = True
+            info["training_timeout"] = True
+            info["training_timeout_reason"] = timeout_reason
+        info["episode_steps"] = self._episode_steps
+        info["no_progress_steps"] = self._steps_since_progress
+        return obs, float(reward), terminated, truncated, info
+
+    def _update_progress(self, info: dict[str, Any]) -> None:
+        progress = self._progress_value(info)
+        if progress is None:
+            return
+        if self._best_progress is None or progress > self._best_progress:
+            self._best_progress = progress
+            self._steps_since_progress = 0
+        else:
+            self._steps_since_progress += 1
+
+    @classmethod
+    def _progress_value(cls, info: dict[str, Any]) -> float | None:
+        for key in cls._PROGRESS_KEYS:
+            value = info.get(key)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+
+class OpenCVLiveRenderEnv(gym.Wrapper):
+    """Display rendered RGB frames with OpenCV after reset and every step."""
+
+    def __init__(
+        self,
+        env: gym.Env,
+        *,
+        window_name: str = "mario-rl",
+        wait_ms: int = 1,
+    ):
+        super().__init__(env)
+        self.window_name = str(window_name)
+        self.wait_ms = int(wait_ms)
+
+    def reset(self, *, seed=None, options=None):
+        obs, info = self.env.reset(seed=seed, options=options)
+        self._show_frame()
+        return obs, info
+
+    def step(self, action):
+        result = self.env.step(action)
+        self._show_frame()
+        return result
+
+    def close(self):
+        try:
+            cv2.destroyWindow(self.window_name)
+        except cv2.error:
+            pass
+        return self.env.close()
+
+    def _show_frame(self):
+        frame = self.env.render()
+        if frame is None:
+            raise RuntimeError("live rendering requires render_mode='rgb_array'")
+        frame = np.asarray(frame)
+        cv2.imshow(self.window_name, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+        cv2.waitKey(max(self.wait_ms, 1))
+
+
 class OpenCVRecordVideoEnv(gym.Wrapper):
     """Record rendered RGB frames to MP4 files with Gymnasium wrapper semantics."""
 
@@ -318,5 +459,16 @@ __all__ = [
     "DownsampleObservationEnv",
     "FrameStackEnv",
     "MaxFrameskipEnv",
+    "OpenCVLiveRenderEnv",
     "OpenCVRecordVideoEnv",
+    "TrainingTimeoutEnv",
 ]
+
+
+def _positive_optional_int(value, name: str) -> int | None:
+    if value is None:
+        return None
+    value = int(value)
+    if value <= 0:
+        return None
+    return value

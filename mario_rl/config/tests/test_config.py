@@ -58,6 +58,9 @@ class ConfigSchemaTest(TestCase):
             "frame_skip",
             "video_enabled",
             "record_statistics",
+            "max_episode_steps",
+            "no_progress_timeout_steps",
+            "stuck_penalty",
             "max_smoke_steps",
         ):
             self.assertIn(name, env_fields)
@@ -198,7 +201,7 @@ class ConfigSchemaTest(TestCase):
         self.assertEqual((84, 84), config.env.image_size)
         self.assertEqual((4, 84, 84), config.replay.state_shape)
         self.assertEqual(AUTO_NUM_ACTIONS, config.model.num_actions)
-        self.assertEqual(7, resolve_model_num_actions(config))
+        self.assertEqual(12, resolve_model_num_actions(config))
 
         conditioned = load("smb_dqn_task_conditioned_fast_dev")
         self.assertTrue(conditioned.model.task_conditioning)
